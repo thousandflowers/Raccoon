@@ -13,8 +13,11 @@ show_battery_help() {
 	echo "Show battery health, cycle count, and charging status"
 	echo ""
 	echo "Options:"
+	echo "  --json          Output in JSON format"
 	echo "  --help, -h      Show this help"
 }
+
+JSON_OUTPUT=false
 
 for arg in "$@"; do
 	case "$arg" in
@@ -22,9 +25,12 @@ for arg in "$@"; do
 		show_battery_help
 		exit 0
 		;;
+	--json)
+		JSON_OUTPUT=true
+		;;
 	*)
 		echo "Unknown option: $arg"
-		echo "Usage: rcc battery"
+		echo "Usage: rcc battery [--json]"
 		exit 1
 		;;
 	esac
@@ -69,12 +75,16 @@ get_battery_json() {
 	local cycle_count max_capacity condition charging full charge
 	IFS='|' read -r cycle_count max_capacity condition charging full charge <<<"$data"
 
-	cycle_count=$(echo "$cycle_count" | cut -d: -f2)
-	max_capacity=$(echo "$max_capacity" | cut -d: -f2)
-	condition=$(echo "$condition" | cut -d: -f2-)
-	charging=$(echo "$charging" | cut -d: -f2)
-	full=$(echo "$full" | cut -d: -f2)
-	charge=$(echo "$charge" | cut -d: -f2)
+	cycle_count=$(echo "$cycle_count" | cut -d: -f2 | tr -d ' ')
+	max_capacity=$(echo "$max_capacity" | cut -d: -f2 | tr -d ' ')
+	condition=$(echo "$condition" | cut -d: -f2- | tr -d '"')
+	charging=$(echo "$charging" | cut -d: -f2 | tr -d ' ')
+	full=$(echo "$full" | cut -d: -f2 | tr -d ' ')
+	charge=$(echo "$charge" | cut -d: -f2 | tr -d ' ')
+
+	[[ -z "$full" ]] && full="No"
+	[[ -z "$charge" ]] && charge=$(pmset -g batt 2>/dev/null | grep -oE '[0-9]+%' | head -1 | tr -d '%')
+	[[ -z "$charge" ]] && charge="0"
 
 	local health_color="green"
 	if [[ $max_capacity -lt 60 ]]; then
@@ -151,6 +161,11 @@ battery_display() {
 }
 
 main() {
+	if [[ "$JSON_OUTPUT" == "true" ]]; then
+		get_battery_json
+		exit 0
+	fi
+
 	print_section_header "Battery Status"
 
 	show_progress_bar \
