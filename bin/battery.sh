@@ -137,19 +137,15 @@ display_battery_status() {
 		health_percent="poor"
 	fi
 
-	echo ""
-	echo "Battery Health"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	print_section_header "Battery Health"
 	echo "  Cycle Count:      ${cycle_count:-N/A}"
 	echo "  Max Capacity:     ${health_color}${max_capacity}%${NC} (${health_percent})"
 	echo "  Condition:        ${condition:-N/A}"
-	echo ""
-	echo "Charge Status"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+	print_section_header "Charge Status"
 	echo "  Charge Level:     ${charge:-N/A}%"
 	echo "  Charging:         ${charging:-No}"
 	echo "  Fully Charged:    ${full:-No}"
-	echo ""
 }
 
 battery_fetch() {
