@@ -55,8 +55,6 @@ show_main_menu() {
 
     printf '\r\033[2K\n'
 
-    local idx=1
-    local desc=""
 printf '\r\033[2K%s\n' "$(show_menu_option 1 "ssh       Check SSH keys/config" "$([[ $selected -eq 1 ]] && echo true || echo false)")"
 	printf '\r\033[2K%s\n' "$(show_menu_option 2 "git       Check local git repos" "$([[ $selected -eq 2 ]] && echo true || echo false)")"
 	printf '\r\033[2K%s\n' "$(show_menu_option 3 "upgrade   Update package managers" "$([[ $selected -eq 3 ]] && echo true || echo false)")"
