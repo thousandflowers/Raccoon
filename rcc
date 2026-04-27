@@ -7,22 +7,19 @@ source "${SCRIPT_DIR}/lib/core/common.sh"
 source "${SCRIPT_DIR}/lib/core/commands.sh"
 
 main() {
-	case "${1:-""}" in
-	"")
-		show_brand_banner
-		interactive_main_menu
-		;;
-	"upgrade") exec "${SCRIPT_DIR}/bin/upgrade.sh" "${@:2}" ;;
-	"ports") exec "${SCRIPT_DIR}/bin/ports.sh" "${@:2}" ;;
-	"battery") exec "${SCRIPT_DIR}/bin/battery.sh" "${@:2}" ;;
-	"backup") exec "${SCRIPT_DIR}/bin/backup.sh" "${@:2}" ;;
-	"--version" | "-V") show_version ;;
-	"help" | "--help" | "-h") show_help ;;
-	*)
-		echo "Unknown command: $1"
-		show_help
-		exit 1
-		;;
+case "${1:-""}" in
+		"")
+			show_brand_banner
+			interactive_main_menu
+			;;
+		"upgrade") exec "${SCRIPT_DIR}/bin/upgrade.sh" "${@:2}" ;;
+		"ports")   exec "${SCRIPT_DIR}/bin/ports.sh" "${@:2}" ;;
+		"battery") exec "${SCRIPT_DIR}/bin/battery.sh" "${@:2}" ;;
+		"backup")  exec "${SCRIPT_DIR}/bin/backup.sh" "${@:2}" ;;
+		"env")     exec "${SCRIPT_DIR}/bin/env.sh" "${@:2}" ;;
+		"--version"|"-V") show_version ;;
+		"help"|"--help"|"-h") show_help ;;
+		*) echo "Unknown command: $1"; show_help; exit 1 ;;
 	esac
 }
 
