@@ -138,6 +138,10 @@ show_progress_bar() {
 		return 0
 	fi
 
+	local tmpfile
+	tmpfile=$(mktemp)
+	trap "rm -f $tmpfile" RETURN
+
 	local bar_width=10
 
 	render_bar() {
@@ -183,11 +187,10 @@ show_progress_bar() {
 			continue
 		fi
 
-		local step_output=""
 		local exit_code=0
 
 		if [[ "$is_tty" == "true" ]]; then
-			step_output=$(eval "$cmd" 2>&1) || exit_code=$?
+			eval "$cmd" > "$tmpfile" 2>&1 || exit_code=$?
 		else
 			set +e
 			eval "$cmd" 2>&1
@@ -195,8 +198,10 @@ show_progress_bar() {
 			set -e
 		fi
 
-		if [[ -n "$step_output" && "$is_tty" == "true" ]]; then
-			printf "\n%s\n" "$step_output"
+		if [[ -s "$tmpfile" && "$is_tty" == "true" ]]; then
+			printf "\n"
+			cat "$tmpfile"
+			printf "\n"
 			render_bar "$current" "$label"
 		fi
 
