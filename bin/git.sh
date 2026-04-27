@@ -104,7 +104,7 @@ check_repos() {
 		fi
 
 		local no_upstream
-		no_upstream=$(git branch -vv 2>/dev/null | grep -v '\[origin/' | grep -v '^\*' | wc -l | tr -d ' ')
+		no_upstream=$(git branch -vv 2>/dev/null | grep -v '\[' | grep -cE '^\s+\S' || true)
 		if [[ "$no_upstream" -gt 0 ]]; then
 			has_issue=1
 			output+="  ${YELLOW}${ICON_SKIP}${NC} $no_upstream branches without upstream"$'\n'
