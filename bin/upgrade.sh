@@ -10,7 +10,7 @@ source "$SCRIPT_DIR/../lib/core/common.sh"
 show_upgrade_help() {
 	echo "Usage: rcc upgrade [options]"
 	echo ""
-	echo "Update package managers: Homebrew, pip, npm, nvm"
+	echo "Update package managers: Homebrew, pip, npm, nvm, rustup, gem"
 	echo ""
 	echo "Options:"
 	echo "  --dry-run, -n    Show what would be upgraded without updating"
@@ -125,6 +125,46 @@ upgrade_nvm() {
 	nvm install --lts
 }
 
+upgrade_rustup() {
+	if ! command -v rustup >/dev/null 2>&1; then
+		echo -e "${GRAY}skipped (not installed)${NC}"
+		return 0
+	fi
+
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		local output
+		output=$(rustup check 2>&1 || true)
+		if [[ -n "$output" ]]; then
+			printf '%s\n' "$output" | sed 's/^/    /'
+		else
+			echo -e "    ${GRAY}All toolchains up to date${NC}"
+		fi
+		return 0
+	fi
+
+	rustup update
+}
+
+upgrade_gem() {
+	if ! command -v gem >/dev/null 2>&1; then
+		echo -e "${GRAY}skipped (not installed)${NC}"
+		return 0
+	fi
+
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		local output
+		output=$(gem outdated 2>&1 || true)
+		if [[ -n "$output" ]]; then
+			printf '%s\n' "$output" | sed 's/^/    /'
+		else
+			echo -e "    ${GRAY}All gems up to date${NC}"
+		fi
+		return 0
+	fi
+
+	gem update --system
+}
+
 main() {
 	print_section_header "Upgrade Package Managers"
 
@@ -136,7 +176,9 @@ main() {
 		"Homebrew:upgrade_homebrew" \
 		"pip:upgrade_pip" \
 		"npm:upgrade_npm" \
-		"nvm:upgrade_nvm"
+		"nvm:upgrade_nvm" \
+		"rustup:upgrade_rustup" \
+		"gem:upgrade_gem"
 }
 
 main "$@"
