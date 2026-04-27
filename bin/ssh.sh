@@ -121,6 +121,25 @@ check_key_permissions() {
 	fi
 }
 
+check_ssh_dir_permissions() {
+	echo ""
+	echo "Directory Permissions"
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+	if [[ -d "$SSH_DIR" ]]; then
+		local dir_perms
+		dir_perms=$(stat -f %A "$SSH_DIR" 2>/dev/null || echo "000")
+
+		if [[ "$dir_perms" != "700" ]]; then
+			echo -e "  ${RED}${ICON_ERROR} ~/.ssh ($dir_perms) - should be 700${NC}"
+		else
+			echo -e "  ${GRAY}~/.ssh (700 ✓)${NC}"
+		fi
+	else
+		echo -e "  ${GRAY}~/.ssh does not exist${NC}"
+	fi
+}
+
 check_ssh_config() {
 	echo ""
 	echo "SSH Config"
@@ -150,6 +169,7 @@ main() {
 	show_progress_bar \
 		"Unprotected keys:check_unprotected_keys" \
 		"Orphan keys:check_orphan_keys" \
+		"Directory permissions:check_ssh_dir_permissions" \
 		"Key permissions:check_key_permissions" \
 		"SSH config:check_ssh_config"
 }
