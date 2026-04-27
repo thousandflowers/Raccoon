@@ -30,10 +30,7 @@ for arg in "$@"; do
 	esac
 done
 
-main() {
-	print_section_header "Time Machine Backup"
-
-	# Check if TM is configured
+check_tm_destination() {
 	local dest
 	dest=$(tmutil destinationinfo 2>/dev/null | grep "Name:" | head -1 |
 		cut -d: -f2- | xargs 2>/dev/null || echo "")
@@ -46,8 +43,9 @@ main() {
 	fi
 
 	echo -e "  Destination:  ${GREEN}${dest}${NC}"
+}
 
-	# Last backup
+check_last_backup() {
 	local last_backup
 	last_backup=$(tmutil latestbackup 2>/dev/null || echo "")
 
@@ -56,7 +54,6 @@ main() {
 		return 0
 	fi
 
-	# Extract date from path (format: .../YYYY-MM-DD-HHMMSS)
 	local backup_date
 	backup_date=$(basename "$last_backup" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)
 
@@ -73,8 +70,14 @@ main() {
 	else
 		echo -e "  Last Backup:  ${RED}${backup_date} (${diff}h ago — overdue!)${NC}"
 	fi
+}
 
-	echo ""
+main() {
+	print_section_header "Time Machine Backup"
+
+	show_progress_bar \
+		"Check TM destination:check_tm_destination" \
+		"Check last backup:check_last_backup"
 }
 
 main "$@"
