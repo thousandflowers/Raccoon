@@ -30,6 +30,40 @@ brew tap thousandflowers/raccoon
 
 ## Commands
 
+### rcc ssh
+
+```bash
+━━ SSH Keys & Config
+
+[1/4] Unprotected keys... ✓
+[2/4] Orphan keys... ✓
+[3/4] Key permissions... ✓
+[4/4] SSH config... ✓
+✓ Completed: 4/4 passed
+```
+
+Checks SSH keys for:
+- Unprotected keys (no passphrase)
+- Orphan keys (private key without .pub)
+- Key permissions (should be 600)
+- SSH config (PasswordAuthentication, Host count)
+
+### rcc git
+
+```bash
+━━ Git Repository Check
+
+[1/2] Scanning repos... ✓
+[2/2] Checking status...
+  ~/Projects/myrepo
+    ○ 3 uncommitted changes
+    ○ 2 unpushed commits
+    ○ 1 stash
+✓ Completed: 2/2 passed
+```
+
+Scans for git repos in ~, ~/Desktop, ~/Documents, ~/Developer, ~/Projects, ~/dev, ~/code, ~/github and checks for uncommitted changes, unpushed commits, stashes, and detached HEAD.
+
 ### rcc upgrade [--dry-run]
 
 ```bash
@@ -71,11 +105,29 @@ Charge Status
 ```bash
 ━━ Time Machine Backup
 
-Time Machine Status
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[1/2] Checking status... ✓
   Destination:  My Backup Drive
   Last Backup:  2026-04-27 (2h ago)
+✓ Completed: 2/2 passed
 ```
+
+### rcc env
+
+```bash
+━━ Environment Check
+
+[1/4] PATH entries... ✓
+[2/4] Broken symlinks... ✓
+[3/4] Duplicates... ✓
+[4/4] Tool versions... ✓
+✓ Completed: 4/4 passed
+```
+
+Checks:
+- PATH entries (valid directories)
+- Broken symlinks in PATH
+- Duplicate PATH entries
+- Tool versions (git, curl, wget, python3, node, brew, docker)
 
 ## Pairs well with
 
