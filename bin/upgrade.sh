@@ -162,7 +162,7 @@ upgrade_gem() {
 		return 0
 	fi
 
-	gem update --system
+	gem update
 }
 
 main() {
