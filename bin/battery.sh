@@ -86,6 +86,13 @@ get_battery_json() {
 	[[ -z "$charge" ]] && charge=$(pmset -g batt 2>/dev/null | grep -oE '[0-9]+%' | head -1 | tr -d '%')
 	[[ -z "$charge" ]] && charge="0"
 
+	[[ "$charging" == "Yes" ]] && charging="true" || charging="false"
+	[[ "$full" == "Yes" ]] && full="true" || full="false"
+
+	[[ -z "$cycle_count" ]] && cycle_count=0
+	[[ -z "$max_capacity" ]] && max_capacity=0
+	[[ -z "$charge" ]] && charge=0
+
 	local health_color="green"
 	if [[ $max_capacity -lt 60 ]]; then
 		health_color="red"
