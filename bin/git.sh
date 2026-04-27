@@ -37,9 +37,6 @@ scan_repos() {
 
 	local search_dirs=(
 		"$HOME"
-		"$HOME/Mole"
-		"$HOME/Raccoon"
-		"$HOME/Documents/università"
 		"$HOME/Desktop"
 		"$HOME/Documents"
 		"$HOME/Developer"
@@ -47,6 +44,7 @@ scan_repos() {
 		"$HOME/dev"
 		"$HOME/code"
 		"$HOME/github"
+		"$HOME/workspace"
 	)
 
 	for dir in "${search_dirs[@]}"; do
