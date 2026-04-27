@@ -36,7 +36,53 @@ for arg in "$@"; do
 	esac
 done
 
+display_ports_json() {
+	local data
+	data=$(lsof -iTCP -iUDP -nP 2>/dev/null || true)
+
+	if [[ -z "$data" ]]; then
+		echo "[]"
+		return 0
+	fi
+
+	set +e
+
+	local json
+	json=$(echo "$data" | awk '
+		BEGIN { first=1 }
+		NR==1 && $1=="COMMAND" { next }
+		{
+			cmd=$1
+			port=$9
+			proto=$8
+			state=$10
+			n=split(port, a, ":")
+			port = a[n]
+			gsub(/[()]/, "", state)
+			if (port=="" || proto=="") next
+			key = port SUBSEP proto SUBSEP cmd SUBSEP state
+			if (!(key in seen)) {
+				seen[key]=1
+				gsub(/"/, "\\\"", cmd)
+				gsub(/"/, "\\\"", state)
+				if (first) first=0; else printf ","
+				printf "\n    {\"port\": \"%s\", \"proto\": \"%s\", \"process\": \"%s\", \"state\": \"%s\"}", port, proto, cmd, state
+			}
+		}
+		END { print "" }
+	')
+
+	set -e
+
+	echo "[$json"$'\n  ]'
+}
+
 main() {
+	if [[ "$JSON_OUTPUT" == "true" ]]; then
+		display_ports_json
+		exit 0
+	fi
+
 	print_section_header "Network Ports"
 
 	local data
