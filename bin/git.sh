@@ -103,6 +103,13 @@ check_repos() {
 			output+="  ${YELLOW}${ICON_SKIP}${NC} detached HEAD"$'\n'
 		fi
 
+		local no_upstream
+		no_upstream=$(git branch -vv 2>/dev/null | grep -v '\[origin/' | grep -v '^\*' | wc -l | tr -d ' ')
+		if [[ "$no_upstream" -gt 0 ]]; then
+			has_issue=1
+			output+="  ${YELLOW}${ICON_SKIP}${NC} $no_upstream branches without upstream"$'\n'
+		fi
+
 		if [[ $has_issue -eq 1 ]]; then
 			((repos_with_issues++))
 			echo ""
