@@ -4,6 +4,7 @@ VERSION="0.1.0"
 TAGLINE="Mac companion toolkit. Beyond Mole's scope."
 
 declare -a RCC_COMMANDS=(
+    "git:Check local git repositories"
     "upgrade:Update package managers"
     "ports:Show open ports and listeners"
     "battery:Battery health and cycle count"
@@ -55,13 +56,14 @@ show_main_menu() {
 
     local idx=1
     local desc=""
-printf '\r\033[2K%s\n' "$(show_menu_option 1 "upgrade   Update package managers" "$([[ $selected -eq 1 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 2 "ports     Show open ports/listeners" "$([[ $selected -eq 2 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 3 "battery   Battery health & cycle count" "$([[ $selected -eq 3 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 4 "backup    Verify Time Machine status" "$([[ $selected -eq 4 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 5 "env       Check environment" "$([[ $selected -eq 5 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 6 "help      Show help" "$([[ $selected -eq 6 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 7 "quit      Exit" "$([[ $selected -eq 7 ]] && echo true || echo false)")"
+printf '\r\033[2K%s\n' "$(show_menu_option 1 "git       Check local git repos" "$([[ $selected -eq 1 ]] && echo true || echo false)")"
+	printf '\r\033[2K%s\n' "$(show_menu_option 2 "upgrade   Update package managers" "$([[ $selected -eq 2 ]] && echo true || echo false)")"
+	printf '\r\033[2K%s\n' "$(show_menu_option 3 "ports     Show open ports/listeners" "$([[ $selected -eq 3 ]] && echo true || echo false)")"
+	printf '\r\033[2K%s\n' "$(show_menu_option 4 "battery   Battery health & cycle count" "$([[ $selected -eq 4 ]] && echo true || echo false)")"
+	printf '\r\033[2K%s\n' "$(show_menu_option 5 "backup    Verify Time Machine status" "$([[ $selected -eq 5 ]] && echo true || echo false)")"
+	printf '\r\033[2K%s\n' "$(show_menu_option 6 "env       Check environment" "$([[ $selected -eq 6 ]] && echo true || echo false)")"
+	printf '\r\033[2K%s\n' "$(show_menu_option 7 "help      Show help" "$([[ $selected -eq 7 ]] && echo true || echo false)")"
+	printf '\r\033[2K%s\n' "$(show_menu_option 8 "quit      Exit" "$([[ $selected -eq 8 ]] && echo true || echo false)")"
 
     if [[ -t 0 ]]; then
         printf '\r\033[2K\n'
@@ -93,26 +95,28 @@ interactive_main_menu() {
 
         case "$key" in
             "UP") ((current_option > 1)) && ((current_option--)) ;;
-            "DOWN") ((current_option < 7)) && ((current_option++)) ;;
+            "DOWN") ((current_option < 8)) && ((current_option++)) ;;
             "ENTER")
                 show_cursor
                 case $current_option in
-                    1) exec "${SCRIPT_DIR}/bin/upgrade.sh" ;;
-                    2) exec "${SCRIPT_DIR}/bin/ports.sh" ;;
-                    3) exec "${SCRIPT_DIR}/bin/battery.sh" ;;
-                    4) exec "${SCRIPT_DIR}/bin/backup.sh" ;;
-                    5) exec "${SCRIPT_DIR}/bin/env.sh" ;;
-                    6) show_help; exit 0 ;;
-                    7) cleanup_and_exit ;;
+                    1) exec "${SCRIPT_DIR}/bin/git.sh" ;;
+                    2) exec "${SCRIPT_DIR}/bin/upgrade.sh" ;;
+                    3) exec "${SCRIPT_DIR}/bin/ports.sh" ;;
+                    4) exec "${SCRIPT_DIR}/bin/battery.sh" ;;
+                    5) exec "${SCRIPT_DIR}/bin/backup.sh" ;;
+                    6) exec "${SCRIPT_DIR}/bin/env.sh" ;;
+                    7) show_help; exit 0 ;;
+                    8) cleanup_and_exit ;;
                 esac
                 ;;
-            "CHAR:1") show_cursor; exec "${SCRIPT_DIR}/bin/upgrade.sh" ;;
-            "CHAR:2") show_cursor; exec "${SCRIPT_DIR}/bin/ports.sh" ;;
-            "CHAR:3") show_cursor; exec "${SCRIPT_DIR}/bin/battery.sh" ;;
-            "CHAR:4") show_cursor; exec "${SCRIPT_DIR}/bin/backup.sh" ;;
-            "CHAR:5") show_cursor; exec "${SCRIPT_DIR}/bin/env.sh" ;;
-            "CHAR:6") show_cursor; show_help; exit 0 ;;
-            "CHAR:7") cleanup_and_exit ;;
+            "CHAR:1") show_cursor; exec "${SCRIPT_DIR}/bin/git.sh" ;;
+            "CHAR:2") show_cursor; exec "${SCRIPT_DIR}/bin/upgrade.sh" ;;
+            "CHAR:3") show_cursor; exec "${SCRIPT_DIR}/bin/ports.sh" ;;
+            "CHAR:4") show_cursor; exec "${SCRIPT_DIR}/bin/battery.sh" ;;
+            "CHAR:5") show_cursor; exec "${SCRIPT_DIR}/bin/backup.sh" ;;
+            "CHAR:6") show_cursor; exec "${SCRIPT_DIR}/bin/env.sh" ;;
+            "CHAR:7") show_cursor; show_help; exit 0 ;;
+            "CHAR:8") cleanup_and_exit ;;
             "QUIT") cleanup_and_exit ;;
         esac
 

@@ -12,6 +12,7 @@ case "${1:-""}" in
 			show_brand_banner
 			interactive_main_menu
 			;;
+		"git")     exec "${SCRIPT_DIR}/bin/git.sh" "${@:2}" ;;
 		"upgrade") exec "${SCRIPT_DIR}/bin/upgrade.sh" "${@:2}" ;;
 		"ports")   exec "${SCRIPT_DIR}/bin/ports.sh" "${@:2}" ;;
 		"battery") exec "${SCRIPT_DIR}/bin/battery.sh" "${@:2}" ;;
