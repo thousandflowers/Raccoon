@@ -30,8 +30,9 @@ Run `rcc` with no arguments to open the interactive menu.
 |---------|-------------|
 | **Core Tools** | |
 | `upgrade` | Update Homebrew, pip, npm, gem, and other package managers |
-| `audit` | Security audit (6 quick checks) |
-| `audit deep` | Full security audit (32 checks with sudo) |
+| `upgrade --dry-run` | Show what would be upgraded without updating |
+| `audit` | Security audit (30 checks: Core, Network, Auth, Persistence, Additional) |
+| `audit deep` | Full audit (+ Privacy checks: Location Services, Analytics) |
 | `audit quiet` | Audit output just counts: "pass warn fail" |
 | `audit fix` | Auto-fix common security issues |
 | `audit json` | Audit output in JSON format |

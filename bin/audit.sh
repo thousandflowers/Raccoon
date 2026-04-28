@@ -396,10 +396,6 @@ fix_issue() {
 run_core_checks() {
 	local -a core_results=()
 	
-	if [[ "$DEEP_SCAN" != "true" ]]; then
-		return
-	fi
-	
 	local fv_status
 	fv_status="$(sudo fdesetup status 2>/dev/null | grep -i "filevault is" | head -1)"
 	if echo "$fv_status" | grep -qi "enabled"; then
@@ -463,11 +459,6 @@ run_core_checks() {
 run_network_checks() {
 	local -a network_results=()
 	
-	if [[ "$DEEP_SCAN" != "true" ]]; then
-		return
-	fi
-	
-	local port_count
 	port_count="$(sudo lsof -i -P -n 2>/dev/null | grep LISTEN | wc -l 2>/dev/null)"
 	[[ -z "$port_count" ]] && port_count="0"
 	port_count="$(echo "$port_count" | sed 's/ *//g')"
@@ -530,10 +521,6 @@ run_network_checks() {
 
 run_auth_checks() {
 	local -a auth_results=()
-	
-	if [[ "$DEEP_SCAN" != "true" ]]; then
-		return
-	fi
 	
 	local auto_user
 	auto_user="$(sudo defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser 2>/dev/null)"
@@ -689,10 +676,6 @@ run_privacy_checks() {
 
 run_additional_checks() {
 	local -a additional_results=()
-	
-	if [[ "$DEEP_SCAN" != "true" ]]; then
-		return
-	fi
 	
 	local xprotect
 	xprotect="$(defaults read /Library/Preferences/com.apple.XprotectFramework XProtectData 2>/dev/null | head -1)"
