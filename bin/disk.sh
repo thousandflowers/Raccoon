@@ -83,10 +83,14 @@ main() {
 	printf "%-18s %12s %12s\n" "Container" "Size" "Free"
 	echo "${GRAY}────────────────────────────────────────────────────${NC}"
 	local container_info
-	container_info=$(diskutil apfs list 2>/dev/null | head -30)
+	container_info=$(diskutil apfs list 2>/dev/null)
+	local container_ref
+	container_ref=$(echo "$container_info" | grep "Container Reference:" | head -1 | awk '{print $NF}')
+	local container_size
+	container_size=$(echo "$container_info" | grep "Size (Capacity Ceiling):" | head -1 | awk '{gsub(/[()]/, "", $6); gsub(/[()]/, "", $7); print $6, $7}')
 	local container_free
-	container_free=$(echo "$container_info" | grep "Container Free" | head -1 | awk '{print $3, $4}' | xargs || echo "116 Gi")
-	printf "%-18s %12s %12s\n" "disk3" "494 Gi" "$container_free"
+	container_free=$(echo "$container_info" | grep "Capacity Not Allocated:" | head -1 | awk '{gsub(/[()]/, "", $6); gsub(/[()]/, "", $7); print $6, $7}')
+	printf "%-18s %12s %12s\n" "$container_ref" "$container_size" "$container_free"
 	echo "${GREEN}✓${NC}"
 
 	echo ""

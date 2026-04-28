@@ -26,29 +26,57 @@ Run `rcc` with no arguments to open the interactive menu.
 
 ### Commands
 
-| Command   | Description                                      |
-|-----------|--------------------------------------------------|
-| `upgrade` | Update Homebrew, pip, npm and other package managers |
-| `ports`   | Show open ports and active listeners             |
-| `battery` | Battery health, cycle count, and charge status   |
-| `backup`  | Verify Time Machine status and last backup date  |
-| `ssh`     | SSH key and config management helpers            |
-| `git`     | Git workflow utilities and diagnostics           |
-| `env`     | Display shell environment summary                |
-| `audit`   | Security audit (quick scan)                    |
-| `audit deep` | Full security audit (32 checks)            |
-| `network` | Network interfaces, DNS, open ports          |
-| `disk`    | Disk space and SMART status                   |
-| `memory`  | Processes by memory usage                     |
-| `startup` | Launch agents and login items                |
-| `trash`   | Trash contents and size                      |
-| `fonts`   | Font duplicates and corrupted                 |
-| `history` | Shell command history                        |
-| `certs`   | SSL certificates in keychain                 |
-| `docker`  | Docker images and containers                  |
-| `xcode`   | Xcode simulators and derived data             |
-| `--version` / `-V` | Print Raccoon version               |
-| `help` / `--help` / `-h` | Show help                      |
+| Command | Description |
+|---------|-------------|
+| **Core Tools** | |
+| `upgrade` | Update Homebrew, pip, npm, gem, and other package managers |
+| `audit` | Security audit (6 quick checks) |
+| `audit deep` | Full security audit (32 checks with sudo) |
+| `audit quiet` | Audit output just counts: "pass warn fail" |
+| `audit fix` | Auto-fix common security issues |
+| `audit json` | Audit output in JSON format |
+| `audit history` | Show audit history with diff |
+| `audit watch` | Schedule weekly audit via LaunchAgent |
+| **System** | |
+| `network` | Network interfaces, Wi-Fi signal, DNS, routing |
+| `disk` | Disk space, APFS container, SMART status |
+| `memory` | Processes sorted by memory usage |
+| `ports` | Open ports and listening services |
+| `battery` | Battery health, cycle count, temperature |
+| `backup` | Time Machine status and last backup date |
+| **Developer** | |
+| `ssh` | SSH key generation and management |
+| `git` | Git status, branches, stash, and cleanup |
+| `docker` | Docker images, containers, volumes |
+| `xcode` | Simulators, derived data, SPM packages |
+| **Maintenance** | |
+| `env` | Shell environment and PATH summary |
+| `startup` | Launch agents and login items |
+| `trash` | Trash contents and size |
+| `fonts` | Font duplicates and corrupted fonts |
+| `history` | Shell command history analysis |
+| `certs` | SSL certificates and expiration |
+| **Meta** | |
+| `--version` / `-V` | Print Raccoon version |
+| `help` / `--help` / `-h` | Show help |
+
+### Audit Options
+
+| Option | Description |
+|--------|-------------|
+| `--deep` | Run all 32 security checks (requires sudo) |
+| `--quiet` | Output just "pass warn fail" counts |
+| `--json` | Output in JSON format |
+| `--csv` | Output in CSV format |
+| `--html` | Output as HTML report |
+| `--report FILE` | Save report to file |
+| `--fix` | Auto-fix issues where possible |
+| `--fix --dry-run` | Show what would be fixed |
+| `--fix --force` | Skip confirmation prompts |
+| `--history` | Show audit history with diff |
+| `--diff` | Show changes since last audit |
+| `--watch` | Schedule weekly audit run |
+| `--notify` | Send notification on completion |
 
 ---
 
@@ -89,25 +117,25 @@ rm /usr/local/bin/rcc   # or ~/.local/bin/rcc
 Raccoon/
 ├── rcc              # Entry point and command dispatcher
 ├── install.sh       # One-line installer
-├── bin/             # Individual command scripts
+├─�� bin/             # Individual command scripts
 │   ├── upgrade.sh
+│   ├── audit.sh
+│   ├── network.sh
+│   ├── disk.sh
+│   ├── memory.sh
 │   ├── ports.sh
 │   ├── battery.sh
 │   ├── backup.sh
 │   ├── ssh.sh
 │   ├── git.sh
+│   ├── docker.sh
+│   ├── xcode.sh
 │   ├── env.sh
-│   ├── audit.sh
-│   ├── network.sh
-│   ├── disk.sh
-│   ├── memory.sh
 │   ├── startup.sh
 │   ├── trash.sh
 │   ├── fonts.sh
 │   ├── history.sh
-│   ├── certs.sh
-│   ├── docker.sh
-│   └── xcode.sh
+│   └── certs.sh
 └── lib/
     └── core/
         ├── common.sh    # Shared utilities and banner

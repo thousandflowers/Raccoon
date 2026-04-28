@@ -51,6 +51,39 @@ show_help() {
     show_version
 }
 
+show_commands() {
+    echo ""
+    echo -e "${PURPLE_BOLD}Available commands:${NC}"
+    echo ""
+    printf "%-14s %s\n" "upgrade" "Update packages (brew, pip, npm, gem)"
+    printf "%-14s %s\n" "audit" "Security audit (quick scan)"
+    printf "%-14s %s\n" "audit deep" "Full security audit (32 checks)"
+    printf "%-14s %s\n" "audit quiet" "Audit output: pass warn fail"
+    printf "%-14s %s\n" "audit fix" "Auto-fix security issues"
+    printf "%-14s %s\n" "audit json" "Audit in JSON format"
+    printf "%-14s %s\n" "audit history" "Audit history with diff"
+    printf "%-14s %s\n" "audit watch" "Schedule weekly audit"
+    printf "%-14s %s\n" "network" "Network interfaces, Wi-Fi, DNS"
+    printf "%-14s %s\n" "disk" "Disk space, APFS container"
+    printf "%-14s %s\n" "memory" "Processes by RAM usage"
+    printf "%-14s %s\n" "ssh" "SSH key management"
+    printf "%-14s %s\n" "git" "Git workflow helpers"
+    printf "%-14s %s\n" "ports" "Open ports and listeners"
+    printf "%-14s %s\n" "battery" "Battery health, cycles"
+    printf "%-14s %s\n" "backup" "Time Machine status"
+    printf "%-14s %s\n" "env" "Shell environment"
+    printf "%-14s %s\n" "startup" "Launch agents, login items"
+    printf "%-14s %s\n" "trash" "Trash contents"
+    printf "%-14s %s\n" "fonts" "Font duplicates"
+    printf "%-14s %s\n" "history" "Shell history"
+    printf "%-14s %s\n" "certs" "SSL certificates"
+    printf "%-14s %s\n" "docker" "Docker images, containers"
+    printf "%-14s %s\n" "xcode" "Xcode simulators"
+    echo ""
+    echo -e "${GRAY}Run '${GREEN}rcc${NC}' for interactive menu${NC}"
+    echo -e "${GRAY}Run '${GREEN}rcc help${NC}' for full help${NC}"
+}
+
 show_brand_banner() {
     echo ""
     echo -e "${GREEN}     _${NC}"

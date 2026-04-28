@@ -270,8 +270,10 @@ show_diff() {
 
 schedule_weekly() {
 	local plist_file="$HOME/Library/LaunchAgents/com.raccoon.audit.plist"
+	local audit_path
+	audit_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/audit.sh"
 	
-	cat > "$plist_file" << 'EOFPLIST'
+	cat > "$plist_file" << EOFPLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -280,7 +282,7 @@ schedule_weekly() {
 	<string>com.raccoon.audit</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/Users/eugeniozamengopontrelli/.raccoon/bin/audit.sh</string>
+		<string>${audit_path}</string>
 		<string>--deep</string>
 		<string>--json</string>
 		<string>--alert</string>
