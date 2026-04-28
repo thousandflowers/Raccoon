@@ -154,6 +154,8 @@ interactive_main_menu() {
     show_brand_banner
     
     while true; do
+        printf $'\033[2J\033[H]'
+        show_brand_banner
         show_menu $cur
         
         read -r -s -n 1 key
@@ -170,7 +172,5 @@ interactive_main_menu() {
             "") run_cmd $cur ;;
             q|Q) exit 0 ;;
         esac
-        
-        printf '\033[5A\r'
     done
 }
