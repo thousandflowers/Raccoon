@@ -152,11 +152,11 @@ interactive_main_menu() {
     trap 'show_cursor; exit 0' INT
     hide_cursor
     
-    printf '\033[2J\033[H'
-    show_brand_banner
-    show_menu $cur
-    
     while true; do
+        printf '\033[2J\033[H'
+        show_brand_banner
+        show_menu $cur
+        
         read -r -s -n 1 key
         case "$key" in
             $'\x1b')
@@ -171,8 +171,5 @@ interactive_main_menu() {
             "") show_cursor; run_cmd $cur ;;
             q|Q) show_cursor; exit 0 ;;
         esac
-        
-        printf '\033[H'
-        show_menu $cur
     done
 }
