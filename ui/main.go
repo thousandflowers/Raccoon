@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -21,7 +23,7 @@ type model struct {
 	selectedIdx int
 	hoverIdx    int
 	binPath     string
-	quitting    bool
+	quitting   bool
 }
 
 type item struct {
@@ -140,7 +142,7 @@ func (m model) View() string {
 		out += "\n"
 	}
 
-	out += "\n\033[90m←→ Navigate · ↑↓ Rows · Enter Run · Q Quit · Mouse Click\033[0m"
+	out += "\n\033[90m←→ Navigate · ↑↓ Rows · Enter Run · Q Quit\033[0m"
 
 	return out
 }
@@ -177,10 +179,21 @@ func main() {
 		binPath:     binPath,
 	}
 
+	fmt.Print("\033[?1000h")
 	fmt.Print("\033[2J\033[H]")
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		fmt.Print("\033[?1000l")
+		os.Exit(0)
+	}()
 
 	program := tea.NewProgram(m)
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 	}
+
+	fmt.Print("\033[?1000l")
 }
