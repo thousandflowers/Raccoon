@@ -151,15 +151,11 @@ interactive_main_menu() {
     
     trap 'exit 0' INT
     
-    if tput setaf 1 >/dev/null 2>&1; then
-        tput clear
-    else
-        printf $'\033[2J\033[H]'
-    fi
     show_brand_banner
     
     while true; do
         show_menu $cur
+        
         read -r -s -n 1 key
         case "$key" in
             $'\x1b')
@@ -175,10 +171,6 @@ interactive_main_menu() {
             q|Q) exit 0 ;;
         esac
         
-        if tput setaf 1 >/dev/null 2>&1; then
-            tput home
-        else
-            printf $'\033[H]'
-        fi
+        printf '\033[5A\r'
     done
 }
