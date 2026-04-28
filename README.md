@@ -4,14 +4,14 @@
 
 ```
      _
-   / \_/\_   Raccoon
-  ( o.o )   Mac companion toolkit. Beyond Mole's scope.
+   / _ /  Raccoon
+  ( o.o ) Mac companion toolkit. Beyond Mole's scope.
    > ^ <
 ```
 
 **Professional system administration for power users**
 
-[Install](#install) · [Commands](#commands) · [Audit](#security-audit) · [Menu](#interactive-menu)
+[Install](#install) - [Commands](#commands) - [Audit](#security-audit) - [Menu](#interactive-menu)
 
 </div>
 
@@ -160,7 +160,7 @@ $ rcc audit deep
 
 [User & Auth]
 ✓ Auto-Login: Disabled
-✓ Keychain: 2 available
+��� Keychain: 2 available
 ✓ SSH Keys: None
 ✓ Authorized Keys: None
 ✓ Sudoers: OK
@@ -203,7 +203,7 @@ rcc audit --fix           # Prompt to fix issues
 rcc audit --fix --dry-run # Show fixes without applying
 rcc audit --fix --force   # Apply fixes without prompt
 rcc audit --json          # JSON output
-rcc audit --csv          # CSV output
+rcc audit --csv           # CSV output
 rcc audit --html          # HTML report
 rcc audit --report file   # Save to file
 ```
@@ -218,8 +218,8 @@ Launch with `rcc` (no arguments):
 $ rcc
 
      _
-   / \_/\_   Raccoon
-  ( o.o )   Mac companion toolkit. Beyond Mole's scope.
+   / \_/  Raccoon
+  ( o.o ) Mac companion toolkit. Beyond Mole's scope.
    > ^ <
 
 ▶ 1. upgrade:Update packages
@@ -319,6 +319,6 @@ MIT License — see [LICENSE](LICENSE)
 
 <div align="center">
 
-**Made with ❤️ for macOS power users**
+**Made with for macOS power users**
 
 </div>
