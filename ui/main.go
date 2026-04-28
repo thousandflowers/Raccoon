@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -14,27 +13,42 @@ import (
 var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("86"))
+			Foreground(lipgloss.Color("86")).
+			MarginLeft(2)
+
+	itemStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245")).
+			Padding(0, 1, 0, 1)
+
+	selectedStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("86")).
+			Background(lipgloss.Color("236")).
+			Bold(true).
+			Padding(0, 1, 0, 1)
 
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240")).
 			MarginTop(1)
 )
 
+const (
+	cols    = 4
+	colWidth = 18
+)
+
 type model struct {
-	list     list.Model
-	binPath  string
-	quitting bool
+	items        []item
+	selectedIdx  int
+	binPath      string
+	quitting    bool
+	width        int
+	height       int
 }
 
-type MenuItem struct {
+type item struct {
 	title string
 	cmd   string
 }
-
-func (i MenuItem) Title() string       { return i.title }
-func (i MenuItem) Description() string { return "" }
-func (i MenuItem) FilterValue() string { return i.title }
 
 func (m model) Init() tea.Cmd {
 	return nil
@@ -43,7 +57,8 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.list.SetSize(msg.Width-4, msg.Height-8)
+		m.width = msg.Width
+		m.height = msg.Height
 		return m, nil
 
 	case tea.KeyMsg:
@@ -51,8 +66,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
+
+		case "left", "h":
+			if m.selectedIdx > 0 {
+				m.selectedIdx--
+			}
+
+		case "right", "l":
+			if m.selectedIdx < len(m.items)-1 {
+				m.selectedIdx++
+			}
+
+		case "up", "k":
+			if m.selectedIdx >= cols {
+				m.selectedIdx -= cols
+			}
+
+		case "down", "j":
+			row := m.selectedIdx / cols
+			nextRow := row + 1
+			nextIdx := nextRow*cols + (m.selectedIdx % cols)
+			if nextIdx < len(m.items) {
+				m.selectedIdx = nextIdx
+			}
+
 		case "enter":
-			selected := m.list.SelectedItem().(MenuItem)
+			selected := m.items[m.selectedIdx]
 			if selected.cmd != "" {
 				scriptPath := filepath.Join(m.binPath, selected.cmd)
 				cmd := exec.Command("bash", scriptPath)
@@ -60,13 +99,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmd.Stderr = os.Stderr
 				cmd.Run()
 			}
-			return m, nil
 		}
 	}
-
-	newList, cmd := m.list.Update(msg)
-	m.list = newList
-	return m, cmd
+	return m, nil
 }
 
 func (m model) View() string {
@@ -74,47 +109,65 @@ func (m model) View() string {
 		return ""
 	}
 
-	return titleStyle.Render("Raccoon") + "\n" +
-		"macOS companion toolkit\n\n" +
-		m.list.View() + "\n\n" +
-		helpStyle.Render("↑↓ Navigate · Enter Run · Q Quit")
+	// Title
+	out := titleStyle.Render("Raccoon") + "\n"
+	out += "macOS companion toolkit\n\n"
+
+	// Grid
+	rows := (len(m.items) + cols - 1) / cols
+
+	for row := 0; row < rows; row++ {
+		for col := 0; col < cols; col++ {
+			idx := row*cols + col
+			if idx >= len(m.items) {
+				break
+			}
+
+			itm := m.items[idx]
+			if idx == m.selectedIdx {
+				out += " " + selectedStyle.Render(itm.title) + " "
+			} else {
+				out += " " + itemStyle.Render(itm.title) + " "
+			}
+		}
+		out += "\n"
+	}
+
+	// Help
+	out += "\n" + helpStyle.Render("←→ Navigate · ↑↓ Rows · Enter Run · Q Quit")
+
+	return out
 }
 
 func main() {
 	home, _ := os.UserHomeDir()
 	binPath := filepath.Join(home, ".raccoon", "bin")
 
-	items := []list.Item{
-		MenuItem{title: "1. upgrade — Update packages", cmd: "upgrade.sh"},
-		MenuItem{title: "2. audit — Security audit", cmd: "audit.sh"},
-		MenuItem{title: "3. audit deep — Full audit", cmd: "audit.sh --deep"},
-		MenuItem{title: "4. network — Network info", cmd: "network.sh"},
-		MenuItem{title: "5. disk — Disk space", cmd: "disk.sh"},
-		MenuItem{title: "6. memory — Memory usage", cmd: "memory.sh"},
-		MenuItem{title: "7. ssh — SSH keys", cmd: "ssh.sh"},
-		MenuItem{title: "8. git — Git repos", cmd: "git.sh"},
-		MenuItem{title: "9. ports — Open ports", cmd: "ports.sh"},
-		MenuItem{title: "10. battery — Battery health", cmd: "battery.sh"},
-		MenuItem{title: "11. backup — Time Machine", cmd: "backup.sh"},
-		MenuItem{title: "12. env — Shell environment", cmd: "env.sh"},
-		MenuItem{title: "13. startup — Launch agents", cmd: "startup.sh"},
-		MenuItem{title: "14. trash — Trash contents", cmd: "trash.sh"},
-		MenuItem{title: "15. fonts — Font duplicates", cmd: "fonts.sh"},
-		MenuItem{title: "16. history — Shell history", cmd: "history.sh"},
-		MenuItem{title: "17. certs — SSL certificates", cmd: "certs.sh"},
-		MenuItem{title: "18. docker — Docker images", cmd: "docker.sh"},
-		MenuItem{title: "19. xcode — Xcode", cmd: "xcode.sh"},
+	items := []item{
+		{title: "upgrade", cmd: "upgrade.sh"},
+		{title: "audit", cmd: "audit.sh"},
+		{title: "network", cmd: "network.sh"},
+		{title: "disk", cmd: "disk.sh"},
+		{title: "memory", cmd: "memory.sh"},
+		{title: "ssh", cmd: "ssh.sh"},
+		{title: "git", cmd: "git.sh"},
+		{title: "ports", cmd: "ports.sh"},
+		{title: "battery", cmd: "battery.sh"},
+		{title: "backup", cmd: "backup.sh"},
+		{title: "env", cmd: "env.sh"},
+		{title: "startup", cmd: "startup.sh"},
+		{title: "trash", cmd: "trash.sh"},
+		{title: "fonts", cmd: "fonts.sh"},
+		{title: "history", cmd: "history.sh"},
+		{title: "certs", cmd: "certs.sh"},
+		{title: "docker", cmd: "docker.sh"},
+		{title: "xcode", cmd: "xcode.sh"},
 	}
 
-	l := list.New(items, list.NewDefaultDelegate(), 40, 20)
-	l.SetShowStatusBar(false)
-	l.SetFilteringEnabled(false)
-	l.SetShowHelp(false)
-	l.Title = ""
-
 	m := model{
-		list:    l,
-		binPath: binPath,
+		items:       items,
+		selectedIdx: 0,
+		binPath:     binPath,
 	}
 
 	fmt.Print("\033[2J\033[H]")
