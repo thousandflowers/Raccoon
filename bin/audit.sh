@@ -112,18 +112,32 @@ HISTORY_DIR="$HOME/.raccoon/audit-history"
 print_result() {
 	local status="$1"
 	local label="$2"
+	local icon=""
+	local colored_label=""
+	
 	if [[ "$status" == "pass" ]]; then
-		echo "${GREEN}✓${NC} $label"
-		((PASS_count++))
+		icon="${GREEN}✓${NC}"
+		colored_label="${GREEN}$label${NC}"
+		((PASS_count++)) || true
 	elif [[ "$status" == "warn" ]]; then
-		echo "${YELLOW}⚠${NC} $label"
-		((WARN_count++))
+		icon="${YELLOW}⚠${NC}"
+		colored_label="${YELLOW}$label${NC}"
+		((WARN_count++)) || true
 	elif [[ "$status" == "fail" ]]; then
-		echo "${RED}✗${NC} $label"
-		((FAIL_count++))
+		icon="${RED}✗${NC}"
+		colored_label="${RED}$label${NC}"
+		((FAIL_count++)) || true
 	else
-		echo "${GRAY}○${NC} $label"
+		icon="${GRAY}○${NC}"
+		colored_label="${GRAY}$label${NC}"
 	fi
+	
+	local raw_len=${#label}
+	local pad_len=$((34 - raw_len))
+	local padding
+	padding=$(printf '%*s' "$pad_len")
+	
+	printf "│ %s %s%s%s │\n" "$icon" "$colored_label" "$padding"
 }
 
 echo_result() {
@@ -138,31 +152,38 @@ print_category() {
 	local -a items=("$@")
 	
 	echo ""
-	echo "${CYAN}[$name]${NC}"
-	
+	echo "┌───────────────────────────────────────┐"
+	echo "│ ${CYAN}${name}${NC}                         │"
+	echo "├───────────────────────────────────────┤"
+
 	for item in "${items[@]}"; do
 		local status="$(echo "$item" | cut -d: -f1)"
 		local rest="$(echo "$item" | cut -d: -f2-)"
 		echo_result "$status" "$rest"
 	done
+	
+	echo "└───────────────────────────────────────┘"
 }
 
 print_summary() {
 	echo ""
-	echo "${PURPLE_BOLD}━━ Summary━━${NC}"
-	echo ""
-	echo "  ${GREEN}Pass:${NC}    $PASS_count"
-	echo "  ${YELLOW}Warning:${NC} $WARN_count"
-	echo "  ${RED}Fail:${NC}   $FAIL_count"
-	echo ""
-	
+	echo "┌───────────────────────────────────────┐"
+	echo "│ ${PURPLE_BOLD}Summary${NC}                           │"
+	echo "├───────────────────────────────────────┤"
+	printf "│ ${GREEN}Pass${NC}    │ %5s                     │\n" "$PASS_count"
+	printf "│ ${YELLOW}Warning${NC} │ %5s                     │\n" "$WARN_count"
+	printf "│ ${RED}Fail${NC}   │ %5s                     │\n" "$FAIL_count"
+	echo "├───────────────────────────────────────┤"
+
 	if [[ $FAIL_count -eq 0 && $WARN_count -eq 0 ]]; then
-		echo "  ${GREEN}${ICON_SUCCESS} All checks passed${NC}"
+		echo "│ ${GREEN}✓ All checks passed${NC}              │"
 	elif [[ $FAIL_count -eq 0 ]]; then
-		echo "  ${YELLOW}${ICON_REVIEW} No critical issues${NC}"
+		echo "│ ${YELLOW}⚠ No critical issues${NC}           │"
 	else
-		echo "  ${RED}${ICON_ERROR} Action required${NC}"
+		echo "│ ${RED}✗ Action required${NC}                │"
 	fi
+
+	echo "└───────────────────────────────────────┘"
 }
 
 save_to_history() {

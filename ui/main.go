@@ -10,15 +10,18 @@ import (
 )
 
 const (
-	cols    = 4
-	cellW   = 10
+	cols   = 4
+	cellW  = 10
+	cellH  = 1
+	header = 2
 )
 
 type model struct {
 	items       []item
 	selectedIdx int
+	hoverIdx    int
 	binPath     string
-	quitting   bool
+	quitting    bool
 }
 
 type item struct {
@@ -60,17 +63,51 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "enter":
-			selected := m.items[m.selectedIdx]
-			if selected.cmd != "" {
-				scriptPath := filepath.Join(m.binPath, selected.cmd)
-				cmd := exec.Command("bash", scriptPath)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				cmd.Run()
-			}
+			m.runSelected()
+		}
+
+	case tea.MouseMsg:
+		m.handleMouse(msg)
+	}
+
+	return m, nil
+}
+
+func (m *model) handleMouse(msg tea.MouseMsg) {
+	x := msg.X
+	y := msg.Y
+
+	if y < header {
+		return
+	}
+
+	row := y - header
+	col := x / cellW
+
+	idx := row*cols + col
+
+	if idx >= 0 && idx < len(m.items) {
+		switch msg.Type {
+		case tea.MouseMotion:
+			m.hoverIdx = idx
+		case tea.MouseLeft:
+			m.selectedIdx = idx
+			m.runSelected()
+		case tea.MouseRelease:
+			m.hoverIdx = idx
 		}
 	}
-	return m, nil
+}
+
+func (m *model) runSelected() {
+	selected := m.items[m.selectedIdx]
+	if selected.cmd != "" {
+		scriptPath := filepath.Join(m.binPath, selected.cmd)
+		cmd := exec.Command("bash", scriptPath)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Run()
+	}
 }
 
 func (m model) View() string {
@@ -91,8 +128,11 @@ func (m model) View() string {
 			}
 
 			itm := m.items[idx]
+
 			if idx == m.selectedIdx {
 				out += fmt.Sprintf(" \033[42m%-10s\033[0m ", itm.title)
+			} else if idx == m.hoverIdx {
+				out += fmt.Sprintf(" \033[1;37m[%-8s]\033[0m ", itm.title)
 			} else {
 				out += fmt.Sprintf(" %-10s ", itm.title)
 			}
@@ -100,7 +140,7 @@ func (m model) View() string {
 		out += "\n"
 	}
 
-	out += "\n\033[90m←→ Navigate · ↑↓ Rows · Enter Run · Q Quit\033[0m"
+	out += "\n\033[90m←→ Navigate · ↑↓ Rows · Enter Run · Q Quit · Mouse Click\033[0m"
 
 	return out
 }
@@ -133,6 +173,7 @@ func main() {
 	m := model{
 		items:       items,
 		selectedIdx: 0,
+		hoverIdx:    -1,
 		binPath:     binPath,
 	}
 
