@@ -1,6 +1,6 @@
 # 🦝 Raccoon
 
-> A Mac companion toolkit for power users.
+> A macOS companion toolkit for power users.
 
 Raccoon (`rcc`) is a lightweight Bash toolkit for macOS that surfaces the information and workflows you need most — network state, hardware health, package hygiene, SSH, Git — through a single unified CLI with an optional interactive menu.
 
@@ -106,9 +106,9 @@ rm /usr/local/bin/rcc   # or ~/.local/bin/rcc
 
 ---
 
-## Pairs well with
+## What Raccoon does
 
-[**Mole**](https://github.com/tw93/Mole) — Deep clean and optimize your Mac. Raccoon is designed as a complement to Mole, not a replacement.
+Raccoon focuses on system monitoring, diagnostics, and maintenance — not cleanup or optimization. It provides actionable insights into your Mac's health, network, security, and performance.
 
 ---
 

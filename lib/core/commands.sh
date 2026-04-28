@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 VERSION="0.1.0"
-TAGLINE="Mac companion toolkit. Beyond Mole's scope."
+TAGLINE="macOS companion toolkit"
 
 MENU_ITEMS=(
     "upgrade:Update packages"
