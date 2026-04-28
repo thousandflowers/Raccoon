@@ -9,15 +9,13 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-const (
-	cols = 4
-)
+const cols = 4
 
 type model struct {
 	items       []item
 	selectedIdx int
 	binPath     string
-	quitting    bool
+	quitting   bool
 }
 
 type item struct {
@@ -142,7 +140,7 @@ func main() {
 	}
 
 	program := tea.NewProgram(m)
-	if _, err := program.Run(); err != nil {
+	if err := program.Start(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 	}
 }

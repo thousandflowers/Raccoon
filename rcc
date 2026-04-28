@@ -8,15 +8,13 @@ UI_BINARY="${SCRIPT_DIR}/bin/rcc-ui"
 
 main() {
 	case "${1:-""}" in
-		"")
-			if [[ -x "$UI_BINARY" ]]; then
-				exec "$UI_BINARY"
-			else
-				source "${SCRIPT_DIR}/lib/core/common.sh"
-				source "${SCRIPT_DIR}/lib/core/commands.sh"
-				interactive_main_menu
-			fi
-			;;
+	"")
+		if [[ -x "$UI_BINARY" ]] && [[ -t 0 || -t 1 ]]; then
+			exec "$UI_BINARY" < /dev/tty > /dev/tty 2>&1
+		else
+			exec "${SCRIPT_DIR}/bin/menu.sh"
+		fi
+		;;
 		"upgrade") exec "${SCRIPT_DIR}/bin/upgrade.sh" "${@:2}" ;;
 		"audit")     exec "${SCRIPT_DIR}/bin/audit.sh" "${@:2}" ;;
 		"audit deep"|"audit-deep") exec "${SCRIPT_DIR}/bin/audit.sh" --deep "${@:2}" ;;
