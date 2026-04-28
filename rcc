@@ -4,13 +4,18 @@ set -euo pipefail
 
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
-source "${SCRIPT_DIR}/lib/core/common.sh"
-source "${SCRIPT_DIR}/lib/core/commands.sh"
+UI_BINARY="${SCRIPT_DIR}/bin/rcc-ui"
 
 main() {
-case "${1:-""}" in
+	case "${1:-""}" in
 		"")
-			interactive_main_menu
+			if [[ -x "$UI_BINARY" ]]; then
+				exec "$UI_BINARY"
+			else
+				source "${SCRIPT_DIR}/lib/core/common.sh"
+				source "${SCRIPT_DIR}/lib/core/commands.sh"
+				interactive_main_menu
+			fi
 			;;
 		"upgrade") exec "${SCRIPT_DIR}/bin/upgrade.sh" "${@:2}" ;;
 		"audit")     exec "${SCRIPT_DIR}/bin/audit.sh" "${@:2}" ;;
