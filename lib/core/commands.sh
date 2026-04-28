@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 
 VERSION="0.1.0"
 TAGLINE="Mac companion toolkit. Beyond Mole's scope."
@@ -33,6 +33,23 @@ MENU_ITEMS=(
 )
 
 TOTAL_OPTIONS=25
+
+show_version() {
+    echo "Raccoon version ${VERSION}"
+    echo "macOS companion toolkit"
+    echo ""
+    echo "Commands:"
+    for item in "${MENU_ITEMS[@]}"; do
+        [[ "$item" == "---" ]] && continue
+        echo "  rcc $item"
+    done
+    echo ""
+    echo "Run 'rcc' for interactive menu"
+}
+
+show_help() {
+    show_version
+}
 
 show_brand_banner() {
     echo ""
