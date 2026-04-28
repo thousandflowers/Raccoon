@@ -149,14 +149,17 @@ show_menu() {
 interactive_main_menu() {
     local cur=1
     
-    trap 'show_cursor; exit 0' INT
-    hide_cursor
+    trap 'exit 0' INT
+    
+    if tput setaf 1 >/dev/null 2>&1; then
+        tput clear
+    else
+        printf '\033[2J\033[H'
+    fi
+    show_brand_banner
     
     while true; do
-        printf '\033[2J\033[H'
-        show_brand_banner
         show_menu $cur
-        
         read -r -s -n 1 key
         case "$key" in
             $'\x1b')
@@ -168,8 +171,14 @@ interactive_main_menu() {
                 [[ $cur -eq 7 || $cur -eq 12 ]] && [[ "$t" == "A" ]] && cur=$((cur-1))
                 [[ $cur -eq 7 || $cur -eq 12 ]] && [[ "$t" == "B" ]] && cur=$((cur+1))
                 ;;
-            "") show_cursor; run_cmd $cur ;;
-            q|Q) show_cursor; exit 0 ;;
+            "") run_cmd $cur ;;
+            q|Q) exit 0 ;;
         esac
+        
+        if tput setaf 1 >/dev/null 2>&1; then
+            tput home
+        else
+            printf '\033[H'
+        fi
     done
 }
