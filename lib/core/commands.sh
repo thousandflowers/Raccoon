@@ -3,125 +3,129 @@
 VERSION="0.1.0"
 TAGLINE="Mac companion toolkit. Beyond Mole's scope."
 
-declare -a RCC_COMMANDS=(
-    "ssh:Check SSH keys and config"
-    "git:Check local git repositories"
-    "upgrade:Update package managers"
-    "ports:Show open ports and listeners"
-    "battery:Battery health and cycle count"
-    "backup:Verify Time Machine status"
-    "env:Check environment and PATH"
+MENU_ITEMS=(
+    "upgrade:Update packages"
+    "audit:Security audit (quick)"
+    "audit deep:Security audit (full)"
+    "network:Network info"
+    "disk:Disk space"
+    "memory:Memory usage"
+    "---"
+    "audit quiet:audit --quiet"
+    "audit fix:audit --fix"
+    "audit json:audit --json"
+    "audit history:audit --history"
+    "audit watch:audit --watch"
+    "---"
+    "ssh:SSH keys"
+    "git:Git repos"
+    "ports:Open ports"
+    "battery:Battery health"
+    "backup:Time Machine"
+    "env:Environment"
+    "startup:Launch agents"
+    "trash:Trash"
+    "fonts:Fonts"
+    "history:Shell history"
+    "certs:SSL certificates"
+    "docker:Docker"
+    "xcode:Xcode"
 )
 
+TOTAL_OPTIONS=25
+
 show_brand_banner() {
-    cat << EOF
-${GREEN}     _
-${GREEN}   / \\_/\\_   ${NC}Raccoon
-${GREEN}  ( o.o )   ${NC}${TAGLINE}
-${GREEN}   > ^ <
-
-EOF
-}
-
-show_version() {
-    echo "Raccoon version ${VERSION}"
-    echo "macOS companion toolkit"
+    echo ""
+    echo -e "${GREEN}     _${NC}"
+    echo -e "${GREEN}   / \_/\_   ${NC}Raccoon ${TAGLINE}"
+    echo -e "${GREEN}  ( o.o )  ${NC}"
+    echo -e "${GREEN}   > ^ <${NC}"
     echo ""
 }
 
-show_help() {
-    show_brand_banner
-    echo "Commands:"
-    for entry in "${RCC_COMMANDS[@]}"; do
-        local name="${entry%%:*}"
-        local desc="${entry#*:}"
-        printf "  %-12s %s\n" "rcc $name" "$desc"
+run_cmd() {
+    local c="$1"
+    case "$c" in
+        1) exec "${SCRIPT_DIR}/bin/upgrade.sh" ;;
+        2) exec "${SCRIPT_DIR}/bin/audit.sh" ;;
+        3) exec "${SCRIPT_DIR}/bin/audit.sh" --deep ;;
+        4) exec "${SCRIPT_DIR}/bin/network.sh" ;;
+        5) exec "${SCRIPT_DIR}/bin/disk.sh" ;;
+        6) exec "${SCRIPT_DIR}/bin/memory.sh" ;;
+        7) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --quiet ;;
+        8) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --fix ;;
+        9) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --json ;;
+        10) exec "${SCRIPT_DIR}/bin/audit.sh" --history ;;
+        11) exec "${SCRIPT_DIR}/bin/audit.sh" --watch ;;
+        13) exec "${SCRIPT_DIR}/bin/ssh.sh" ;;
+        14) exec "${SCRIPT_DIR}/bin/git.sh" ;;
+        15) exec "${SCRIPT_DIR}/bin/ports.sh" ;;
+        16) exec "${SCRIPT_DIR}/bin/battery.sh" ;;
+        17) exec "${SCRIPT_DIR}/bin/backup.sh" ;;
+        18) exec "${SCRIPT_DIR}/bin/env.sh" ;;
+        19) exec "${SCRIPT_DIR}/bin/startup.sh" ;;
+        20) exec "${SCRIPT_DIR}/bin/trash.sh" ;;
+        21) exec "${SCRIPT_DIR}/bin/fonts.sh" ;;
+        22) exec "${SCRIPT_DIR}/bin/history.sh" ;;
+        23) exec "${SCRIPT_DIR}/bin/certs.sh" ;;
+        24) exec "${SCRIPT_DIR}/bin/docker.sh" ;;
+        25) exec "${SCRIPT_DIR}/bin/xcode.sh" ;;
+    esac
+}
+
+show_menu() {
+    local sel="$1"
+    local n=1
+    local line=6
+    
+    while [[ $n -le $TOTAL_OPTIONS ]]; do
+        local item="${MENU_ITEMS[$((n-1))]}"
+        
+        if [[ "$item" == "---" ]]; then
+            echo -e "${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            line=$((line+1))
+            n=$((n+1))
+            continue
+        fi
+        
+        if [[ $n -eq $sel ]]; then
+            echo -e "${GREEN}▶ $n. $item${NC}"
+        else
+            echo "  $n. $item"
+        fi
+        line=$((line+1))
+        n=$((n+1))
     done
+    
     echo ""
-    printf "  %-12s %s\n" "rcc help" "Show this help"
-    printf "  %-12s %s\n" "rcc --version" "Show version"
-    echo ""
-    echo "Use 'rcc' without arguments for interactive menu"
-}
-
-show_main_menu() {
-    local selected="${1:-1}"
-
-    printf '\033[2J\033[H'
-
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        printf '\r\033[2K%s\n' "$line"
-    done <<< "$(show_brand_banner)"
-
-    printf '\r\033[2K\n'
-
-printf '\r\033[2K%s\n' "$(show_menu_option 1 "ssh       Check SSH keys/config" "$([[ $selected -eq 1 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 2 "git       Check local git repos" "$([[ $selected -eq 2 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 3 "upgrade   Update package managers" "$([[ $selected -eq 3 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 4 "ports     Show open ports/listeners" "$([[ $selected -eq 4 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 5 "battery   Battery health & cycle count" "$([[ $selected -eq 5 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 6 "backup    Verify Time Machine status" "$([[ $selected -eq 6 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 7 "env       Check environment" "$([[ $selected -eq 7 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 8 "help      Show help" "$([[ $selected -eq 8 ]] && echo true || echo false)")"
-	printf '\r\033[2K%s\n' "$(show_menu_option 9 "quit      Exit" "$([[ $selected -eq 9 ]] && echo true || echo false)")"
-
-    if [[ -t 0 ]]; then
-        printf '\r\033[2K\n'
-        printf '\r\033[2K%s\n' "${GRAY}↑↓  |  Enter  |  Q Quit${NC}"
-        printf '\r\033[2K\n'
-    fi
-
-    printf '\033[J'
+    echo -e "${GRAY}↑↓ Navigate | Enter | Q Quit${NC}"
 }
 
 interactive_main_menu() {
-    local current_option=1
-
-    cleanup_and_exit() {
-        show_cursor
-        exit 0
-    }
-
-    trap cleanup_and_exit INT
+    local cur=1
+    
+    trap 'show_cursor; exit 0' INT
     hide_cursor
-
+    
+    printf '\033[2J\033[H'
+    show_brand_banner
+    
     while true; do
-        show_main_menu $current_option
-
-        local key
-        if ! key=$(read_key); then
-            continue
-        fi
-
+        show_menu $cur
+        
+        read -r -s -n 1 key
         case "$key" in
-            "UP") ((current_option > 1)) && ((current_option--)) ;;
-            "DOWN") ((current_option < 9)) && ((current_option++)) ;;
-            "ENTER")
-                show_cursor
-                case $current_option in
-                    1) exec "${SCRIPT_DIR}/bin/ssh.sh" ;;
-                    2) exec "${SCRIPT_DIR}/bin/git.sh" ;;
-                    3) exec "${SCRIPT_DIR}/bin/upgrade.sh" ;;
-                    4) exec "${SCRIPT_DIR}/bin/ports.sh" ;;
-                    5) exec "${SCRIPT_DIR}/bin/battery.sh" ;;
-                    6) exec "${SCRIPT_DIR}/bin/backup.sh" ;;
-                    7) exec "${SCRIPT_DIR}/bin/env.sh" ;;
-                    8) show_help; exit 0 ;;
-                    9) cleanup_and_exit ;;
-                esac
+            $'\x1b')
+                read -r -s -n 1 t
+                [[ "$t" == "[" ]] || continue
+                read -r -s -n 1 t
+                [[ "$t" == "A" ]] && ((cur > 1)) && cur=$((cur-1))
+                [[ "$t" == "B" ]] && ((cur < TOTAL_OPTIONS)) && cur=$((cur+1))
+                [[ $cur -eq 7 || $cur -eq 12 ]] && [[ "$t" == "A" ]] && cur=$((cur-1))
+                [[ $cur -eq 7 || $cur -eq 12 ]] && [[ "$t" == "B" ]] && cur=$((cur+1))
                 ;;
-            "CHAR:1") show_cursor; exec "${SCRIPT_DIR}/bin/ssh.sh" ;;
-            "CHAR:2") show_cursor; exec "${SCRIPT_DIR}/bin/git.sh" ;;
-            "CHAR:3") show_cursor; exec "${SCRIPT_DIR}/bin/upgrade.sh" ;;
-            "CHAR:4") show_cursor; exec "${SCRIPT_DIR}/bin/ports.sh" ;;
-            "CHAR:5") show_cursor; exec "${SCRIPT_DIR}/bin/battery.sh" ;;
-            "CHAR:6") show_cursor; exec "${SCRIPT_DIR}/bin/backup.sh" ;;
-            "CHAR:7") show_cursor; exec "${SCRIPT_DIR}/bin/env.sh" ;;
-            "CHAR:8") show_cursor; show_help; exit 0 ;;
-            "CHAR:9") cleanup_and_exit ;;
-            "QUIT") cleanup_and_exit ;;
+            "") show_cursor; run_cmd $cur ;;
+            q|Q) show_cursor; clear; exit 0 ;;
         esac
-
-        drain_pending_input
     done
 }
