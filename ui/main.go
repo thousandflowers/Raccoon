@@ -4,26 +4,20 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 const (
-	cols   = 4
-	cellW  = 10
-	cellH  = 1
-	header = 2
+	cols = 4
 )
 
 type model struct {
 	items       []item
 	selectedIdx int
-	hoverIdx    int
 	binPath     string
-	quitting   bool
+	quitting    bool
 }
 
 type item struct {
@@ -67,38 +61,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			m.runSelected()
 		}
-
-	case tea.MouseMsg:
-		m.handleMouse(msg)
 	}
 
 	return m, nil
-}
-
-func (m *model) handleMouse(msg tea.MouseMsg) {
-	x := msg.X
-	y := msg.Y
-
-	if y < header {
-		return
-	}
-
-	row := y - header
-	col := x / cellW
-
-	idx := row*cols + col
-
-	if idx >= 0 && idx < len(m.items) {
-		switch msg.Type {
-		case tea.MouseMotion:
-			m.hoverIdx = idx
-		case tea.MouseLeft:
-			m.selectedIdx = idx
-			m.runSelected()
-		case tea.MouseRelease:
-			m.hoverIdx = idx
-		}
-	}
 }
 
 func (m *model) runSelected() {
@@ -133,8 +98,6 @@ func (m model) View() string {
 
 			if idx == m.selectedIdx {
 				out += fmt.Sprintf(" \033[42m%-10s\033[0m ", itm.title)
-			} else if idx == m.hoverIdx {
-				out += fmt.Sprintf(" \033[1;37m[%-8s]\033[0m ", itm.title)
 			} else {
 				out += fmt.Sprintf(" %-10s ", itm.title)
 			}
@@ -175,25 +138,11 @@ func main() {
 	m := model{
 		items:       items,
 		selectedIdx: 0,
-		hoverIdx:    -1,
 		binPath:     binPath,
 	}
-
-	fmt.Print("\033[?1000h")
-	fmt.Print("\033[2J\033[H]")
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		fmt.Print("\033[?1000l")
-		os.Exit(0)
-	}()
 
 	program := tea.NewProgram(m)
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 	}
-
-	fmt.Print("\033[?1000l")
 }
