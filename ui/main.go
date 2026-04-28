@@ -7,42 +7,18 @@ import (
 	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-)
-
-var (
-	titleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("86")).
-			MarginLeft(2)
-
-	itemStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("245")).
-			Padding(0, 1, 0, 1)
-
-	selectedStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("86")).
-			Background(lipgloss.Color("236")).
-			Bold(true).
-			Padding(0, 1, 0, 1)
-
-	helpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
-			MarginTop(1)
 )
 
 const (
 	cols    = 4
-	colWidth = 18
+	cellW   = 10
 )
 
 type model struct {
-	items        []item
-	selectedIdx  int
-	binPath      string
-	quitting    bool
-	width        int
-	height       int
+	items       []item
+	selectedIdx int
+	binPath     string
+	quitting   bool
 }
 
 type item struct {
@@ -56,11 +32,6 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		return m, nil
-
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
@@ -83,9 +54,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "down", "j":
-			row := m.selectedIdx / cols
-			nextRow := row + 1
-			nextIdx := nextRow*cols + (m.selectedIdx % cols)
+			nextIdx := m.selectedIdx + cols
 			if nextIdx < len(m.items) {
 				m.selectedIdx = nextIdx
 			}
@@ -109,11 +78,9 @@ func (m model) View() string {
 		return ""
 	}
 
-	// Title
-	out := titleStyle.Render("Raccoon") + "\n"
+	out := "\033[36mRaccoon\033[0m\n"
 	out += "macOS companion toolkit\n\n"
 
-	// Grid
 	rows := (len(m.items) + cols - 1) / cols
 
 	for row := 0; row < rows; row++ {
@@ -125,16 +92,15 @@ func (m model) View() string {
 
 			itm := m.items[idx]
 			if idx == m.selectedIdx {
-				out += " " + selectedStyle.Render(itm.title) + " "
+				out += fmt.Sprintf(" \033[42m%-10s\033[0m ", itm.title)
 			} else {
-				out += " " + itemStyle.Render(itm.title) + " "
+				out += fmt.Sprintf(" %-10s ", itm.title)
 			}
 		}
 		out += "\n"
 	}
 
-	// Help
-	out += "\n" + helpStyle.Render("←→ Navigate · ↑↓ Rows · Enter Run · Q Quit")
+	out += "\n\033[90m←→ Navigate · ↑↓ Rows · Enter Run · Q Quit\033[0m"
 
 	return out
 }
