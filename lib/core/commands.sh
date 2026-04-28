@@ -151,10 +151,11 @@ interactive_main_menu() {
     
     trap 'exit 0' INT
     
+    clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf $'\033[2J\033[H]'
     show_brand_banner
     
     while true; do
-        printf $'\033[2J\033[H]'
+        clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf $'\033[2J\033[H]'
         show_brand_banner
         show_menu $cur
         
