@@ -126,24 +126,19 @@ run_cmd() {
 show_menu() {
     local sel="$1"
     local n=1
-    local line=6
     
     while [[ $n -le $TOTAL_OPTIONS ]]; do
         local item="${MENU_ITEMS[$((n-1))]}"
         
         if [[ "$item" == "---" ]]; then
             echo -e "${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            line=$((line+1))
-            n=$((n+1))
-            continue
-        fi
-        
-        if [[ $n -eq $sel ]]; then
-            echo -e "${GREEN}▶ $n. $item${NC}"
         else
-            echo "  $n. $item"
+            if [[ $n -eq $sel ]]; then
+                echo -e "${GREEN}▶ $n. $item${NC}"
+            else
+                echo "  $n. $item"
+            fi
         fi
-        line=$((line+1))
         n=$((n+1))
     done
     
@@ -159,10 +154,9 @@ interactive_main_menu() {
     
     printf '\033[2J\033[H'
     show_brand_banner
+    show_menu $cur
     
     while true; do
-        show_menu $cur
-        
         read -r -s -n 1 key
         case "$key" in
             $'\x1b')
@@ -175,7 +169,10 @@ interactive_main_menu() {
                 [[ $cur -eq 7 || $cur -eq 12 ]] && [[ "$t" == "B" ]] && cur=$((cur+1))
                 ;;
             "") show_cursor; run_cmd $cur ;;
-            q|Q) show_cursor; clear; exit 0 ;;
+            q|Q) show_cursor; exit 0 ;;
         esac
+        
+        printf '\033[H'
+        show_menu $cur
     done
 }
