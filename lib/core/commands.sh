@@ -154,7 +154,7 @@ interactive_main_menu() {
     if tput setaf 1 >/dev/null 2>&1; then
         tput clear
     else
-        printf '\033[2J\033[H'
+        printf $'\033[2J\033[H]'
     fi
     show_brand_banner
     
@@ -178,7 +178,7 @@ interactive_main_menu() {
         if tput setaf 1 >/dev/null 2>&1; then
             tput home
         else
-            printf '\033[H'
+            printf $'\033[H]'
         fi
     done
 }
