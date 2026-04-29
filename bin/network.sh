@@ -94,33 +94,13 @@ get_latency() {
 	echo "$result"
 }
 
-print_header() {
-	local title="$1"
-	local cols="$2"
-	echo ""
-	echo "${GRAY}$title${NC}"
-	printf "%-12s %-15s %s\n" "Name" "Type" "Value"
-	echo "${GRAY}${cols}${NC}"
-}
 
-print_header_ports() {
-	local title="$1"
-	local cols="$2"
-	echo ""
-	echo "${GRAY}$title${NC}"
-	printf "%-8s %-15s %s\n" "Port" "Service" "Description"
-	echo "${GRAY}$cols${NC}"
-}
-
-print_header_simple() {
-	echo ""
-	echo "${GRAY}$1${NC}"
-}
 
 main() {
 	print_section_header "Network Status"
 
-	print_header "[1/10] Interfaces" "────────────────────────────────────────────────────"
+	print_section_header "[1/10] Interfaces"
+	print_table_header "Name|Type|Value" 12 15 30
 	for iface in lo0 en0 en1 utun0 utun1 utun2 utun3 utun4 utun5; do
 		local ip
 		ip=$(ifconfig "$iface" 2>/dev/null | grep "inet " | awk '{print $2}' || true)
@@ -145,7 +125,8 @@ main() {
 	done
 	echo "${GREEN}✓${NC}"
 
-	print_header_ports "[2/10] Listening Ports" "───────────────────────────────────────"
+	print_section_header "[2/10] Listening Ports"
+	print_table_header "Port|Service|Description" 8 15 30
 	local port_found=0
 	local ports
 	ports=$(lsof -i -P -n 2>/dev/null | grep LISTEN | grep -vE "^COMMAND" | awk '{print $2}' | sed 's/.*:://' | sed 's/(.*//' | sort -u || true)
@@ -174,7 +155,7 @@ main() {
 	fi
 	echo "${GREEN}✓${NC}"
 
-	print_header_simple "[3/10] Processes..."
+	print_section_header "[3/10] Processes..."
 	echo "  ${GRAY}Detected:${NC}"
 	local proc_found=0
 	local procs
@@ -194,7 +175,7 @@ main() {
 	fi
 	echo "${GREEN}✓${NC}"
 
-	print_header_simple "[4/10] Environment Proxies..."
+	print_section_header "[4/10] Environment Proxies..."
 	echo "  ${GRAY}Detected:${NC}"
 	local env_found=0
 	local proxies
@@ -210,7 +191,7 @@ main() {
 	fi
 	echo "${GREEN}✓${NC}"
 
-	print_header_simple "[5/10] NO_PROXY Config..."
+	print_section_header "[5/10] NO_PROXY Config..."
 	echo "  ${GRAY}Exclusions:${NC}"
 	local noproxy_found=0
 	local noproxy
@@ -224,7 +205,7 @@ main() {
 	fi
 	echo "${GREEN}✓${NC}"
 
-	print_header_simple "[6/10] VPNs (scutil --nc)..."
+	print_section_header "[6/10] VPNs (scutil --nc)..."
 	echo "  ${GRAY}Configured:${NC}"
 	local vpn_found=0
 	local vpns
@@ -246,7 +227,8 @@ main() {
 	fi
 	echo "${GREEN}✓${NC}"
 
-	print_header "[7/10] DNS Servers" "───────────────────────────────────────────────"
+	print_section_header "[7/10] DNS Servers"
+	print_table_header "Server|Label" 24 30
 	local dns_found=0
 	local dns_list=""
 	dns_list=$(scutil --dns 2>/dev/null | grep "nameserver" | head -5 | sed 's/.*: //' | sort -u || true)
@@ -269,7 +251,7 @@ main() {
 	fi
 	echo "${GREEN}✓${NC}"
 
-	print_header_simple "[8/10] Firewall Status..."
+	print_section_header "[8/10] Firewall Status..."
 	echo "  ${GRAY}Status:${NC}"
 	local fw_found=0
 	local awlf
@@ -291,7 +273,8 @@ main() {
 	fi
 	echo "${GREEN}✓${NC}"
 
-	print_header "[9/10] Latency & Connections" "─────────────────────────────────────────"
+	print_section_header "[9/10] Latency & Connections"
+	print_table_header "Server|Latency|Status" 12 8 10
 	local l8=$(get_latency "8.8.8.8")
 	local l1=$(get_latency "1.1.1.1")
 	local connections
@@ -304,7 +287,7 @@ main() {
 	[[ "$l8" != "N/A" || "$l1" != "N/A" ]] && add_confidence
 	echo "${GREEN}✓${NC}"
 
-	print_header_simple "[10/10] Summary..."
+	print_section_header "[10/10] Summary..."
 	local pct=$(( (confidence_score * 100) / 10 ))
 	local level
 	if [[ $pct -ge 80 ]]; then level="Certain"

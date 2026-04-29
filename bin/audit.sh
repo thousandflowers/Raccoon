@@ -152,9 +152,14 @@ print_category() {
 	shift
 	local -a items=("$@")
 	
+	local name_len=${#name}
+	local padding=$((37 - name_len))
+	local pad_str
+	pad_str=$(printf '%*s' "$padding" '')
+	
 	echo ""
 	echo "+---------------------------------------+"
-	echo "| ${CYAN}${name}${NC}                         |"
+	echo "| ${CYAN}${name}${NC}${pad_str}|"
 	echo "+---------------------------------------+"
 
 	for item in "${items[@]}"; do
@@ -812,6 +817,19 @@ main() {
 		sudo -v 2>/dev/null || true
 	fi
 	
+	if [[ "$QUIET_MODE" == "true" ]]; then
+		{
+			run_core_checks
+			run_network_checks
+			run_auth_checks
+			run_persistence_checks
+			run_privacy_checks
+			run_additional_checks
+		} > /dev/null 2>&1
+		echo "pass:${PASS_count} warn:${WARN_count} fail:${FAIL_count}"
+		return 0
+	fi
+
 	run_core_checks
 	run_network_checks
 	run_auth_checks
@@ -819,31 +837,25 @@ main() {
 	run_privacy_checks
 	run_additional_checks
 	
-	if [[ "$QUIET_MODE" == "true" ]]; then
-		return 0
-	fi
-	
 	print_summary
 
 	if [[ ${#FIX_QUEUE[@]} -gt 0 && "$AUTO_FIX" != "true" && "$OUTPUT_FORMAT" == "text" && "$QUIET_MODE" != "true" ]]; then
-		if [[ -t 0 || -t 1 ]]; then
+		echo ""
+		echo -n "Fix ${#FIX_QUEUE[@]} issue(s) automatically? [y/N] "
+		read -r answer
+		if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
 			echo ""
-			echo -n "Fix ${#FIX_QUEUE[@]} issue(s) automatically? [y/N] "
-			read -r answer
-			if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
-				echo ""
-				for item in "${FIX_QUEUE[@]}"; do
-					check_name="${item%%|*}"
-					fix_cmd="${item#*|}"
-					if [[ "$fix_cmd" == MANUAL:* ]]; then
-						echo "  ${YELLOW}→ Fixing: $check_name${NC}"
-						echo "  ${GRAY}ℹ Skipped: ${fix_cmd#MANUAL:}${NC}"
-					else
-						echo "  ${YELLOW}→ Fixing: $check_name${NC}"
-						eval "$fix_cmd" 2>/dev/null && echo "  ${GREEN}✓ Fixed${NC}" || echo "  ${RED}✗ Fix failed${NC}"
-					fi
-				done
-			fi
+			for item in "${FIX_QUEUE[@]}"; do
+				check_name="${item%%|*}"
+				fix_cmd="${item#*|}"
+				if [[ "$fix_cmd" == MANUAL:* ]]; then
+					echo "  ${YELLOW}→ Fixing: $check_name${NC}"
+					echo "  ${GRAY}ℹ Skipped: ${fix_cmd#MANUAL:}${NC}"
+				else
+					echo "  ${YELLOW}→ Fixing: $check_name${NC}"
+					eval "$fix_cmd" 2>/dev/null && echo "  ${GREEN}✓ Fixed${NC}" || echo "  ${RED}✗ Fix failed${NC}"
+				fi
+			done
 		fi
 	fi
 

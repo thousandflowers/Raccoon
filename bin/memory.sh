@@ -22,23 +22,26 @@ show_memory_help() {
 JSON_OUTPUT=false
 TOP_N=10
 
-for arg in "$@"; do
-	case "$arg" in
+while [[ $# -gt 0 ]]; do
+	case "$1" in
 	--help | -h)
 		show_memory_help
 		exit 0
 		;;
 	--json)
 		JSON_OUTPUT=true
+		shift
 		;;
 	--top)
 		TOP_N="${2:-10}"
-		shift
+		shift 2
 		;;
 	--top=*)
-		TOP_N="${arg#*=}"
+		TOP_N="${1#*=}"
+		shift
 		;;
 	*)
+		shift
 		;;
 	esac
 done
@@ -48,17 +51,24 @@ main() {
 
 	if [[ "$JSON_OUTPUT" == "true" ]]; then
 		echo "["
-		ps aux -m | awk -v top="$TOP_N" 'NR>1 && NR<=top+1 {print "  {\"pid\": "$2", \"rss\": "$6", \"command\": \""$11"\"}"}' | sed '$s/}/},\n/'
+		ps aux -m | awk -v top="$TOP_N" 'NR>1 && NR<=top+1 {print "  {\"pid\": " $2 ", \"rss\": " $6 ", \"command\": \"" $11 "\"}"}' | sed '$s/}/},\n/'
 		echo "]"
 		return 0
 	fi
 
-	print_table_header "PID|COMMAND|RSS (MB)" 8 30 8
+	print_table_header "PID|COMMAND|RSS (MB)" 8 30 10
 
-	ps aux -m | awk -v top="$TOP_N" 'NR>1 && NR<=top+1 {printf "| %s | %s | %s |\n", $2, $11, $6/1024}'
+	local -a processes=()
+	while IFS= read -r line; do
+		processes+=("$line")
+	done < <(ps aux -m | awk -v top="$TOP_N" 'NR>1 && NR<=top+1 {print $2 "|" $11 "|" int($6/1024)}')
+
+	for proc in "${processes[@]}"; do
+		print_table_row "$proc" 8 30 10
+		done
 
 	local total_rss
-	total_rss=$(ps aux -m | awk 'NR>1 {sum+=$6} END {print sum/1024}')
+	total_rss=$(ps aux -m | awk 'NR>1 {sum+=$6} END {print int(sum/1024)}')
 	echo ""
 	echo "| Total RSS: ${total_rss} MB |"
 

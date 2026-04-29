@@ -38,8 +38,7 @@ main() {
 	print_section_header "Disk Status"
 
 	echo "${GRAY}[1/5] Physical Disks...${NC}"
-	printf "| %-10s | %-12s | %-10s |\n" "Disk" "Size" "SMART"
-	echo "${GRAY}| ${NC}$(printf '%s' "$(printf ' %.0s' {1..10})" | tr ' ' '-') | ${NC}$(printf '%s' "$(printf ' %.0s' {1..12})" | tr ' ' '-') | ${NC}$(printf '%s' "$(printf ' %.0s' {1..10})" | tr ' ' '-') | ${NC}"
+	print_table_header "Disk|Size|SMART" 10 12 10
 
 	local disk_info
 	disk_info=$(diskutil info disk0 2>/dev/null)
@@ -55,51 +54,48 @@ main() {
 	else
 		smart_colored="${GRAY}N/A${NC}"
 	fi
-	printf "| %-10s | %-12s | %-10s |\n" "disk0" "$disk_size" "$smart_colored"
+	print_table_row "disk0|$disk_size|$smart_colored" 10 12 10
 	echo "${GREEN}✓${NC}"
 
 	echo ""
 	echo "${GRAY}[2/5] Volumes...${NC}"
-	printf "| %-18s | %-8s | %-10s | %-10s |\n" "Volume" "Type" "Used" "Free"
-	echo "${GRAY}| ${NC}$(printf '%s' "$(printf ' %.0s' {1..18})" | tr ' ' '-') | ${NC}$(printf '%s' "$(printf ' %.0s' {1..8})" | tr ' ' '-') | ${NC}$(printf '%s' "$(printf ' %.0s' {1..10})" | tr ' ' '-') | ${NC}$(printf '%s' "$(printf ' %.0s' {1..10})" | tr ' ' '-') | ${NC}"
+	print_table_header "Volume|Type|Used|Free" 18 8 10 10
 
 	root_info=$(df -h / | tail -1)
 	root_used=$(echo "$root_info" | awk '{print $3}')
 	root_free=$(echo "$root_info" | awk '{print $4}')
 	root_pct=$(echo "$root_info" | awk '{print $5}')
-	printf "| %-18s | %-8s | %-10s | %-10s |\n" "System" "APFS" "$root_used" "$root_free"
+	print_table_row "System|APFS|$root_used|$root_free" 18 8 10 10
 
 	data_info=$(df -h /System/Volumes/Data 2>/dev/null | tail -1 || echo "")
 	if [[ -n "$data_info" ]]; then
 		data_used=$(echo "$data_info" | awk '{print $3}')
 		data_free=$(echo "$data_info" | awk '{print $4}')
 		data_pct=$(echo "$data_info" | awk '{print $5}')
-		printf "| %-18s | %-8s | %-10s | %-10s |\n" "Data" "APFS" "$data_used" "$data_free"
+		print_table_row "Data|APFS|$data_used|$data_free" 18 8 10 10
 	fi
 
 	echo "${GREEN}✓${NC}"
 
 	echo ""
 	echo "${GRAY}[3/5] APFS Container...${NC}"
-	printf "| %-18s | %-12s | %-12s |\n" "Container" "Size" "Free"
-	echo "${GRAY}| ${NC}$(printf '%s' "$(printf ' %.0s' {1..18})" | tr ' ' '-') | ${NC}$(printf '%s' "$(printf ' %.0s' {1..12})" | tr ' ' '-') | ${NC}$(printf '%s' "$(printf ' %.0s' {1..12})" | tr ' ' '-') | ${NC}"
+	print_table_header "Container|Size|Free" 18 12 12
 
 	container_info=$(diskutil apfs list 2>/dev/null)
 	container_ref=$(echo "$container_info" | grep "Container Reference:" | head -1 | awk '{print $NF}')
 	container_size=$(echo "$container_info" | grep "Size (Capacity Ceiling):" | head -1 | sed 's/.*(\([0-9.]*\) GB.*/\1 GB/')
 	container_line=$(echo "$container_info" | grep "Capacity Not Allocated:" | head -1)
 	container_free=$(echo "$container_line" | sed 's/.*(\([0-9.]*\) GB.*/\1 GB/')
-	printf "| %-18s | %-12s | %-12s |\n" "$container_ref" "$container_size" "$container_free"
+	print_table_row "$container_ref|$container_size|$container_free" 18 12 12
 	echo "${GREEN}✓${NC}"
 
 	echo ""
 	echo "${GRAY}[4/5] Space Usage...${NC}"
-	printf "| %-18s | %-8s | %-10s | %-10s |\n" "Volume" "Used" "Free" "Percent"
-	echo "${GRAY}| ${NC}$(printf '%s' "$(printf ' %.0s' {1..18})" | tr ' ' '-') | ${NC}$(printf '%s' "$(printf ' %.0s' {1..8})" | tr ' ' '-') | ${NC}$(printf '%s' "$(printf ' %.0s' {1..10})" | tr ' ' '-') | ${NC}$(printf '%s' "$(printf ' %.0s' {1..10})" | tr ' ' '-') | ${NC}"
+	print_table_header "Volume|Used|Free|Percent" 18 8 10 10
 
-	printf "| %-18s | %-8s | %-10s | %-10s |\n" "System" "$root_used" "$root_free" "$root_pct"
-	if [[ -n "$data_used" ]]; then
-		printf "| %-18s | %-8s | %-10s | %-10s |\n" "Data" "$data_used" "$data_free" "$data_pct"
+	print_table_row "System|$root_used|$root_free|$root_pct" 18 8 10 10
+	if [[ -n "${data_used:-}" ]]; then
+		print_table_row "Data|$data_used|$data_free|$data_pct" 18 8 10 10
 	fi
 
 	echo "${GREEN}✓${NC}"

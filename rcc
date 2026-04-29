@@ -28,13 +28,17 @@ case "${1:-""}" in
 		"battery") exec "${SCRIPT_DIR}/bin/battery.sh" "${@:2}" ;;
 		"backup")  exec "${SCRIPT_DIR}/bin/backup.sh" "${@:2}" ;;
 		"env")     exec "${SCRIPT_DIR}/bin/env.sh" "${@:2}" ;;
-		"audit")     exec "${SCRIPT_DIR}/bin/audit.sh" "${@:2}" ;;
-		"audit fix") exec "${SCRIPT_DIR}/bin/audit.sh" --fix "${@:2}" ;;
-		"audit deep") exec "${SCRIPT_DIR}/bin/audit.sh" --deep "${@:2}" ;;
-		"audit quiet") exec "${SCRIPT_DIR}/bin/audit.sh" --deep --quiet "${@:2}" ;;
-		"audit json") exec "${SCRIPT_DIR}/bin/audit.sh" --deep --json "${@:2}" ;;
-		"audit history") exec "${SCRIPT_DIR}/bin/audit.sh" --history "${@:2}" ;;
-		"audit watch") exec "${SCRIPT_DIR}/bin/audit.sh" --watch "${@:2}" ;;
+		"audit")
+			case "${2:-}" in
+				"fix")   exec "${SCRIPT_DIR}/bin/audit.sh" --fix "${@:3}" ;;
+				"deep")  exec "${SCRIPT_DIR}/bin/audit.sh" --deep "${@:3}" ;;
+				"quiet") exec "${SCRIPT_DIR}/bin/audit.sh" --deep --quiet "${@:3}" ;;
+				"json")  exec "${SCRIPT_DIR}/bin/audit.sh" --deep --json "${@:3}" ;;
+				"history") exec "${SCRIPT_DIR}/bin/audit.sh" --history "${@:3}" ;;
+				"watch") exec "${SCRIPT_DIR}/bin/audit.sh" --watch "${@:3}" ;;
+				*)       exec "${SCRIPT_DIR}/bin/audit.sh" "${@:2}" ;;
+			esac
+			;;
 		"network") exec "${SCRIPT_DIR}/bin/network.sh" "${@:2}" ;;
 		"disk")    exec "${SCRIPT_DIR}/bin/disk.sh" "${@:2}" ;;
 		"memory")  exec "${SCRIPT_DIR}/bin/memory.sh" "${@:2}" ;;
