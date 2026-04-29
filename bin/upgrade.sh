@@ -53,7 +53,9 @@ upgrade_homebrew() {
 			print_table_row "brew|${GREEN}up to date${NC}"
 		fi
 	else
+		start_inline_spinner "Updating Homebrew..."
 		brew update 2>/dev/null && brew upgrade 2>/dev/null || true
+		stop_inline_spinner
 		print_table_row "brew|${GREEN}updated${NC}"
 	fi
 }
@@ -82,9 +84,11 @@ upgrade_pip() {
 			print_table_row "$pip_cmd|${GREEN}up to date${NC}"
 		fi
 	else
+		start_inline_spinner "Updating pip packages..."
 		$pip_cmd list --outdated --format=freeze 2>/dev/null |
 			grep -v '^\-e' | cut -d = -f 1 |
 			xargs -n1 $pip_cmd install --upgrade 2>/dev/null || true
+		stop_inline_spinner
 		print_table_row "$pip_cmd|${GREEN}updated${NC}"
 	fi
 }
@@ -103,7 +107,9 @@ upgrade_npm() {
 		npm outdated -g || true
 		print_table_row "npm|${YELLOW}check output above${NC}"
 	else
+		start_inline_spinner "Updating npm packages..."
 		npm update -g 2>/dev/null || true
+		stop_inline_spinner
 		print_table_row "npm|${GREEN}updated${NC}"
 	fi
 }
@@ -132,7 +138,9 @@ upgrade_nvm() {
 	else
 		export NVM_DIR="$nvm_dir"
 		source "$nvm_sh"
+		start_inline_spinner "Updating nvm..."
 		nvm install --lts 2>/dev/null || true
+		stop_inline_spinner
 		print_table_row "nvm|${GREEN}updated${NC}"
 	fi
 }
@@ -156,7 +164,9 @@ upgrade_rustup() {
 			print_table_row "rustup|${GREEN}up to date${NC}"
 		fi
 	else
+		start_inline_spinner "Updating rustup..."
 		rustup update 2>/dev/null || true
+		stop_inline_spinner
 		print_table_row "rustup|${GREEN}updated${NC}"
 	fi
 }
@@ -180,7 +190,9 @@ upgrade_gem() {
 			print_table_row "gem|${GREEN}up to date${NC}"
 		fi
 	else
+		start_inline_spinner "Updating gem..."
 		gem update 2>/dev/null || true
+		stop_inline_spinner
 		print_table_row "gem|${GREEN}updated${NC}"
 	fi
 }

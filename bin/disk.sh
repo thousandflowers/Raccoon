@@ -103,11 +103,11 @@ main() {
 	echo ""
 	echo "${GRAY}[5/5] SMART Status...${NC}"
 	if [[ "$smart" == "Verified" ]]; then
-		echo "| disk0: ${GREEN}Verified${NC}"
+		echo "  disk0: ${GREEN}Verified${NC}"
 	elif [[ "$smart" == "Failing" ]]; then
-		echo "| disk0: ${RED}Failing${NC}"
+		echo "  disk0: ${RED}Failing${NC}"
 	else
-		echo "| disk0: ${GRAY}N/A${NC}"
+		echo "  disk0: ${GRAY}N/A${NC}"
 	fi
 	echo "${GREEN}✓${NC}"
 

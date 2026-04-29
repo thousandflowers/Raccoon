@@ -12,10 +12,7 @@ main() {
 case "${1:-""}" in
 		"")
 			if [[ -x "$UI_BINARY" ]] && [[ -t 0 || -t 1 ]]; then
-				exec "$UI_BINARY" 2>/dev/null || {
-					show_brand_banner
-					interactive_main_menu
-				}
+				"$UI_BINARY"
 			else
 				show_brand_banner
 				interactive_main_menu

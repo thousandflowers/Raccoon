@@ -242,36 +242,6 @@ show_progress_bar() {
 	[[ $failed_count -gt 0 ]] && return 1 || return 0
 }
 
-print_header() {
-    local -a cols=("$@")
-    local width=14
-    echo -n "+"
-    for i in "${!cols[@]}"; do
-        printf "%${cols[$i]:s//-/$((width-2))s}+" | sed 's/ /-/g'
-    done | sed 's/.$/+/'
-    echo ""
-}
-
-print_row() {
-    local -a cols=("$@")
-    local width=14
-    echo -n "|"
-    for c in "${cols[@]}"; do
-        printf " %-*s |" "$((width-3))" "$c"
-    done
-    echo ""
-}
-
-print_footer() {
-    echo "+---------------------------------+"
-}
-
-print_key_value() {
-    local key="$1"
-    local value="$2"
-    printf "| %-13s | %-14s |\n" "$key" "$value"
-}
-
 print_table_header() {
     local sep="|"
     local cols="$1"

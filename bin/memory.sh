@@ -50,9 +50,11 @@ main() {
 	print_section_header "Memory Usage"
 
 	if [[ "$JSON_OUTPUT" == "true" ]]; then
-		echo "["
-		ps aux -m | awk -v top="$TOP_N" 'NR>1 && NR<=top+1 {print "  {\"pid\": " $2 ", \"rss\": " $6 ", \"command\": \"" $11 "\"}"}' | sed '$s/}/},\n/'
-		echo "]"
+		local tmpf
+		tmpf=$(mktemp)
+		ps aux -m | awk -v top="$TOP_N" 'NR>1 && NR<=top+1 {printf "{\"pid\": %s, \"rss\": %s, \"command\": \"%s\"}\n", $2, $6, $11}' > "$tmpf"
+		awk 'BEGIN{print "["} {if(NR>1) printf ",\n"; printf "  %s", $0} END{print "\n]"}' "$tmpf"
+		rm "$tmpf"
 		return 0
 	fi
 
