@@ -47,7 +47,7 @@ check_path_entries() {
 		fi
 	done <<< "${PATH}:"
 
-	print_table_row "${GRAY}Total: $count entries, $ missing missing${NC}|" 45 10
+	print_table_row "${GRAY}Total: $count entries, $missing missing${NC}|" 45 10
 }
 
 check_broken_symlinks() {
@@ -66,7 +66,7 @@ check_broken_symlinks() {
 				dir=$(dirname "$link")
 				target="$dir/$target"
 			fi
-			if [[ ! -e "$link" ]]; then
+			if [[ -L "$link" && ! -e "$link" ]]; then
 				((total++)) || true
 				local link_name
 				link_name=$(basename "$link")

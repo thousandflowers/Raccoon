@@ -45,7 +45,7 @@ main() {
 	fi
 
 	echo "${GRAY}[1/4] iOS Simulators...${NC}"
-	print_table_header "(xcrun simctl list devices)" 40
+	echo "  ${GRAY}Available simulators:${NC}"
 
 	local simulators
 	simulators=$(xcrun simctl list devices available 2>/dev/null | grep -E "iPhone|iPad" | head -10 || echo "")
@@ -79,7 +79,7 @@ main() {
 
 	echo ""
 	echo "${GRAY}[3/4] Device Support...${NC}"
-	print_table_header "(Platforms)" 40
+	echo "  ${GRAY}Installed platforms:${NC}"
 
 	local xcode_path
 	xcode_path=$(xcode-select -p 2>/dev/null | sed 's/\/Contents\/Developer//')
@@ -94,7 +94,7 @@ main() {
 
 	echo ""
 	echo "${GRAY}[4/4] Xcode Version...${NC}"
-	print_table_header "(xcodebuild -version)" 40
+	echo "  ${GRAY}Version info:${NC}"
 
 	local xcode_version
 	xcode_version=$(xcodebuild -version 2>/dev/null | head -2 || echo "Unknown")

@@ -35,6 +35,7 @@ check_tm_destination() {
 
 	print_section_header "Time Machine"
 
+	echo "${GRAY}[1/2] Destination...${NC}"
 	print_table_header "Setting|Value" 20 30
 
 	if [[ -z "$dest" ]]; then
@@ -49,6 +50,7 @@ check_last_backup() {
 	local last_backup
 	last_backup=$(tmutil latestbackup 2>/dev/null || echo "")
 
+	echo "${GRAY}[2/2] Last Backup...${NC}"
 	print_table_header "Last Backup|When" 20 30
 
 	if [[ -z "$last_backup" ]]; then

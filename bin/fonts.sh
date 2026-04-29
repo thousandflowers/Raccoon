@@ -37,6 +37,7 @@ done
 main() {
 	print_section_header "Fonts Status"
 
+	echo "${GRAY}[1/4] System Fonts...${NC}"
 	print_table_header "Source|Count" 25 20
 
 	local sys_fonts
@@ -45,6 +46,13 @@ main() {
 
 	local user_fonts
 	user_fonts=$(ls -1 ~/Library/Fonts/ 2>/dev/null | wc -l | xargs || echo "0")
+	print_table_row "~/Library/Fonts/|$user_fonts" 25 20
+
+	echo "${GREEN}✓${NC}"
+
+	echo ""
+	echo "${GRAY}[2/4] User Fonts...${NC}"
+	print_table_header "Source|Count" 25 20
 	print_table_row "~/Library/Fonts/|$user_fonts" 25 20
 
 	echo "${GREEN}✓${NC}"

@@ -97,6 +97,8 @@ show_brand_banner() {
     echo ""
 }
 
+# Used by the bash fallback menu (when Go UI is not available)
+# SCRIPT_DIR is inherited from rcc which sources this file
 run_cmd() {
     # Reset completo del terminale prima di ogni comando
     printf '\r'

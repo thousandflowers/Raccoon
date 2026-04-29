@@ -49,60 +49,75 @@ SCHEDULE_WEEKLY=false
 ALERT_ON_ISSUES=false
 NOTIFY=false
 
-for arg in "$@"; do
-	case "$arg" in
+while [[ $# -gt 0 ]]; do
+	case "$1" in
 	--help | -h)
 		show_audit_help
 		exit 0
 		;;
 	--deep)
 		DEEP_SCAN=true
+		shift
 		;;
 	--fix)
 		AUTO_FIX=true
+		shift
 		;;
 	--dry-run)
 		FIX_DRY_RUN=true
+		shift
 		;;
 	--force)
 		FIX_FORCE=true
+		shift
 		;;
 	--quiet | -q)
 		QUIET_MODE=true
 		DEEP_SCAN=true
+		shift
 		;;
 	--report)
 		REPORT_FILE="$2"
-		shift
+		shift 2
 		;;
 	--report=*)
-		REPORT_FILE="${arg#--report=}"
+		REPORT_FILE="${1#--report=}"
+		shift
 		;;
 	--html)
 		OUTPUT_FORMAT="html"
+		shift
 		;;
 	--csv)
 		OUTPUT_FORMAT="csv"
+		shift
 		;;
 	--json)
 		OUTPUT_FORMAT="json"
+		shift
 		;;
 	--history)
 		SHOW_HISTORY=true
+		shift
 		;;
 	--diff)
 		SHOW_DIFF=true
+		shift
 		;;
 	--watch)
 		SCHEDULE_WEEKLY=true
+		shift
 		;;
 	--alert)
 		ALERT_ON_ISSUES=true
+		shift
 		;;
 	--notify)
 		NOTIFY=true
+		shift
 		;;
 	*)
+		shift
 		;;
 	esac
 done

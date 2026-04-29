@@ -44,6 +44,7 @@ main() {
 
 	local trash_path="$HOME/.Trash"
 
+	echo "${GRAY}[1/3] Trash Location...${NC}"
 	print_table_header "Setting|Value" 20 30
 	print_table_row "Path|$trash_path" 20 30
 	echo "${GREEN}✓${NC}"

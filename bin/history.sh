@@ -37,42 +37,37 @@ done
 main() {
 	print_section_header "Shell History"
 
-	echo "+-------------+------------+"
-	echo "| Shell      | Commands   |"
-	echo "+-------------+------------+"
+	echo "${GRAY}[1/2] Command Counts...${NC}"
+	print_table_header "Shell|Commands" 10 10
 
 	local zsh_history="$HOME/.zsh_history"
 	local zsh_lines=0
 	if [[ -f "$zsh_history" ]]; then
 		zsh_lines=$(wc -l < "$zsh_history" | xargs || echo "0")
 	fi
-	printf "| ${CYAN}%-9s${NC} | %9s |\n" "zsh" "$zsh_lines"
+	print_table_row "zsh|$zsh_lines" 10 10
 
 	local bash_history="$HOME/.bash_history"
 	local bash_lines=0
 	if [[ -f "$bash_history" ]]; then
 		bash_lines=$(wc -l < "$bash_history" | xargs || echo "0")
 	fi
-	printf "| ${CYAN}%-9s${NC} | %9s |\n" "bash" "$bash_lines"
+	print_table_row "bash|$bash_lines" 10 10
 
 	local fish_history="$HOME/.local/share/fish/history/default"
 	local fish_lines=0
 	if [[ -f "$fish_history" ]]; then
 		fish_lines=$(wc -l < "$fish_history" 2>/dev/null | xargs || echo "0")
 	fi
-	printf "| ${CYAN}%-9s${NC} | %9s |\n" "fish" "$fish_lines"
-
-	echo "+-------------+------------+"
+	print_table_row "fish|$fish_lines" 10 10
 
 	local total=$((zsh_lines + bash_lines + fish_lines))
-	printf "| ${GRAY}Total${NC}     | %9s |\n" "$total"
-
-	echo "+-------------+------------+"
+	print_table_row "${GRAY}Total${NC}|$total" 10 10
+	echo "${GREEN}✓${NC}"
 
 	echo ""
-	echo "+-------------------------------------+"
-	echo "| Recent Commands                     |"
-	echo "+-------------------------------------+"
+	echo "${GRAY}[2/2] Recent Commands...${NC}"
+	print_table_header "Recent Command" 35
 
 	local recent_count=0
 	if [[ -f "$zsh_history" ]]; then
@@ -81,7 +76,7 @@ main() {
 			local cmd
 			cmd=$(echo "$line" | awk '{print $1}' | xargs || echo "")
 			[[ -n "$cmd" ]] && {
-				printf "│ %-34s │\n" "$cmd"
+				print_table_row "$cmd" 35
 				((recent_count++)) || true
 				[[ $recent_count -ge 5 ]] && break
 			}
@@ -89,10 +84,10 @@ main() {
 	fi
 
 	if [[ $recent_count -eq 0 ]]; then
-		echo "│ ${GRAY}No recent commands${NC}            │"
+		print_table_row "${GRAY}No recent commands${NC}" 35
 	fi
 
-	echo "+-------------------------------------+"
+	echo "${GREEN}✓${NC}"
 
 	echo ""
 	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
