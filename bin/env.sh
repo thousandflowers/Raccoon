@@ -4,7 +4,8 @@ set -euo pipefail
 export LC_ALL=C
 export LANG=C
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_env_help() {
@@ -23,9 +24,6 @@ for arg in "$@"; do
 		exit 0
 		;;
 	*)
-		echo "Unknown option: $arg"
-		echo "Usage: rcc env"
-		exit 1
 		;;
 	esac
 done
@@ -34,31 +32,30 @@ check_path_entries() {
 	local count=0
 	local missing=0
 
-	echo ""
-	echo "PATH Entries"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	print_section_header "PATH Entries"
+
+	print_table_header "Path|Status" 45 10
 
 	while IFS= read -r -d ':' path; do
 		[[ -z "$path" ]] && continue
-		((count++))
+		((count++)) || true
 		if [[ -d "$path" ]]; then
-			echo -e "  ${GRAY}$path${NC}"
+			print_table_row "$path|${GREEN}OK${NC}" 45 10
 		else
-			echo -e "  ${RED}${ICON_ERROR} $path${NC}"
-			((missing++))
+			print_table_row "$path|${RED}MISSING${NC}" 45 10
+			((missing++)) || true
 		fi
 	done <<< "${PATH}:"
 
-	echo "  ─────────────────────────────────"
-	echo "  Total: $count entries, ${missing} missing"
+	print_table_row "${GRAY}Total: $count entries, $ missing missing${NC}|" 45 10
 }
 
 check_broken_symlinks() {
 	local total=0
 
-	echo ""
-	echo "Broken Symlinks in PATH"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	print_section_header "Broken Symlinks"
+
+	print_table_header "Symlink|Target" 45 30
 
 	while IFS= read -r -d ':' path_dir; do
 		[[ -z "$path_dir" || ! -d "$path_dir" ]] && continue
@@ -70,14 +67,16 @@ check_broken_symlinks() {
 				target="$dir/$target"
 			fi
 			if [[ ! -e "$link" ]]; then
-				((total++))
-				echo -e "  ${RED}${ICON_ERROR} $link -> $(readlink "$link")${NC}"
+				((total++)) || true
+				local link_name
+				link_name=$(basename "$link")
+				print_table_row "$link_name|${RED}$target${NC}" 45 30
 			fi
 		done < <(find "$path_dir" -maxdepth 1 -type l 2>/dev/null)
 	done <<< "${PATH}:"
 
 	if [[ $total -eq 0 ]]; then
-		echo -e "  ${GRAY}No broken symlinks found${NC}"
+		print_table_row "${GRAY}No broken symlinks found${NC}|" 45 30
 	fi
 }
 
@@ -85,45 +84,41 @@ check_duplicate_path() {
 	local seen=""
 	local duplicates=""
 
-	echo ""
-	echo "Duplicate PATH Entries"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	print_section_header "Duplicate PATH Entries"
+
+	print_table_header "Path|Status" 45 10
 
 	IFS=':' read -ra path_parts <<< "$PATH"
 	for dir in "${path_parts[@]}"; do
 		if echo "$seen" | grep -qxF "$dir"; then
-			duplicates+="  ${YELLOW}$dir (duplicate)${NC}"$'\n'
+			print_table_row "$dir|${YELLOW}duplicate${NC}" 45 10
 		else
 			seen+=$'\n'"$dir"
 		fi
 	done
 
 	if [[ -z "$duplicates" ]]; then
-		echo -e "  ${GRAY}No duplicates found${NC}"
-	else
-		printf "%b" "$duplicates"
+		print_table_row "${GRAY}No duplicates found${NC}|${GREEN}OK${NC}" 45 10
 	fi
 }
 
 check_tool_versions() {
-	echo ""
-	echo "Tool Versions"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	print_section_header "Tool Versions"
+
+	print_table_header "Tool|Version" 15 40
 
 	for tool in git curl wget python3 node brew docker; do
 		if command -v "$tool" >/dev/null 2>&1; then
 			local version
 			version=$("$tool" --version 2>/dev/null | head -1 || "$tool" -v 2>/dev/null | head -1 || echo "found")
-			echo -e "  ${GREEN}$tool${NC}  $version"
+			print_table_row "$tool|$version" 15 40
 		else
-			echo -e "  ${GRAY}$tool${NC}  not found"
+			print_table_row "$tool|${GRAY}not found${NC}" 15 40
 		fi
 	done
 }
 
 main() {
-	print_section_header "Environment Check"
-
 	show_progress_bar \
 		"PATH entries:check_path_entries" \
 		"Broken symlinks:check_broken_symlinks" \

@@ -7,6 +7,12 @@ INSTALL_DIR="${HOME}/.raccoon"
 BIN_DIR=""
 VERSION="unknown"
 
+if ! command -v git >/dev/null 2>&1; then
+	echo "Error: git is required but not installed"
+	echo "  Install with: brew install git   # or xcode-select --install"
+	exit 1
+fi
+
 detect_bin_dir() {
 	if [[ -w "/usr/local/bin" ]]; then
 		echo "/usr/local/bin"
@@ -37,6 +43,20 @@ else
 fi
 
 VERSION=$(get_version)
+[[ -z "$VERSION" || "$VERSION" == "unknown" ]] && VERSION="0.2.0"
+
+# Make all bin scripts executable
+chmod +x "${INSTALL_DIR}/bin/"*.sh 2>/dev/null || true
+
+# Compile rcc-ui if Go is available
+if command -v go &>/dev/null; then
+	echo "Compiling rcc-ui (Go UI)..."
+	cd "${INSTALL_DIR}/ui" && bash build.sh 2>/dev/null || {
+		echo "  Note: Go UI compilation failed, using bash menu fallback"
+	}
+else
+	echo "  Note: Go not found, using bash menu fallback"
+fi
 
 if [[ ! -f "${BIN_DIR}/rcc" ]]; then
 	ln -sf "${INSTALL_DIR}/rcc" "${BIN_DIR}/rcc"

@@ -50,7 +50,7 @@ stop_inline_spinner() {
 print_section_header() {
     local title="$1"
     echo ""
-    echo "${PURPLE_BOLD}━━ ${title}${NC}"
+    echo "${PURPLE_BOLD}-- ${title}${NC}"
     echo ""
 }
 
@@ -240,4 +240,43 @@ show_progress_bar() {
 	fi
 
 	[[ $failed_count -gt 0 ]] && return 1 || return 0
+}
+
+print_table_header() {
+    local sep="|"
+    local cols="$1"
+    shift
+    local -a widths=("$@")
+    IFS='|' read -ra col_arr <<< "$cols"
+    printf "%s" "$sep"
+    for i in "${!col_arr[@]}"; do
+        local w=${widths[$i]:-20}
+        printf " %-${w}s %s" "${col_arr[$i]}" "$sep"
+    done
+    echo ""
+    printf "%s" "$sep"
+    for i in "${!col_arr[@]}"; do
+        local w=${widths[$i]:-20}
+        printf " %${w}s %s" "$(printf '%*s' $w '' | tr ' ' '-')" "$sep"
+    done
+    echo ""
+}
+
+print_table_row() {
+    local sep="|"
+    local values="$1"
+    shift
+    local -a widths=("$@")
+    IFS='|' read -ra val_arr <<< "$values"
+    printf "%s" "$sep"
+    for i in "${!val_arr[@]}"; do
+        local w=${widths[$i]:-20}
+        local text="${val_arr[$i]}"
+        local clean=$(echo "$text" | sed -E 's/\x1b\[[0-9;]*m//g')
+        local vlen=${#clean}
+        local pad=$((w - vlen))
+        [[ $pad -lt 0 ]] && pad=0
+        printf " %s%*s %s" "$text" "$pad" "" "$sep"
+    done
+    echo ""
 }

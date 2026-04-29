@@ -1,11 +1,10 @@
-# Raccoon
+# 🦝 Raccoon
 
-```
-     _
-   / \_/\_   Raccoon
-  ( o.o )   Mac companion toolkit. Beyond Mole's scope.
-   > ^ <
-```
+> A macOS companion toolkit for power users.
+
+Raccoon (`rcc`) is a lightweight Bash toolkit for macOS that surfaces the information and workflows you need most — network state, hardware health, package hygiene, SSH, Git — through a single unified CLI with an optional interactive menu.
+
+---
 
 ## Install
 
@@ -13,195 +12,152 @@
 curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
 ```
 
-## Commands
+Raccoon clones itself to `~/.raccoon` and symlinks `rcc` into `/usr/local/bin` (or `~/.local/bin` if `/usr/local/bin` is not writable).
 
-### rcc battery
+### Requirements
 
-```bash
-$ rcc battery
-
-━━ Battery Status
-
-[1/2] Fetch battery info... ✓
-[2/2] Display status...
-━━ Battery Health
-
-  Cycle Count:      571
-  Max Capacity:     85% (good)
-  Condition:        Normal
-
-━━ Charge Status
-
-  Charge Level:     100%
-  Charging:         No
-  Fully Charged:    No
-
-✓ Completed: 2/2 passed
-```
-
-### rcc ports
-
-```bash
-$ rcc ports
-
-━━ Network Ports
-
-  PORT     PROTO  PROCESS              STATE
-  ────────────────────────────────────────────
-  7000     TCP    ControlCenter        LISTEN
-  5000     TCP    ControlCenter        LISTEN
-  52177    TCP    rapportd             LISTEN
-  50592    TCP    rapportd             LISTEN
-  50593    TCP    rapportd             LISTEN
-  3722     UDP    rapportd
-```
-
-### rcc backup
-
-```bash
-$ rcc backup
-
-━━ Time Machine Backup
-
-[1/2] Check TM destination... ✓
-[2/2] Check last backup... ✓
-  Destination:  TimeMachineDrive
-  Last Backup:  2026-04-27 (3h ago)
-
-✓ Completed: 2/2 passed
-```
-
-### rcc ssh
-
-```bash
-$ rcc ssh
-
-━━ SSH Keys & Config
-
-[1/5] Unprotected keys... ✓
-[2/5] Orphan keys... ✓
-[3/5] Directory permissions... ✓
-[4/5] Key permissions... ✓
-[5/5] SSH config... ✓
-  Config file exists (3 host entries)
-
-✓ Completed: 5/5 passed
-```
-
-### rcc git
-
-```bash
-$ rcc git
-
-━━ Git Repository Check
-
-[1/2] Scanning repos... ✓
-[2/2] Checking status...
-  ~/Projects/webapp
-    ○ 12 uncommitted changes
-    ○ 3 unpushed commits
-    ○ 2 branches without upstream
-
-  ~/Projects/api-server
-    ○ 1 uncommitted changes
-
-  ~/Developer/old-project
-    ○ detached HEAD
-    ○ 5 stashed changes
-
-✓ Completed: 2/2 passed
-```
-
-### rcc upgrade
-
-```bash
-$ rcc upgrade
-
-━━ Upgrade Package Managers
-
-[1/6] Homebrew... ✓
-[2/6] pip... ✓
-[3/6] npm... ✓
-[4/6] nvm... ✓
-[5/6] rustup... ✓
-[6/6] gem... ✓
-
-✓ Completed: 6/6 passed
-```
-
-Dry-run mode:
-
-```bash
-$ rcc upgrade --dry-run
-
-━━ Upgrade Package Managers
-
-→ DRY RUN MODE, no packages will be updated
-
-[1/6] Homebrew...
-    postgresql    16.5.0 -> 16.6.0
-    redis         7.2.3 -> 7.4.0
-    python@3.12   3.12.6 -> 3.12.7
-✓
-[2/6] pip...
-    requests    2.31.0 -> 2.32.0
-    numpy       1.26.4 -> 1.27.0
-✓
-...
-```
-
-### rcc env
-
-```bash
-$ rcc env
-
-━━ Environment Check
-
-[1/4] PATH entries... ✓
-  Total: 21 entries, 2 missing
-
-[2/4] Broken symlinks... ✓
-  ✗ /usr/local/bin/old-tool -> /removed/path
-
-[3/4] Duplicates... ✓
-  No duplicates found
-
-[4/4] Tool versions... ✓
-  git      2.50.1 (Apple Git-155)
-  curl     8.7.1
-  node     v22.12.0
-  brew     4.3.0
-
-✓ Completed: 4/4 passed
-```
-
-### rcc menu
-
-Interactive menu with keyboard navigation:
-
-```bash
-$ rcc
-
-     _
-   / \_/\_   Raccoon
-  ( o.o )   Mac companion toolkit. Beyond Mole's scope.
-   > ^ <
-
-→  1. ssh       Check SSH keys/config
-   2. git       Check local git repos
-   3. upgrade   Update package managers
-   4. ports     Show open ports/listeners
-   5. battery   Battery health & cycle count
-   6. backup    Verify Time Machine status
-   7. env       Check environment
-
-  ↑↓  |  Enter  |  Q Quit
-```
-
-## Pairs well with
-
-[Mole](https://github.com/tw93/Mole) - Deep clean and optimize your Mac
+- macOS 11+ (Big Sur or later)
+- `git` (for installation)
+- Go 1.21+ (optional, for compiling the interactive UI)
 
 ---
 
-MIT License
+## Usage
+
+```
+rcc [command] [options]
+```
+
+Run `rcc` with no arguments to open the interactive menu.
+
+### Interactive UI
+
+Raccoon includes an optional interactive menu built with Go and Bubble Tea. It launches automatically when you run `rcc` with no arguments. If Go is not available, it falls back to a bash-based menu.
+
+<!-- screenshot coming soon -->
+![Raccoon Interactive Menu](docs/screenshot.png)
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| **Core Tools** | |
+| `upgrade` | Update Homebrew, pip, npm, gem, and other package managers |
+| `upgrade --dry-run` | Show what would be upgraded without updating |
+| `audit` | Security audit (30 checks: Core, Network, Auth, Persistence, Additional) |
+| `audit deep` | Full audit (+ Privacy checks: Location Services, Analytics) |
+| `audit quiet` | Audit output just counts: "pass warn fail" |
+| `audit fix` | Auto-fix common security issues |
+| `audit json` | Audit output in JSON format |
+| `audit history` | Show audit history with diff |
+| `audit watch` | Schedule weekly audit via LaunchAgent |
+| **System** | |
+| `network` | Network interfaces, Wi-Fi signal, DNS, routing |
+| `disk` | Disk space, APFS container, SMART status |
+| `memory` | Processes sorted by memory usage |
+| `ports` | Open ports and listening services |
+| `battery` | Battery health, cycle count, temperature |
+| `backup` | Time Machine status and last backup date |
+| **Developer** | |
+| `ssh` | SSH key generation and management |
+| `git` | Git status, branches, stash, and cleanup |
+| `docker` | Docker images, containers, volumes |
+| `xcode` | Simulators, derived data, SPM packages |
+| **Maintenance** | |
+| `env` | Shell environment and PATH summary |
+| `startup` | Launch agents and login items |
+| `trash` | Trash contents and size |
+| `fonts` | Font duplicates and corrupted fonts |
+| `history` | Shell command history analysis |
+| `certs` | SSL certificates and expiration |
+| **Meta** | |
+| `--version` / `-V` | Print Raccoon version |
+| `help` / `--help` / `-h` | Show help |
+
+### Audit Options
+
+| Option | Description |
+|--------|-------------|
+| `--deep` | Run all 32 security checks (requires sudo) |
+| `--quiet` | Output just "pass warn fail" counts |
+| `--json` | Output in JSON format |
+| `--csv` | Output in CSV format |
+| `--html` | Output as HTML report |
+| `--report FILE` | Save report to file |
+| `--fix` | Auto-fix issues where possible |
+| `--fix --dry-run` | Show what would be fixed |
+| `--fix --force` | Skip confirmation prompts |
+| `--history` | Show audit history with diff |
+| `--diff` | Show changes since last audit |
+| `--watch` | Schedule weekly audit run |
+| `--notify` | Send notification on completion |
+
+---
+
+## Update
+
+The installer handles updates automatically — just re-run the install command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
+```
+
+Or, if you prefer updating manually:
+
+```bash
+cd ~/.raccoon && git pull
+```
+
+---
+
+## Uninstall
+
+```bash
+rm -rf ~/.raccoon
+rm /usr/local/bin/rcc   # or ~/.local/bin/rcc
+```
+
+---
+
+## What Raccoon does
+
+Raccoon focuses on system monitoring, diagnostics, and maintenance — not cleanup or optimization. It provides actionable insights into your Mac's health, network, security, and performance.
+
+---
+
+## Structure
+
+```
+Raccoon/
+├── rcc              # Entry point and command dispatcher
+├── install.sh       # One-line installer
+├─�� bin/             # Individual command scripts
+│   ├── upgrade.sh
+│   ├── audit.sh
+│   ├── network.sh
+│   ├── disk.sh
+│   ├── memory.sh
+│   ├── ports.sh
+│   ├── battery.sh
+│   ├── backup.sh
+│   ├── ssh.sh
+│   ├── git.sh
+│   ├── docker.sh
+│   ├── xcode.sh
+│   ├── env.sh
+│   ├── startup.sh
+│   ├── trash.sh
+│   ├── fonts.sh
+│   ├── history.sh
+│   └── certs.sh
+└── lib/
+    └── core/
+        ├── common.sh    # Shared utilities and banner
+        └── commands.sh  # Version, help, menu
+```
+
+---
+
+## License
+
+MIT
