@@ -37,42 +37,42 @@ done
 main() {
 	print_section_header "Shell History"
 
-	echo "┌─────────────┬────────────┐"
-	echo "│ Shell      │ Commands   │"
-	echo "├─────────────┼────────────┤"
+	echo "+-------------+------------+"
+	echo "| Shell      | Commands   |"
+	echo "+-------------+------------+"
 
 	local zsh_history="$HOME/.zsh_history"
 	local zsh_lines=0
 	if [[ -f "$zsh_history" ]]; then
 		zsh_lines=$(wc -l < "$zsh_history" | xargs || echo "0")
 	fi
-	printf "│ ${CYAN}%-9s${NC} │ %9s │\n" "zsh" "$zsh_lines"
+	printf "| ${CYAN}%-9s${NC} | %9s |\n" "zsh" "$zsh_lines"
 
 	local bash_history="$HOME/.bash_history"
 	local bash_lines=0
 	if [[ -f "$bash_history" ]]; then
 		bash_lines=$(wc -l < "$bash_history" | xargs || echo "0")
 	fi
-	printf "│ ${CYAN}%-9s${NC} │ %9s │\n" "bash" "$bash_lines"
+	printf "| ${CYAN}%-9s${NC} | %9s |\n" "bash" "$bash_lines"
 
 	local fish_history="$HOME/.local/share/fish/history/default"
 	local fish_lines=0
 	if [[ -f "$fish_history" ]]; then
 		fish_lines=$(wc -l < "$fish_history" 2>/dev/null | xargs || echo "0")
 	fi
-	printf "│ ${CYAN}%-9s${NC} │ %9s │\n" "fish" "$fish_lines"
+	printf "| ${CYAN}%-9s${NC} | %9s |\n" "fish" "$fish_lines"
 
-	echo "├─────────────┼────────────┤"
+	echo "+-------------+------------+"
 
 	local total=$((zsh_lines + bash_lines + fish_lines))
-	printf "│ ${GRAY}Total${NC}     │ %9s │\n" "$total"
+	printf "| ${GRAY}Total${NC}     | %9s |\n" "$total"
 
-	echo "└─────────────┴────────────┘"
+	echo "+-------------+------------+"
 
 	echo ""
-	echo "┌─────────────────────────────────────┐"
-	echo "│ Recent Commands                     │"
-	echo "├─────────────────────────────────────┤"
+	echo "+-------------------------------------+"
+	echo "| Recent Commands                     |"
+	echo "+-------------------------------------+"
 
 	local recent_count=0
 	if [[ -f "$zsh_history" ]]; then
@@ -92,7 +92,7 @@ main() {
 		echo "│ ${GRAY}No recent commands${NC}            │"
 	fi
 
-	echo "└─────────────────────────────────────┘"
+	echo "+-------------------------------------+"
 
 	echo ""
 	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"

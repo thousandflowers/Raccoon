@@ -57,22 +57,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "enter":
-			m.runSelected()
+			selected := m.items[m.selectedIdx]
+			if selected.cmd != "" {
+				scriptPath := filepath.Join(m.binPath, selected.cmd)
+				c := exec.Command("bash", scriptPath)
+				return m, tea.ExecProcess(c, func(err error) tea.Msg {
+					return tea.Quit()
+				})
+			}
 		}
 	}
 
 	return m, nil
-}
-
-func (m *model) runSelected() {
-	selected := m.items[m.selectedIdx]
-	if selected.cmd != "" {
-		scriptPath := filepath.Join(m.binPath, selected.cmd)
-		cmd := exec.Command("bash", scriptPath)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Run()
-	}
 }
 
 func (m model) View() string {

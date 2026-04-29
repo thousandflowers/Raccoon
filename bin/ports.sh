@@ -86,16 +86,14 @@ main() {
 
 	print_section_header "Network Ports"
 
-	local data
 	data=$(lsof -iTCP -iUDP -nP 2>/dev/null || true)
 
 	if [[ -z "$data" ]]; then
-		echo -e "  ${YELLOW}No ports found${NC}"
+		echo "| ${YELLOW}No ports found${NC} |"
 		return 0
 	fi
 
-	printf "  %-8s %-6s %-20s %s\n" "PORT" "PROTO" "PROCESS" "STATE"
-	echo "  ────────────────────────────────────────────"
+	print_table_header "PORT|PROTO|PROCESS|STATE" 8 6 20 10
 
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		[[ "$line" == COMMAND* ]] && continue
@@ -109,9 +107,9 @@ main() {
 		[[ -z "$port" || -z "$proto" ]] && continue
 
 		if [[ "$port" -lt 1024 ]] 2>/dev/null; then
-			printf "  ${YELLOW}%-8s${NC} %-6s %-20s %s\n" "$port" "$proto" "$cmd" "${state:-}"
+			print_table_row "${YELLOW}${port}${NC}|$proto|$cmd|${state:-}" 8 6 20 10
 		else
-			printf "  %-8s %-6s %-20s %s\n" "$port" "$proto" "$cmd" "${state:-}"
+			print_table_row "$port|$proto|$cmd|${state:-}" 8 6 20 10
 		fi
 	done <<< "$data" | sort -u -k1,1 -k3,3
 

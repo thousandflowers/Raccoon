@@ -26,9 +26,6 @@ for arg in "$@"; do
 		exit 0
 		;;
 	*)
-		echo "Unknown option: $arg"
-		echo "Usage: rcc git"
-		exit 1
 		;;
 	esac
 done
@@ -65,73 +62,74 @@ scan_repos() {
 }
 
 check_repos() {
+	print_section_header "Git Repositories"
+
 	if [[ -z "$REPOS" ]]; then
-		echo -e "  ${GRAY}No repositories found${NC}"
+		echo "${GRAY}No repositories found${NC}"
 		return 0
 	fi
+
+	print_table_header "Repository|Issues" 40 20
 
 	local repos_with_issues=0
 
 	while IFS= read -r repo; do
 		local has_issue=0
-		local output=""
+		local issues=""
 
-		cd "$repo"
+		cd "$repo" 2>/dev/null || continue
 
 		local uncommitted
 		uncommitted=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
 		if [[ "$uncommitted" -gt 0 ]]; then
 			has_issue=1
-			output+="  ${YELLOW}${ICON_SKIP}${NC} $uncommitted uncommitted changes"$'\n'
+			issues+="${YELLOW}$uncommitted uncommitted${NC}, "
 		fi
 
 		local unpushed
 		unpushed=$(git log @{u}.. --oneline 2>/dev/null | wc -l | tr -d ' ')
 		if [[ "$unpushed" -gt 0 ]]; then
 			has_issue=1
-			output+="  ${YELLOW}${ICON_SKIP}${NC} $unpushed unpushed commits"$'\n'
+			issues+="${YELLOW}$unpushed unpushed${NC}, "
 		fi
 
 		local stashed
 		stashed=$(git stash list 2>/dev/null | wc -l | tr -d ' ')
 		if [[ "$stashed" -gt 0 ]]; then
 			has_issue=1
-			output+="  ${YELLOW}${ICON_SKIP}${NC} $stashed stash"$'\n'
+			issues+="${YELLOW}$stashed stashed${NC}, "
 		fi
 
 		if ! git symbolic-ref HEAD >/dev/null 2>&1; then
 			has_issue=1
-			output+="  ${YELLOW}${ICON_SKIP}${NC} detached HEAD"$'\n'
+			issues+="${YELLOW}detached HEAD${NC}, "
 		fi
 
 		local no_upstream
 		no_upstream=$(git branch -vv 2>/dev/null | grep -v '\[' | grep -cE '^\s+\S' || true)
 		if [[ "$no_upstream" -gt 0 ]]; then
 			has_issue=1
-			output+="  ${YELLOW}${ICON_SKIP}${NC} $no_upstream branches without upstream"$'\n'
+			issues+="${YELLOW}$no_upstream no upstream${NC}"
 		fi
 
 		if [[ $has_issue -eq 1 ]]; then
-			((repos_with_issues++))
-			echo ""
-			echo "$repo"
-			printf "%b" "$output"
+			((repos_with_issues++)) || true
+			local repo_name
+			repo_name=$(basename "$repo")
+			print_table_row "$repo_name|$issues" 40 20
 		fi
 
 	done <<< "$REPOS"
 
 	if [[ $repos_with_issues -eq 0 ]]; then
-		echo ""
-		echo -e "  ${GREEN}${ICON_SUCCESS} All repositories are clean${NC}"
-	else
-		echo ""
-		echo "  Found $repos_with_issues repositories with issues"
+		print_table_row "All repos|${GREEN}Clean${NC}" 40 20
 	fi
+
+	echo ""
+	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
 }
 
 main() {
-	print_section_header "Git Repository Check"
-
 	show_progress_bar \
 		"Scanning repos:scan_repos" \
 		"Checking status:check_repos"

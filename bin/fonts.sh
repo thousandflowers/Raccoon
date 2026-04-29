@@ -37,67 +37,66 @@ done
 main() {
 	print_section_header "Fonts Status"
 
-	echo "${GRAY}[1/4] System Fonts...${NC}"
+	print_table_header "Source|Count" 25 20
+
 	local sys_fonts
 	sys_fonts=$(ls -1 /Library/Fonts/ 2>/dev/null | wc -l | xargs || echo "0")
-	printf "  /Library/Fonts/: %s fonts\n" "$sys_fonts"
-	echo "${GREEN}✓${NC}"
+	print_table_row "/Library/Fonts/|$sys_fonts" 25 20
 
-	echo ""
-	echo "${GRAY}[2/4] User Fonts...${NC}"
 	local user_fonts
 	user_fonts=$(ls -1 ~/Library/Fonts/ 2>/dev/null | wc -l | xargs || echo "0")
-	printf "  ~/Library/Fonts/: %s fonts\n" "$user_fonts"
+	print_table_row "~/Library/Fonts/|$user_fonts" 25 20
+
 	echo "${GREEN}✓${NC}"
 
 	echo ""
 	echo "${GRAY}[3/4] FontConfig Catalog...${NC}"
-	local fc_count fc_families
+
+	print_table_header "Metric|Count" 25 20
+
 	if command -v fc-list >/dev/null 2>&1; then
+		local fc_count fc_families
 		fc_count=$(fc-list : family 2>/dev/null | wc -l | xargs || echo "0")
 		fc_families=$(fc-list : family 2>/dev/null | sort -u | wc -l | xargs || echo "0")
-		printf "  Total fonts:       %s\n" "$fc_count"
-		printf "  Unique families: %s\n" "$fc_families"
+		print_table_row "Total fonts|$fc_count" 25 20
+		print_table_row "Unique families|$fc_families" 25 20
 	else
-		echo "  ${GRAY}fontconfig not installed (brew install fontconfig)${NC}"
-		fc_count="N/A"
-		fc_families="N/A"
+		print_table_row "fontconfig|${YELLOW}not installed${NC}" 25 20
 	fi
+
 	echo "${GREEN}✓${NC}"
 
 	echo ""
-	echo "${GRAY}[4/4] Duplicate Check...${NC}"
+	echo "${GRAY}[4/4] Duplicate & Corrupt Check...${NC}"
+
+	print_table_header "Check|Result" 25 20
+
 	if command -v fc-list >/dev/null 2>&1; then
 		local duplicates
 		duplicates=$(fc-list : family 2>/dev/null | sort | uniq -d | wc -l | xargs || echo "0")
 		if [[ "$duplicates" -gt 0 ]]; then
-			echo "  ${YELLOW}Found $duplicates duplicate families${NC}"
-			fc-list : family 2>/dev/null | sort | uniq -d | head -5 | while read -r dup; do
-				echo "    $dup"
-			done
+			print_table_row "Duplicates|${YELLOW}${duplicates} families${NC}" 25 20
 		else
-			echo "  No duplicate fonts found ✓"
+			print_table_row "Duplicates|${GREEN}none found${NC}" 25 20
 		fi
-		
-		local corrupted
-		corrupted=0
-		echo "  Checking for corrupted fonts..."
+
+		local corrupted=0
 		local all_fonts
 		all_fonts=$(ls /Library/Fonts/*.{ttf,otf} ~/Library/Fonts/*.{ttf,otf} 2>/dev/null || true)
 		for font in $all_fonts; do
 			[[ ! -f "$font" ]] && continue
 			fc-scan "$font" >/dev/null 2>&1 || ((corrupted++))
 		done 2>/dev/null || true
-		printf "  Corrupted fonts: %s\n" "$corrupted"
+		print_table_row "Corrupted fonts|$corrupted" 25 20
 	else
-		echo "  ${GRAY}Skipped (fontconfig not available)${NC}"
+		print_table_row "Checks|${GRAY}skipped${NC}" 25 20
 	fi
+
 	echo "${GREEN}✓${NC}"
 
-	echo ""
 	local total=$((sys_fonts + user_fonts))
-	echo "  ${GRAY}Total installed: $total fonts${NC}"
-	
+	print_table_row "${GRAY}Total installed${NC}|$total fonts" 25 20
+
 	echo ""
 	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
 }

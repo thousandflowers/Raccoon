@@ -50,7 +50,7 @@ stop_inline_spinner() {
 print_section_header() {
     local title="$1"
     echo ""
-    echo "${PURPLE_BOLD}━━ ${title}${NC}"
+    echo "${PURPLE_BOLD}-- ${title}${NC}"
     echo ""
 }
 
@@ -245,29 +245,68 @@ show_progress_bar() {
 print_header() {
     local -a cols=("$@")
     local width=14
-    echo -n "┌"
+    echo -n "+"
     for i in "${!cols[@]}"; do
-        printf "%${cols[$i]:s//─/$((width-2))s}┬" | sed 's/ /─/g'
-    done | sed 's/.$/┐/'
+        printf "%${cols[$i]:s//-/$((width-2))s}+" | sed 's/ /-/g'
+    done | sed 's/.$/+/'
     echo ""
 }
 
 print_row() {
     local -a cols=("$@")
     local width=14
-    echo -n "│"
+    echo -n "|"
     for c in "${cols[@]}"; do
-        printf " %-*s │" "$((width-3))" "$c"
+        printf " %-*s |" "$((width-3))" "$c"
     done
     echo ""
 }
 
 print_footer() {
-    echo "└─────────────────────────────────┘"
+    echo "+---------------------------------+"
 }
 
 print_key_value() {
     local key="$1"
     local value="$2"
-    printf "│ %-13s │ %-14s │\n" "$key" "$value"
+    printf "| %-13s | %-14s |\n" "$key" "$value"
+}
+
+print_table_header() {
+    local sep="|"
+    local cols="$1"
+    shift
+    local -a widths=("$@")
+    IFS='|' read -ra col_arr <<< "$cols"
+    printf "%s" "$sep"
+    for i in "${!col_arr[@]}"; do
+        local w=${widths[$i]:-20}
+        printf " %-${w}s %s" "${col_arr[$i]}" "$sep"
+    done
+    echo ""
+    printf "%s" "$sep"
+    for i in "${!col_arr[@]}"; do
+        local w=${widths[$i]:-20}
+        printf " %${w}s %s" "$(printf '%*s' $w '' | tr ' ' '-')" "$sep"
+    done
+    echo ""
+}
+
+print_table_row() {
+    local sep="|"
+    local values="$1"
+    shift
+    local -a widths=("$@")
+    IFS='|' read -ra val_arr <<< "$values"
+    printf "%s" "$sep"
+    for i in "${!val_arr[@]}"; do
+        local w=${widths[$i]:-20}
+        local text="${val_arr[$i]}"
+        local clean=$(echo "$text" | sed -E 's/\x1b\[[0-9;]*m//g')
+        local vlen=${#clean}
+        local pad=$((w - vlen))
+        [[ $pad -lt 0 ]] && pad=0
+        printf " %s%*s %s" "$text" "$pad" "" "$sep"
+    done
+    echo ""
 }

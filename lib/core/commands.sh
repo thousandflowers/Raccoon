@@ -1,7 +1,11 @@
-#!/bin/bash 
+#!/bin/bash
 
 VERSION="0.1.0"
 TAGLINE="macOS companion toolkit"
+
+reset_terminal() {
+    tput reset 2>/dev/null || printf '\033[?25h\033[0m\033[2J\033[H'
+}
 
 MENU_ITEMS=(
     "upgrade:Update packages"
@@ -94,6 +98,13 @@ show_brand_banner() {
 }
 
 run_cmd() {
+    # Reset completo del terminale prima di ogni comando
+    printf '\r'
+    printf '\033[2J\033[H'
+    printf '\033[0m'
+    printf '\033[?25h'
+    stty sane
+    
     local c="$1"
     case "$c" in
         1) exec "${SCRIPT_DIR}/bin/upgrade.sh" ;;
@@ -131,7 +142,7 @@ show_menu() {
         local item="${MENU_ITEMS[$((n-1))]}"
         
         if [[ "$item" == "---" ]]; then
-            echo -e "${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo -e "${GRAY}--------------------------------${NC}"
         else
             if [[ $n -eq $sel ]]; then
                 echo -e "${GREEN}▶ $n. $item${NC}"

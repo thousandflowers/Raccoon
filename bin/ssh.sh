@@ -26,17 +26,14 @@ for arg in "$@"; do
 		exit 0
 		;;
 	*)
-		echo "Unknown option: $arg"
-		echo "Usage: rcc ssh"
-		exit 1
 		;;
 	esac
 done
 
 check_unprotected_keys() {
 	echo ""
-	echo "Unprotected Keys (no passphrase)"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "Unprotected Keys"
+	print_table_header "Key|Type|Status" 30 15 15
 
 	local found=0
 	if [[ -d "$SSH_DIR" ]]; then
@@ -50,25 +47,25 @@ check_unprotected_keys() {
 			if ssh-keygen -y -P "" -f "$key" >/dev/null 2>&1; then
 				local key_type=""
 				if [[ -f "${key}.pub" ]]; then
-					key_type=$(ssh-keygen -l -f "${key}.pub" 2>/dev/null | awk '{print $4}' || echo "unknown")
+					key_type=$(ssh-keygen -l -f "${key}.pub" 2>/dev/null | awk '{print $4}' || echo "?")
 				else
 					key_type="?"
 				fi
-				echo -e "  ${YELLOW}${ICON_ERROR} $key_name ($key_type) has NO passphrase${NC}"
-				((found++))
+				print_table_row "$key_name|$key_type|${YELLOW}NO PASSPHRASE${NC}" 30 15 15
+				((found++)) || true
 			fi
 		done
 	fi
 
 	if [[ $found -eq 0 ]]; then
-		echo -e "  ${GRAY}All keys are protected${NC}"
+		print_table_row "None|All protected|${GRAY}OK${NC}" 30 15 15
 	fi
 }
 
 check_orphan_keys() {
 	echo ""
-	echo "Orphan Keys (private key without .pub)"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	echo "Orphan Keys"
+	print_table_header "Key|Status" 30 15
 
 	local found=0
 	if [[ -d "$SSH_DIR" ]]; then
@@ -80,21 +77,21 @@ check_orphan_keys() {
 			key_name=$(basename "$key")
 
 			if [[ ! -f "${key}.pub" ]]; then
-				echo -e "  ${YELLOW}${ICON_ERROR} $key_name (no .pub file)${NC}"
-				((found++))
+				print_table_row "$key_name|${YELLOW}No .pub file${NC}" 30 15
+				((found++)) || true
 			fi
 		done
 	fi
 
 	if [[ $found -eq 0 ]]; then
-		echo -e "  ${GRAY}All private keys have matching .pub files${NC}"
+		print_table_row "None|${GRAY}OK${NC}" 30 15
 	fi
 }
 
 check_key_permissions() {
 	echo ""
 	echo "Key Permissions"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	print_table_header "Key|Perms|Status" 30 10 15
 
 	local found=0
 	if [[ -d "$SSH_DIR" ]]; then
@@ -109,70 +106,22 @@ check_key_permissions() {
 			perms=$(stat -f %A "$key" 2>/dev/null || echo "000")
 
 			if [[ "$perms" != "600" ]]; then
-				echo -e "  ${RED}${ICON_ERROR} $key_name ($perms) - should be 600${NC}"
+				print_table_row "$key_name|$perms|${RED}Should be 600${NC}" 30 10 15
 			else
-				echo -e "  ${GRAY}$key_name (600 ✓)${NC}"
+				print_table_row "$key_name|$perms|${GRAY}OK${NC}" 30 10 15
 			fi
-			((found++))
+			((found++)) || true
 		done
-	fi
-
-	if [[ $found -eq 0 ]]; then
-		echo -e "  ${GRAY}No private keys found${NC}"
-	fi
-}
-
-check_ssh_dir_permissions() {
-	echo ""
-	echo "Directory Permissions"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-	if [[ -d "$SSH_DIR" ]]; then
-		local dir_perms
-		dir_perms=$(stat -f %A "$SSH_DIR" 2>/dev/null || echo "000")
-
-		if [[ "$dir_perms" != "700" ]]; then
-			echo -e "  ${RED}${ICON_ERROR} ~/.ssh ($dir_perms) - should be 700${NC}"
-		else
-			echo -e "  ${GRAY}~/.ssh (700 ✓)${NC}"
-		fi
-	else
-		echo -e "  ${GRAY}~/.ssh does not exist${NC}"
-	fi
-}
-
-check_ssh_config() {
-	echo ""
-	echo "SSH Config"
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-	if [[ -f "$SSH_DIR/config" ]]; then
-		local host_count
-		host_count=$(grep -c "^Host " "$SSH_DIR/config" 2>/dev/null || echo "0")
-		echo -e "  ${GREEN}Config file exists${NC} (${host_count} host entries)"
-
-		local weak_configs=0
-		if grep -qi "PasswordAuthentication yes" "$SSH_DIR/config" 2>/dev/null; then
-			echo -e "  ${YELLOW}${ICON_ERROR} PasswordAuthentication yes found (insecure)${NC}"
-			((weak_configs++))
-		fi
-		if [[ $weak_configs -eq 0 ]]; then
-			echo -e "  ${GRAY}No weak configurations found${NC}"
-		fi
-	else
-		echo -e "  ${GRAY}No config file${NC}"
 	fi
 }
 
 main() {
-	print_section_header "SSH Keys & Config"
+	check_unprotected_keys
+	check_orphan_keys
+	check_key_permissions
 
-	show_progress_bar \
-		"Unprotected keys:check_unprotected_keys" \
-		"Orphan keys:check_orphan_keys" \
-		"Directory permissions:check_ssh_dir_permissions" \
-		"Key permissions:check_key_permissions" \
-		"SSH config:check_ssh_config"
+	echo ""
+	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
 }
 
 main "$@"

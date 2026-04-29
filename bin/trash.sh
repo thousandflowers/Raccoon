@@ -15,8 +15,8 @@ show_trash_help() {
 	echo ""
 	echo "Options:"
 	echo "  --empty        Empty the trash (requires confirmation)"
-	echo "  --json          Output in JSON format"
-	echo "  --help, -h      Show this help"
+	echo "  --json        Output in JSON format"
+	echo "  --help, -h   Show this help"
 }
 
 JSON_OUTPUT=false
@@ -44,15 +44,15 @@ main() {
 
 	local trash_path="$HOME/.Trash"
 
-	echo "${GRAY}[1/3] Trash Location...${NC}"
-	echo "  Path: $trash_path"
+	print_table_header "Setting|Value" 20 30
+	print_table_row "Path|$trash_path" 20 30
 	echo "${GREEN}✓${NC}"
 
 	echo ""
 	echo "${GRAY}[2/3] Trash Contents...${NC}"
-	
+
 	if [[ ! -d "$trash_path" ]]; then
-		echo "  ${GRAY}Trash folder not found${NC}"
+		print_table_row "Status|${GRAY}Trash folder not found${NC}" 20 30
 		echo "${GREEN}✓${NC}"
 		echo ""
 		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
@@ -63,17 +63,17 @@ main() {
 	size=$(du -sh "$trash_path" 2>/dev/null | awk '{print $1}' || echo "0")
 	count=$(ls -1 "$trash_path" 2>/dev/null | wc -l | xargs || echo "0")
 
-	printf "  Size:  %s\n" "$size"
-	printf "  Items: %s files/folders\n" "$count"
+	print_table_row "Size|$size" 20 30
+	print_table_row "Items|$count files/folders" 20 30
 
 	if [[ -n "$size" && "$size" != "0" ]]; then
 		local size_num
 		size_num=$(echo "$size" | sed 's/[A-Za-z]//g')
 		local unit
 		unit=$(echo "$size" | sed 's/[0-9.]//g')
-		
+
 		if [[ "$unit" == *"G"* ]] && (( $(echo "$size_num > 1" | bc -l) )); then
-			echo "  ${YELLOW}Warning: Trash contains large files${NC}"
+			print_table_row "Warning|${YELLOW}Trash contains large files${NC}" 20 30
 		fi
 	fi
 
@@ -81,12 +81,15 @@ main() {
 
 	echo ""
 	echo "${GRAY}[3/3] Recent Items (Last 10)...${NC}"
+	print_table_header "Item" 40
+
 	ls -lt "$trash_path" 2>/dev/null | head -11 | tail -n +2 | while read -r line; do
 		local item_date item_name
 		item_date=$(echo "$line" | awk '{print $6, $7, $8}')
 		item_name=$(echo "$line" | awk '{print $NF}')
-		[[ -n "$item_name" ]] && echo "  $item_date  $item_name"
-	done || echo "  ${GRAY}empty${NC}"
+		[[ -n "$item_name" ]] && print_table_row "$item_name" 40
+	done || print_table_row "${GRAY}empty${NC}" 40
+
 	echo "${GREEN}✓${NC}"
 
 	echo ""

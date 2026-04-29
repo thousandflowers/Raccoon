@@ -32,7 +32,7 @@ cols=4
 selected=0
 
 render() {
-	printf "\033[2J\033[H"
+	clear 2>/dev/null || true
 	echo ""
 	echo "${CYAN}Raccoon${NC}"
 	echo "macOS companion toolkit"
@@ -98,7 +98,7 @@ main() {
 		render
 	done
 	
-	printf "\033[2J\033[H"
+	clear 2>/dev/null || true
 }
 
 main "$@"

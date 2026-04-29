@@ -11,6 +11,7 @@ source "$SCRIPT_DIR/../lib/core/common.sh"
 PASS_count=0
 WARN_count=0
 FAIL_count=0
+declare -a FIX_QUEUE=()
 
 show_audit_help() {
 	echo "Usage: rcc audit [options]"
@@ -152,9 +153,9 @@ print_category() {
 	local -a items=("$@")
 	
 	echo ""
-	echo "┌───────────────────────────────────────┐"
-	echo "│ ${CYAN}${name}${NC}                         │"
-	echo "├───────────────────────────────────────┤"
+	echo "+---------------------------------------+"
+	echo "| ${CYAN}${name}${NC}                         |"
+	echo "+---------------------------------------+"
 
 	for item in "${items[@]}"; do
 		local status="$(echo "$item" | cut -d: -f1)"
@@ -162,28 +163,28 @@ print_category() {
 		echo_result "$status" "$rest"
 	done
 	
-	echo "└───────────────────────────────────────┘"
+	echo "+---------------------------------------+"
 }
 
 print_summary() {
 	echo ""
-	echo "┌───────────────────────────────────────┐"
-	echo "│ ${PURPLE_BOLD}Summary${NC}                           │"
-	echo "├───────────────────────────────────────┤"
-	printf "│ ${GREEN}Pass${NC}    │ %5s                     │\n" "$PASS_count"
-	printf "│ ${YELLOW}Warning${NC} │ %5s                     │\n" "$WARN_count"
-	printf "│ ${RED}Fail${NC}   │ %5s                     │\n" "$FAIL_count"
-	echo "├───────────────────────────────────────┤"
+	echo "+---------------------------------------+"
+	echo "| ${PURPLE_BOLD}Summary${NC}                           |"
+	echo "+---------------------------------------+"
+	printf "| ${GREEN}Pass${NC}    | %5s                     |\n" "$PASS_count"
+	printf "| ${YELLOW}Warning${NC} | %5s                     |\n" "$WARN_count"
+	printf "| ${RED}Fail${NC}   | %5s                     |\n" "$FAIL_count"
+	echo "+---------------------------------------+"
 
 	if [[ $FAIL_count -eq 0 && $WARN_count -eq 0 ]]; then
-		echo "│ ${GREEN}✓ All checks passed${NC}              │"
+		echo "| ${GREEN}✓ All checks passed${NC}              |"
 	elif [[ $FAIL_count -eq 0 ]]; then
-		echo "│ ${YELLOW}⚠ No critical issues${NC}           │"
+		echo "| ${YELLOW}⚠ No critical issues${NC}           |"
 	else
-		echo "│ ${RED}✗ Action required${NC}                │"
+		echo "| ${RED}✗ Action required${NC}                |"
 	fi
 
-	echo "└───────────────────────────────────────┘"
+	echo "+---------------------------------------+"
 }
 
 save_to_history() {
@@ -207,7 +208,7 @@ EOF
 }
 
 show_audit_history() {
-	echo "${PURPLE_BOLD}━━ Audit History━━${NC}"
+	echo "${PURPLE_BOLD}-- Audit History--${NC}"
 	echo ""
 	
 	if [[ ! -d "$HISTORY_DIR" ]]; then
@@ -241,7 +242,7 @@ show_audit_history() {
 }
 
 show_diff() {
-	echo "${PURPLE_BOLD}━━ Diff with Previous Run━━${NC}"
+	echo "${PURPLE_BOLD}-- Diff with Previous Run--${NC}"
 	echo ""
 	
 	local latest_link="$HISTORY_DIR/latest.json"
@@ -392,26 +393,26 @@ print_output_json() {
 fix_issue() {
 	local check_name="$1"
 	local fix_cmd="$2"
-	
-	if [[ "$AUTO_FIX" != "true" ]]; then
-		return
+
+	if [[ "$AUTO_FIX" == "true" ]]; then
+		if [[ "$FIX_DRY_RUN" == "true" ]]; then
+			echo "  ${CYAN}→ Would fix: $check_name${NC}"
+			echo "    Command: $fix_cmd"
+			return
+		fi
+
+		if [[ "$FIX_FORCE" != "true" ]]; then
+			echo -n "  ${YELLOW}→ Fix $check_name? [y/N] ${NC}"
+			read -r -n 1 -t 5 answer || answer="n"
+			echo ""
+			[[ "$answer" != "y" && "$answer" != "Y" ]] && return
+		fi
+
+		echo "  ${YELLOW}→ Fixing: $check_name${NC}"
+		eval "$fix_cmd" 2>/dev/null && echo "  ${GREEN}✓ Fixed${NC}" || echo "  ${RED}✗ Fix failed${NC}"
+	else
+		FIX_QUEUE+=("${check_name}|${fix_cmd}")
 	fi
-	
-	if [[ "$FIX_DRY_RUN" == "true" ]]; then
-		echo "  ${CYAN}→ Would fix: $check_name${NC}"
-		echo "    Command: $fix_cmd"
-		return
-	fi
-	
-	if [[ "$FIX_FORCE" != "true" ]]; then
-		echo -n "  ${YELLOW}→ Fix $check_name? [y/N] ${NC}"
-		read -r -n 1 -t 5 answer || answer="n"
-		echo ""
-		[[ "$answer" != "y" && "$answer" != "Y" ]] && return
-	fi
-	
-	echo "  ${YELLOW}→ Fixing: $check_name${NC}"
-	eval "$fix_cmd" 2>/dev/null && echo "  ${GREEN}✓ Fixed${NC}" || echo "  ${RED}✗ Fix failed${NC}"
 }
 
 run_core_checks() {
@@ -487,16 +488,18 @@ run_network_checks() {
 		network_results+=("pass:Open Ports: ${port_count} listening")
 	else
 		network_results+=("warn:Open Ports: ${port_count} listening")
+		fix_issue "Open Ports" "echo 'Consider reviewing open ports with: sudo lsof -i -P -n'"
 	fi
-	
+
 	local dns_servers
 	dns_servers="$(scutil --dns 2>/dev/null | grep "nameserver" | head -1 | awk '{print $NF}')"
 	if [[ -n "$dns_servers" ]]; then
 		network_results+=("pass:DNS Servers: ${dns_servers}")
 	else
 		network_results+=("warn:DNS Servers: None configured")
+		fix_issue "DNS Servers" "networksetup -setdnsservers Wi-Fi 8.8.8.8"
 	fi
-	
+
 	local vpn_count
 	vpn_count="$(networksetup -listallnetworkservices 2>/dev/null | grep -c "VPN" 2>/dev/null)"
 	[[ -z "$vpn_count" ]] && vpn_count="0"
@@ -504,8 +507,9 @@ run_network_checks() {
 		network_results+=("pass:VPN: None configured")
 	else
 		network_results+=("warn:VPN: ${vpn_count} configured")
+		fix_issue "VPN" "for svc in \$(networksetup -listallnetworkservices | grep VPN); do networksetup -disconnectvpn \"\$svc\" 2>/dev/null; done"
 	fi
-	
+
 	local bt_status
 	bt_status="$(blueutil status 2>/dev/null)"
 	if echo "$bt_status" | grep -qi "off"; then
@@ -516,10 +520,12 @@ run_network_checks() {
 		else
 			network_results+=("pass:Bluetooth: On")
 		fi
+		fix_issue "Bluetooth" "sudo defaults write /Library/Preferences/com.apple.Bluetooth ControllerPowerState -int 0 && sudo killall -HUP blued 2>/dev/null || true"
 	else
 		network_results+=("warn:Bluetooth: Unknown")
+		fix_issue "Bluetooth" "sudo defaults write /Library/Preferences/com.apple.Bluetooth ControllerPowerState -int 0 && sudo killall -HUP blued 2>/dev/null || true"
 	fi
-	
+
 	local sharing_count
 	sharing_count="$(sharing -l 2>/dev/null | grep -c "Share" 2>/dev/null)"
 	[[ -z "$sharing_count" ]] && sharing_count="0"
@@ -527,14 +533,16 @@ run_network_checks() {
 		network_results+=("pass:Sharing: None enabled")
 	else
 		network_results+=("warn:Sharing: ${sharing_count} enabled")
+		fix_issue "Sharing" "sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null; sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.smbd.plist 2>/dev/null; sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.AppleFileServer.plist 2>/dev/null; true"
 	fi
-	
+
 	local sshd_check
 	sshd_check="$(sudo launchctl list com.openssh.sshd 2>/dev/null)"
 	if [[ -z "$sshd_check" ]] || echo "$sshd_check" | grep -q "not found"; then
 		network_results+=("pass:SSH Daemon: Disabled")
 	else
 		network_results+=("warn:SSH Daemon: Running")
+		fix_issue "SSH Daemon" "sudo launchctl unload /System/Library/LaunchDaemons/sshd.plist"
 	fi
 	
 	print_category "Network" "${network_results[@]}"
@@ -580,8 +588,9 @@ run_auth_checks() {
 		auth_results+=("pass:Authorized Keys: None")
 	else
 		auth_results+=("warn:Authorized Keys: ${auth_keys_count} key(s)")
+		fix_issue "Authorized Keys" "rm ~/.ssh/authorized_keys"
 	fi
-	
+
 	local sudoers_check
 	sudoers_check="$(sudo visudo -c 2>&1)"
 	if echo "$sudoers_check" | grep -qi "parsed"; then
@@ -606,8 +615,9 @@ run_persistence_checks() {
 		persistence_results+=("pass:User LaunchAgents: ${user_la_count} items")
 	else
 		persistence_results+=("warn:User LaunchAgents: ${user_la_count} items")
+		fix_issue "User LaunchAgents" "rm -rf ~/Library/LaunchAgents/*.plist 2>/dev/null; echo 'Removed user launch agents'"
 	fi
-	
+
 	local sys_la_count
 	sys_la_count="$(ls -1 /Library/LaunchAgents/ 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$sys_la_count" ]] && sys_la_count="0"
@@ -619,7 +629,7 @@ run_persistence_checks() {
 	else
 		persistence_results+=("warn:System LaunchAgents: ${sys_la_count} items")
 	fi
-	
+
 	local ld_count
 	ld_count="$(ls -1 /Library/LaunchDaemons/ 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$ld_count" ]] && ld_count="0"
@@ -631,7 +641,7 @@ run_persistence_checks() {
 	else
 		persistence_results+=("warn:LaunchDaemons: ${ld_count} items")
 	fi
-	
+
 	local cron_count
 	cron_count="$(crontab -l 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$cron_count" ]] && cron_count="0"
@@ -640,8 +650,9 @@ run_persistence_checks() {
 		persistence_results+=("pass:Cron Jobs: None")
 	else
 		persistence_results+=("warn:Cron Jobs: ${cron_count} jobs")
+		fix_issue "Cron Jobs" "crontab -r 2>/dev/null || true"
 	fi
-	
+
 	local at_count
 	at_count="$(atq 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$at_count" ]] && at_count="0"
@@ -650,8 +661,9 @@ run_persistence_checks() {
 		persistence_results+=("pass:At Jobs: None")
 	else
 		persistence_results+=("warn:At Jobs: ${at_count} jobs")
+		fix_issue "At Jobs" "atrm -a 2>/dev/null || true"
 	fi
-	
+
 	local li_count
 	li_count="$(osascript -e 'tell application "System Events" to get the name of every login item' 2>/dev/null | tr ',' '\n' | wc -l 2>/dev/null)"
 	[[ -z "$li_count" ]] && li_count="0"
@@ -662,6 +674,7 @@ run_persistence_checks() {
 		persistence_results+=("pass:Login Items: ${li_count} items")
 	else
 		persistence_results+=("warn:Login Items: ${li_count} items")
+		fix_issue "Login Items" "osascript -e 'tell application \"System Events\" to delete every login item' 2>/dev/null || true"
 	fi
 	
 	print_category "Persistence" "${persistence_results[@]}"
@@ -712,24 +725,27 @@ run_additional_checks() {
 		additional_results+=("pass:Screen Lock: ${lock_timeout}s timeout")
 	else
 		additional_results+=("warn:Screen Lock: Default")
+		fix_issue "Screen Lock" "sudo defaults write /Library/Preferences/com.apple.screensaver askForPasswordDelay -int 0 && defaults write com.apple.screensaver askForPassword -int 1"
 	fi
-	
+
 	local file_perms
 	file_perms="$(ls -la ~/.ssh 2>/dev/null | head -1 | awk '{print $1}')"
 	if [[ "$file_perms" == "drwx------" ]]; then
 		additional_results+=("pass:.ssh Permissions: Secure")
 	else
 		additional_results+=("warn:.ssh Permissions: Insecure")
+		fix_issue ".ssh Permissions" "chmod 700 ~/.ssh && chmod 600 ~/.ssh/*"
 	fi
-	
+
 	local quarantined
 	quarantined="$(xattr -lr ~/Downloads 2>/dev/null | grep -c "com.apple.quarantine" || echo "0")"
 	if [[ "$quarantined" -eq 0 ]]; then
 		additional_results+=("pass:Quarantined Files: None")
 	else
 		additional_results+=("warn:Quarantined Files: ${quarantined}")
+		fix_issue "Quarantined Files" "find ~/Downloads -xattr -r -d com.apple.quarantine 2>/dev/null || true"
 	fi
-	
+
 	local kext_count
 	kext_count="$(kextstat 2>/dev/null | grep -v "com.apple" | wc -l 2>/dev/null | sed 's/ *//g')"
 	[[ -z "$kext_count" ]] && kext_count="0"
@@ -739,8 +755,9 @@ run_additional_checks() {
 		additional_results+=("pass:Kernel Extensions: ${kext_count} (third-party)")
 	else
 		additional_results+=("warn:Kernel Extensions: ${kext_count} (third-party)")
+		fix_issue "Kernel Extensions" "echo 'Warning: Removing kernel extensions requires SIP disabled. Manual review recommended.'"
 	fi
-	
+
 	local sudo_last
 	sudo_last="$(sudo -l 2>/dev/null | head -1)"
 	if [[ -n "$sudo_last" && "$sudo_last" != "Sorry" ]]; then
@@ -748,13 +765,14 @@ run_additional_checks() {
 	else
 		additional_results+=("pass:Sudo Access: Limited")
 	fi
-	
+
 	local doh
 	doh="$(scutil --dns 2>/dev/null | grep "DOT" | head -1)"
 	if [[ -n "$doh" ]]; then
 		additional_results+=("pass:DNS-over-HTTPS: Enabled")
 	else
 		additional_results+=("warn:DNS-over-HTTPS: Disabled")
+					FIX_QUEUE+=("DNS-over-HTTPS|MANUAL:requires manual setup in System Settings → Network → Advanced → DNS")
 	fi
 	
 	print_category "Additional" "${additional_results[@]}"
@@ -802,12 +820,33 @@ main() {
 	run_additional_checks
 	
 	if [[ "$QUIET_MODE" == "true" ]]; then
-		echo "$PASS_count $WARN_count $FAIL_count"
 		return 0
 	fi
 	
 	print_summary
-	
+
+	if [[ ${#FIX_QUEUE[@]} -gt 0 && "$AUTO_FIX" != "true" && "$OUTPUT_FORMAT" == "text" && "$QUIET_MODE" != "true" ]]; then
+		if [[ -t 0 || -t 1 ]]; then
+			echo ""
+			echo -n "Fix ${#FIX_QUEUE[@]} issue(s) automatically? [y/N] "
+			read -r answer
+			if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
+				echo ""
+				for item in "${FIX_QUEUE[@]}"; do
+					check_name="${item%%|*}"
+					fix_cmd="${item#*|}"
+					if [[ "$fix_cmd" == MANUAL:* ]]; then
+						echo "  ${YELLOW}→ Fixing: $check_name${NC}"
+						echo "  ${GRAY}ℹ Skipped: ${fix_cmd#MANUAL:}${NC}"
+					else
+						echo "  ${YELLOW}→ Fixing: $check_name${NC}"
+						eval "$fix_cmd" 2>/dev/null && echo "  ${GREEN}✓ Fixed${NC}" || echo "  ${RED}✗ Fix failed${NC}"
+					fi
+				done
+			fi
+		fi
+	fi
+
 	if [[ "$NOTIFY" == "true" ]]; then
 		send_notification
 	fi

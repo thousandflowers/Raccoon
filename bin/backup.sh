@@ -24,9 +24,6 @@ for arg in "$@"; do
 		exit 0
 		;;
 	*)
-		echo "Unknown option: $arg"
-		echo "Usage: rcc backup"
-		exit 1
 		;;
 	esac
 done
@@ -36,22 +33,26 @@ check_tm_destination() {
 	dest=$(tmutil destinationinfo 2>/dev/null | grep "Name:" | head -1 |
 		cut -d: -f2- | xargs 2>/dev/null || echo "")
 
+	print_section_header "Time Machine"
+
+	print_table_header "Setting|Value" 20 30
+
 	if [[ -z "$dest" ]]; then
-		echo -e "  ${RED}${ICON_ERROR} Time Machine not configured${NC}"
-		echo ""
-		echo "  Configure in: System Settings > General > Time Machine"
+		print_table_row "Destination|${RED}Not configured${NC}" 20 30
 		return 0
 	fi
 
-	echo -e "  Destination:  ${GREEN}${dest}${NC}"
+	print_table_row "Destination|${GREEN}${dest}${NC}" 20 30
 }
 
 check_last_backup() {
 	local last_backup
 	last_backup=$(tmutil latestbackup 2>/dev/null || echo "")
 
+	print_table_header "Last Backup|When" 20 30
+
 	if [[ -z "$last_backup" ]]; then
-		echo -e "  Last Backup:  ${YELLOW}No backup found${NC}"
+		print_table_row "Backup|${YELLOW}No backup found${NC}" 20 30
 		return 0
 	fi
 
@@ -65,20 +66,20 @@ check_last_backup() {
 	local diff=$(((now - backup_ts) / 3600))
 
 	if [[ $diff -lt 24 ]]; then
-		echo -e "  Last Backup:  ${GREEN}${backup_date} (${diff}h ago)${NC}"
+		print_table_row "Backup|${GREEN}${backup_date} (${diff}h ago)${NC}" 20 30
 	elif [[ $diff -lt 168 ]]; then
-		echo -e "  Last Backup:  ${YELLOW}${backup_date} (${diff}h ago)${NC}"
+		print_table_row "Backup|${YELLOW}${backup_date} (${diff}h ago)${NC}" 20 30
 	else
-		echo -e "  Last Backup:  ${RED}${backup_date} (${diff}h ago — overdue!)${NC}"
+		print_table_row "Backup|${RED}${backup_date} (${diff}h overdue!)${NC}" 20 30
 	fi
 }
 
 main() {
-	print_section_header "Time Machine Backup"
+	check_tm_destination
+	check_last_backup
 
-	show_progress_bar \
-		"Check TM destination:check_tm_destination" \
-		"Check last backup:check_last_backup"
+	echo ""
+	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
 }
 
 main "$@"
