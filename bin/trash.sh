@@ -93,6 +93,16 @@ main() {
 
 	echo "${GREEN}✓${NC}"
 
+	if [[ "$EMPTY_TRASH" == "true" ]]; then
+		echo ""
+		echo -n "Empty the trash? [y/N] "
+		read -r answer
+		if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
+			osascript -e 'tell application "Finder" to empty trash' 2>/dev/null || rm -rf "$trash_path"/*
+			echo "${GREEN}✓ Trash emptied${NC}"
+		fi
+	fi
+
 	echo ""
 	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
 }

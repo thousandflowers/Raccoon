@@ -82,7 +82,7 @@ check_broken_symlinks() {
 
 check_duplicate_path() {
 	local seen=""
-	local duplicates=""
+	local dup_count=0
 
 	print_section_header "Duplicate PATH Entries"
 
@@ -92,12 +92,13 @@ check_duplicate_path() {
 	for dir in "${path_parts[@]}"; do
 		if echo "$seen" | grep -qxF "$dir"; then
 			print_table_row "$dir|${YELLOW}duplicate${NC}" 45 10
+			((dup_count++)) || true
 		else
 			seen+=$'\n'"$dir"
 		fi
 	done
 
-	if [[ -z "$duplicates" ]]; then
+	if [[ $dup_count -eq 0 ]]; then
 		print_table_row "${GRAY}No duplicates found${NC}|${GREEN}OK${NC}" 45 10
 	fi
 }
