@@ -59,7 +59,7 @@ main() {
 			[[ -n "$repo" ]] && print_table_row "$repo|$tag|$size" 25 15 10
 		done
 	else
-		print_table_row "${GRAY}No images found${NC}||" 25 15 10
+		print_table_row "${GRAY}No images found${NC}|-|-" 25 15 10
 	fi
 	echo "${GREEN}✓${NC}"
 
@@ -79,7 +79,7 @@ main() {
 			[[ -n "$cid" ]] && print_table_row "$cid|$image|$status" 14 20 15
 		done
 	else
-		print_table_row "${GRAY}No containers found${NC}||" 14 20 15
+		print_table_row "${GRAY}No containers found${NC}|-|-" 14 20 15
 	fi
 	echo "${GREEN}✓${NC}"
 
@@ -101,7 +101,7 @@ main() {
 			[[ -n "$vol_name" && "$vol_name" != "NAME" ]] && print_table_row "$vol_name|$driver" 30 15
 		done
 	else
-		print_table_row "${GRAY}No volumes found${NC}|" 30 15
+		print_table_row "${GRAY}No volumes found${NC}|-" 30 15
 	fi
 	echo "${GREEN}✓${NC}"
 
@@ -120,7 +120,7 @@ main() {
 			[[ -n "$type" ]] && print_table_row "$type|$size" 25 20
 		done
 	else
-		print_table_row "${GRAY}Could not get info${NC}|" 25 20
+		print_table_row "${GRAY}Could not get info${NC}|-" 25 20
 	fi
 	echo "${GREEN}✓${NC}"
 

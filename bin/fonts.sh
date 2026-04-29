@@ -44,15 +44,14 @@ main() {
 	sys_fonts=$(ls -1 /Library/Fonts/ 2>/dev/null | wc -l | xargs || echo "0")
 	print_table_row "/Library/Fonts/|$sys_fonts" 25 20
 
-	local user_fonts
-	user_fonts=$(ls -1 ~/Library/Fonts/ 2>/dev/null | wc -l | xargs || echo "0")
-	print_table_row "~/Library/Fonts/|$user_fonts" 25 20
-
 	echo "${GREEN}✓${NC}"
 
 	echo ""
 	echo "${GRAY}[2/4] User Fonts...${NC}"
 	print_table_header "Source|Count" 25 20
+
+	local user_fonts
+	user_fonts=$(ls -1 ~/Library/Fonts/ 2>/dev/null | wc -l | xargs || echo "0")
 	print_table_row "~/Library/Fonts/|$user_fonts" 25 20
 
 	echo "${GREEN}✓${NC}"
@@ -100,10 +99,10 @@ main() {
 		print_table_row "Checks|${GRAY}skipped${NC}" 25 20
 	fi
 
-	echo "${GREEN}✓${NC}"
-
 	local total=$((sys_fonts + user_fonts))
 	print_table_row "${GRAY}Total installed${NC}|$total fonts" 25 20
+
+	echo "${GREEN}✓${NC}"
 
 	echo ""
 	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"

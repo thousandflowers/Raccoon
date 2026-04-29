@@ -47,7 +47,7 @@ main() {
 		while IFS= read -r item; do
 			[[ -z "$item" ]] && continue
 			local name
-			name=$(echo "$item" | sed 's/.plist//' | sed 's/com.//' | sed 's/.//')
+			name=$(echo "$item" | sed 's/^com\.//' | sed 's/^org\.//' | sed 's/^io\.//' | sed 's/\.plist$//')
 			print_table_row "✓ $name" 40
 			((count++)) || true
 		done <<< "$user_agents"
@@ -122,7 +122,7 @@ main() {
 	local uptime
 	uptime=$(uptime 2>/dev/null || echo "N/A")
 	local load
-	load=$(uptime 2>/dev/null | grep "load" | sed 's/.*load //' | sed 's/,//g' || echo "N/A")
+	load=$(uptime 2>/dev/null | awk -F'load averages?: ' '{print $2}' | sed 's/,//g' || echo "N/A")
 	print_table_row "$uptime" 40
 	if [[ -n "$load" && "$load" != "N/A" ]]; then
 		print_table_row "Load average: $load" 40

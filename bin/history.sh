@@ -74,7 +74,7 @@ main() {
 		while IFS= read -r line || [[ -n "$line" ]]; do
 			[[ -z "$line" ]] && continue
 			local cmd
-			cmd=$(echo "$line" | awk '{print $1}' | xargs || echo "")
+			cmd=$(echo "$line" | sed 's/^: [0-9]*:[0-9]*;//' | awk '{print $1}' | xargs || echo "")
 			[[ -n "$cmd" ]] && {
 				print_table_row "$cmd" 35
 				((recent_count++)) || true

@@ -119,11 +119,13 @@ check_tool_versions() {
 }
 
 main() {
-	show_progress_bar \
-		"PATH entries:check_path_entries" \
-		"Broken symlinks:check_broken_symlinks" \
-		"Duplicates:check_duplicate_path" \
-		"Tool versions:check_tool_versions"
+	check_path_entries
+	check_broken_symlinks
+	check_duplicate_path
+	check_tool_versions
+
+	echo ""
+	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
 }
 
 main "$@"
