@@ -182,8 +182,10 @@ func (m model) View() string {
 		return ""
 	}
 
-	out := "\033[36mRaccoon\033[0m\n"
-	out += "macOS companion toolkit\n\n"
+	out := "     _\n"
+	out += `   / \_/\_   ` + "\x1b[36mRaccoon\x1b[0m\n"
+	out += "  ( o.o )  \x1b[90mmacOS companion toolkit\x1b[0m\n"
+	out += "   > ^ <\n\n"
 
 	filtered := m.filteredItems()
 
