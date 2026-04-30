@@ -8,8 +8,6 @@ SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
-REPOS=""
-
 show_git_help() {
 	echo "Usage: rcc git [options]"
 	echo ""
@@ -24,8 +22,6 @@ for arg in "$@"; do
 	--help | -h)
 		show_git_help
 		exit 0
-		;;
-	*)
 		;;
 	esac
 done
@@ -54,85 +50,128 @@ scan_repos() {
 			fi
 			while IFS= read -r repo; do
 				all_repos+=$'\n'"$repo"
-			done < <(find "$dir" -maxdepth "$depth" -type d -name '.git' -exec dirname {} \; 2>/dev/null)
+				done < <(find "$dir" -maxdepth "$depth" -type d -name '.git' -exec dirname {} \; 2>/dev/null)
 		fi
 	done
 
-	REPOS=$(echo "$all_repos" | sort -u | grep -v '^$' | tr '\n' $'\n')
+	echo "$all_repos" | sort -u | grep -v '^$' | tr '\n' $'\n'
 }
 
-check_repos() {
-	print_section_header "Git Repositories"
+check_repo() {
+	local repo="$1"
+	cd "$repo" 2>/dev/null || return 1
 
-	if [[ -z "$REPOS" ]]; then
-		echo "${GRAY}No repositories found${NC}"
-		return 0
+	local has_issue=0
+	local issues=""
+
+	local uncommitted
+	uncommitted=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+	if [[ "$uncommitted" -gt 0 ]]; then
+		has_issue=1
+		issues+="${YELLOW}$uncommitted uncommitted${NC}, "
 	fi
 
-	print_table_header "Repository|Issues" 40 20
+	local unpushed
+	unpushed=$(git log @{u}.. --oneline 2>/dev/null | wc -l | tr -d ' ')
+	if [[ "$unpushed" -gt 0 ]]; then
+		has_issue=1
+		issues+="${YELLOW}$unpushed unpushed${NC}, "
+	fi
 
+	local stashed
+	stashed=$(git stash list 2>/dev/null | wc -l | tr -d ' ')
+	if [[ "$stashed" -gt 0 ]]; then
+		has_issue=1
+		issues+="${YELLOW}$stashed stashed${NC}, "
+	fi
+
+	if ! git symbolic-ref HEAD >/dev/null 2>&1; then
+		has_issue=1
+		issues+="${YELLOW}detached HEAD${NC}, "
+	fi
+
+	local no_upstream
+	no_upstream=$(git branch -vv 2>/dev/null | grep -v '\[' | grep -cE '^\s+\S' || true)
+	if [[ "$no_upstream" -gt 0 ]]; then
+		has_issue=1
+		issues+="${YELLOW}$no_upstream no upstream${NC}"
+	fi
+
+	if [[ $has_issue -eq 1 ]]; then
+		local repo_name
+		repo_name=$(basename "$repo")
+		echo "$repo_name|$issues"
+	fi
+}
+
+main() {
+	local use_global_progress=false
+	if [[ -t 1 ]]; then
+		use_global_progress=true
+	fi
+
+	if [[ "$use_global_progress" == "true" ]]; then
+		init_global_progress 2
+		update_global_progress_info "git: scanning for repositories..."
+	fi
+
+	local -a repos=()
+	while IFS= read -r repo; do
+		[[ -z "$repo" ]] && continue
+		repos+=("$repo")
+		if [[ "$use_global_progress" == "true" ]]; then
+			append_progress_output "Found: $repo"
+		fi
+	done < <(scan_repos)
+
+	if [[ "$use_global_progress" == "true" ]]; then
+		increment_global_progress
+		update_global_progress_info "git: checking ${#repos[@]} repositories..."
+	fi
+
+	local -a repo_issues=()
 	local repos_with_issues=0
 
-	while IFS= read -r repo; do
-		local has_issue=0
-		local issues=""
-
-		cd "$repo" 2>/dev/null || continue
-
-		local uncommitted
-		uncommitted=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
-		if [[ "$uncommitted" -gt 0 ]]; then
-			has_issue=1
-			issues+="${YELLOW}$uncommitted uncommitted${NC}, "
-		fi
-
-		local unpushed
-		unpushed=$(git log @{u}.. --oneline 2>/dev/null | wc -l | tr -d ' ')
-		if [[ "$unpushed" -gt 0 ]]; then
-			has_issue=1
-			issues+="${YELLOW}$unpushed unpushed${NC}, "
-		fi
-
-		local stashed
-		stashed=$(git stash list 2>/dev/null | wc -l | tr -d ' ')
-		if [[ "$stashed" -gt 0 ]]; then
-			has_issue=1
-			issues+="${YELLOW}$stashed stashed${NC}, "
-		fi
-
-		if ! git symbolic-ref HEAD >/dev/null 2>&1; then
-			has_issue=1
-			issues+="${YELLOW}detached HEAD${NC}, "
-		fi
-
-		local no_upstream
-		no_upstream=$(git branch -vv 2>/dev/null | grep -v '\[' | grep -cE '^\s+\S' || true)
-		if [[ "$no_upstream" -gt 0 ]]; then
-			has_issue=1
-			issues+="${YELLOW}$no_upstream no upstream${NC}"
-		fi
-
-		if [[ $has_issue -eq 1 ]]; then
+	for repo in "${repos[@]}"; do
+		local result
+		result=$(check_repo "$repo")
+		if [[ -n "$result" ]]; then
 			((repos_with_issues++)) || true
-			local repo_name
-			repo_name=$(basename "$repo")
-			print_table_row "$repo_name|$issues" 40 20
+			repo_issues+=("$result")
+			if [[ "$use_global_progress" == "true" ]]; then
+				local repo_name="${result%%|*}"
+				append_progress_output "$repo_name: has issues"
+			fi
 		fi
+	done
 
-	done <<< "$REPOS"
+	if [[ "$use_global_progress" == "true" ]]; then
+		increment_global_progress
+		finish_global_progress
+	fi
 
-	if [[ $repos_with_issues -eq 0 ]]; then
-		print_table_row "All repos|${GREEN}Clean${NC}" 40 20
+	print_section_header "Git Repositories"
+
+	if [[ ${#repos[@]} -eq 0 ]]; then
+		if [[ "$use_global_progress" == "true" ]]; then
+			finish_global_progress
+		fi
+		echo "${GRAY}No repositories found${NC}"
+	else
+		print_table_header "Repository|Issues" 40 20
+		if [[ $repos_with_issues -eq 0 ]]; then
+			print_table_row "All repos|${GREEN}Clean${NC}" 40 20
+		else
+			for result in "${repo_issues[@]}"; do
+				local repo_name="${result%%|*}"
+				local issues="${result#*|}"
+				print_table_row "$repo_name|$issues" 40 20
+			done
+		fi
 	fi
 
 	echo ""
 	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
-}
-
-main() {
-	show_progress_bar \
-		"Scanning repos:scan_repos" \
-		"Checking status:check_repos"
 }
 
 main "$@"

@@ -19,6 +19,7 @@ show_upgrade_help() {
 }
 
 RCC_DRY_RUN=false
+RCC_USE_GLOBAL_PROGRESS=false
 
 for arg in "$@"; do
 	case "$arg" in
@@ -29,40 +30,389 @@ for arg in "$@"; do
 	--dry-run | -n)
 		RCC_DRY_RUN=true
 		;;
-	*)
-		;;
 	esac
 done
 
-upgrade_homebrew() {
-	print_section_header "Homebrew"
+# ============================================================
+# Output parsers — extract meaningful info from command lines
+# ============================================================
 
+_parse_brew_update() {
+	local line="$1"
+	if [[ "$line" == *"Updating Homebrew"* ]]; then
+		update_global_progress_info "brew: updating..."
+	elif [[ "$line" == *"Updated"*tap* ]]; then
+		update_global_progress_info "brew: updated taps"
+	elif [[ "$line" == *"Already up-to-date"* ]]; then
+		update_global_progress_info "brew: up to date"
+	fi
+}
+
+_parse_brew_upgrade() {
+	local line="$1"
+	if [[ "$line" == *"==> Upgrading"* ]]; then
+		local pkg="${line#*==> Upgrading }"
+		update_global_progress_info "brew: upgrade $pkg"
+	elif [[ "$line" == *"==> Fetching"* ]]; then
+		update_global_progress_info "brew: fetching..."
+	elif [[ "$line" == *"==> Downloading"* ]]; then
+		update_global_progress_info "brew: downloading..."
+	elif [[ "$line" == *"==> Pouring"* ]]; then
+		update_global_progress_info "brew: installing..."
+	elif [[ "$line" == *"🍺"* ]]; then
+		update_global_progress_info "brew: completed"
+	elif [[ "$line" == *"==> Caveats"* ]]; then
+		update_global_progress_info "brew: caveats"
+	fi
+}
+
+_parse_pip() {
+	local line="$1"
+	if [[ "$line" == *"Collecting"* ]]; then
+		local pkg
+		pkg=$(echo "$line" | sed 's/Collecting //;s/ (.*//')
+		update_global_progress_info "pip: collect $pkg"
+	elif [[ "$line" == *"Downloading"* ]]; then
+		update_global_progress_info "pip: downloading..."
+	elif [[ "$line" == *"Installing collected packages"* ]]; then
+		update_global_progress_info "pip: installing..."
+	elif [[ "$line" == *"Successfully installed"* ]]; then
+		update_global_progress_info "pip: installed"
+	elif [[ "$line" == *"Requirement already satisfied"* ]]; then
+		update_global_progress_info "pip: up to date"
+	fi
+}
+
+_parse_npm() {
+	local line="$1"
+	if [[ "$line" == *"added"* || "$line" == *"removed"* || "$line" == *"changed"* ]]; then
+		update_global_progress_info "npm: $line"
+	elif [[ "$line" == *"packages are looking for funding"* ]]; then
+		:
+	elif [[ "$line" == *"found"* || "$line" == *"vulnerabilities"* ]]; then
+		update_global_progress_info "npm: $line"
+	fi
+}
+
+_parse_nvm() {
+	local line="$1"
+	if [[ "$line" == *"Now using"* ]]; then
+		update_global_progress_info "nvm: $line"
+	elif [[ "$line" == *"Installing"* ]]; then
+		update_global_progress_info "nvm: installing..."
+	elif [[ "$line" == *"v"* && "$line" == *"already installed"* ]]; then
+		update_global_progress_info "nvm: already installed"
+	fi
+}
+
+_parse_rustup() {
+	local line="$1"
+	if [[ -n "$line" && "$line" != *"info:"* ]]; then
+		update_global_progress_info "rustup: $line"
+	elif [[ "$line" == *"updated"* ]]; then
+		update_global_progress_info "rustup: updated"
+	elif [[ "$line" == *"unchanged"* ]]; then
+		update_global_progress_info "rustup: unchanged"
+	fi
+}
+
+_parse_gem() {
+	local line="$1"
+	if [[ "$line" == *"Updating"* ]]; then
+		update_global_progress_info "gem: $line"
+	elif [[ "$line" == *"Nothing to update"* ]]; then
+		update_global_progress_info "gem: up to date"
+	elif [[ "$line" == *"Gems updated"* ]]; then
+		update_global_progress_info "gem: updated"
+	fi
+}
+
+# ============================================================
+# Upgrade functions
+# ============================================================
+
+upgrade_homebrew() {
+	update_global_progress_info "brew: checking..."
+
+	if ! command -v brew >/dev/null 2>&1; then
+		update_global_progress_info "brew: not installed"
+		append_progress_output "brew: not installed"
+		increment_global_progress
+		return 0
+	fi
+
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		update_global_progress_info "brew: dry run"
+		local output
+		output=$(brew outdated 2>&1 || true)
+		if [[ -n "$output" ]]; then
+			append_progress_output "brew: outdated packages found"
+			while IFS= read -r line; do
+				append_progress_output "$line"
+			done <<< "$output"
+		else
+			append_progress_output "brew: up to date"
+		fi
+		increment_global_progress
+		return 0
+	fi
+
+	update_global_progress_info "brew: updating..."
+	set +e
+	set +o pipefail
+	brew update 2>&1 | while IFS= read -r line; do
+		append_progress_output "$line"
+		_parse_brew_update "$line"
+	done
+	set -e
+	set -o pipefail
+
+	update_global_progress_info "brew: upgrading..."
+	set +e
+	set +o pipefail
+	brew upgrade 2>&1 | while IFS= read -r line; do
+		append_progress_output "$line"
+		_parse_brew_upgrade "$line"
+	done
+	set -e
+	set -o pipefail
+
+	increment_global_progress
+}
+
+upgrade_pip() {
+	update_global_progress_info "pip: checking..."
+
+	local pip_cmd=""
+	if command -v pip3 >/dev/null 2>&1; then
+		pip_cmd="pip3"
+	elif command -v pip >/dev/null 2>&1; then
+		pip_cmd="pip"
+	else
+		update_global_progress_info "pip: not installed"
+		append_progress_output "pip: not installed"
+		increment_global_progress
+		return 0
+	fi
+
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		update_global_progress_info "pip: dry run"
+		local output
+		output=$($pip_cmd list --outdated 2>&1 || true)
+		if [[ -n "$output" ]]; then
+			append_progress_output "pip: outdated packages found"
+			while IFS= read -r line; do
+				append_progress_output "$line"
+			done <<< "$output"
+		else
+			append_progress_output "pip: up to date"
+		fi
+		increment_global_progress
+		return 0
+	fi
+
+	update_global_progress_info "pip: checking outdated..."
+	local pkgs
+	pkgs=$($pip_cmd list --outdated --format=freeze 2>/dev/null | grep -v '^\-e' | cut -d = -f 1 || true)
+
+	if [[ -z "$pkgs" ]]; then
+		update_global_progress_info "pip: up to date"
+		append_progress_output "pip: no outdated packages"
+		increment_global_progress
+		return 0
+	fi
+
+	while IFS= read -r pkg; do
+		[[ -z "$pkg" ]] && continue
+		update_global_progress_info "pip: upgrade $pkg"
+		set +e
+		set +o pipefail
+		$pip_cmd install --upgrade "$pkg" 2>&1 | while IFS= read -r line; do
+			append_progress_output "$line"
+			_parse_pip "$line"
+		done
+		set -e
+		set -o pipefail
+	done <<< "$pkgs"
+
+	increment_global_progress
+}
+
+upgrade_npm() {
+	update_global_progress_info "npm: checking..."
+
+	if ! command -v npm >/dev/null 2>&1; then
+		update_global_progress_info "npm: not installed"
+		append_progress_output "npm: not installed"
+		increment_global_progress
+		return 0
+	fi
+
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		update_global_progress_info "npm: dry run"
+		set +e
+		set +o pipefail
+		npm outdated -g 2>&1 | while IFS= read -r line; do
+			append_progress_output "$line"
+		done
+		set -e
+		set -o pipefail
+		increment_global_progress
+		return 0
+	fi
+
+	update_global_progress_info "npm: updating..."
+	set +e
+	set +o pipefail
+	npm update -g 2>&1 | while IFS= read -r line; do
+		append_progress_output "$line"
+		_parse_npm "$line"
+	done
+	set -e
+	set -o pipefail
+
+	increment_global_progress
+}
+
+upgrade_nvm() {
+	update_global_progress_info "nvm: checking..."
+
+	local nvm_dir="${NVM_DIR:-$HOME/.nvm}"
+	local nvm_sh="$nvm_dir/nvm.sh"
+
+	if [[ ! -s "$nvm_sh" ]]; then
+		update_global_progress_info "nvm: not installed"
+		append_progress_output "nvm: not installed"
+		increment_global_progress
+		return 0
+	fi
+
+	export NVM_DIR="$nvm_dir"
+	source "$nvm_sh" >/dev/null 2>&1
+
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		update_global_progress_info "nvm: dry run"
+		local current latest
+		current=$(nvm version current 2>/dev/null || echo "system")
+		latest=$(nvm version-remote --lts 2>/dev/null || echo "unknown")
+		append_progress_output "nvm: $current -> $latest"
+		increment_global_progress
+		return 0
+	fi
+
+	update_global_progress_info "nvm: updating..."
+	set +e
+	set +o pipefail
+	nvm install --lts 2>&1 | while IFS= read -r line; do
+		append_progress_output "$line"
+		_parse_nvm "$line"
+	done
+	set -e
+	set -o pipefail
+
+	increment_global_progress
+}
+
+upgrade_rustup() {
+	update_global_progress_info "rustup: checking..."
+
+	if ! command -v rustup >/dev/null 2>&1; then
+		update_global_progress_info "rustup: not installed"
+		append_progress_output "rustup: not installed"
+		increment_global_progress
+		return 0
+	fi
+
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		update_global_progress_info "rustup: dry run"
+		local output
+		output=$(rustup check 2>&1 || true)
+		if [[ -n "$output" ]]; then
+			append_progress_output "rustup: check results"
+			while IFS= read -r line; do
+				append_progress_output "$line"
+			done <<< "$output"
+		else
+			append_progress_output "rustup: up to date"
+		fi
+		increment_global_progress
+		return 0
+	fi
+
+	update_global_progress_info "rustup: updating..."
+	set +e
+	set +o pipefail
+	rustup update 2>&1 | while IFS= read -r line; do
+		append_progress_output "$line"
+		_parse_rustup "$line"
+	done
+	set -e
+	set -o pipefail
+
+	increment_global_progress
+}
+
+upgrade_gem() {
+	update_global_progress_info "gem: checking..."
+
+	if ! command -v gem >/dev/null 2>&1; then
+		update_global_progress_info "gem: not installed"
+		append_progress_output "gem: not installed"
+		increment_global_progress
+		return 0
+	fi
+
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		update_global_progress_info "gem: dry run"
+		local output
+		output=$(gem outdated 2>&1 || true)
+		if [[ -n "$output" ]]; then
+			append_progress_output "gem: outdated gems found"
+			while IFS= read -r line; do
+				append_progress_output "$line"
+			done <<< "$output"
+		else
+			append_progress_output "gem: up to date"
+		fi
+		increment_global_progress
+		return 0
+	fi
+
+	update_global_progress_info "gem: updating..."
+	set +e
+	set +o pipefail
+	gem update 2>&1 | while IFS= read -r line; do
+		append_progress_output "$line"
+		_parse_gem "$line"
+	done
+	set -e
+	set -o pipefail
+
+	increment_global_progress
+}
+
+# ============================================================
+# Fallback output (non-TTY)
+# ============================================================
+
+_fallback_upgrade_homebrew() {
+	echo ""
+	echo "${PURPLE_BOLD}-- Homebrew${NC}"
 	if ! command -v brew >/dev/null 2>&1; then
 		echo "${GRAY}not installed${NC}"
 		return 0
 	fi
-
-	print_table_header "Manager|Status" 20 20
-
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		local output
-		output=$(brew outdated 2>&1 || true)
-		if [[ -n "$output" ]]; then
-			print_table_row "brew|${YELLOW}needs update${NC}"
-		else
-			print_table_row "brew|${GREEN}up to date${NC}"
-		fi
+		brew outdated 2>&1 || true
 	else
-		start_inline_spinner "Updating Homebrew..."
-		brew update 2>/dev/null && brew upgrade 2>/dev/null || true
-		stop_inline_spinner
-		print_table_row "brew|${GREEN}updated${NC}"
+		brew update 2>&1 || true
+		brew upgrade 2>&1 || true
 	fi
 }
 
-upgrade_pip() {
-	print_section_header "pip"
-
+_fallback_upgrade_pip() {
+	echo ""
+	echo "${PURPLE_BOLD}-- pip${NC}"
 	local pip_cmd=""
 	if command -v pip3 >/dev/null 2>&1; then
 		pip_cmd="pip3"
@@ -72,148 +422,113 @@ upgrade_pip() {
 		echo "${GRAY}not installed${NC}"
 		return 0
 	fi
-
-	print_table_header "Manager|Status" 20 20
-
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		local output
-		output=$($pip_cmd list --outdated 2>&1 || true)
-		if [[ -n "$output" ]]; then
-			print_table_row "$pip_cmd|${YELLOW}needs update${NC}"
-		else
-			print_table_row "$pip_cmd|${GREEN}up to date${NC}"
-		fi
+		$pip_cmd list --outdated 2>&1 || true
 	else
-		start_inline_spinner "Updating pip packages..."
 		$pip_cmd list --outdated --format=freeze 2>/dev/null |
 			grep -v '^\-e' | cut -d = -f 1 |
-			xargs -n1 $pip_cmd install --upgrade 2>/dev/null || true
-		stop_inline_spinner
-		print_table_row "$pip_cmd|${GREEN}updated${NC}"
+			xargs -n1 $pip_cmd install --upgrade 2>&1 || true
 	fi
 }
 
-upgrade_npm() {
-	print_section_header "npm"
-
+_fallback_upgrade_npm() {
+	echo ""
+	echo "${PURPLE_BOLD}-- npm${NC}"
 	if ! command -v npm >/dev/null 2>&1; then
 		echo "${GRAY}not installed${NC}"
 		return 0
 	fi
-
-	print_table_header "Manager|Status" 20 20
-
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		npm outdated -g || true
-		print_table_row "npm|${YELLOW}check output above${NC}"
+		npm outdated -g 2>&1 || true
 	else
-		start_inline_spinner "Updating npm packages..."
-		npm update -g 2>/dev/null || true
-		stop_inline_spinner
-		print_table_row "npm|${GREEN}updated${NC}"
+		npm update -g 2>&1 || true
 	fi
 }
 
-upgrade_nvm() {
-	print_section_header "nvm"
-
+_fallback_upgrade_nvm() {
+	echo ""
+	echo "${PURPLE_BOLD}-- nvm${NC}"
 	local nvm_dir="${NVM_DIR:-$HOME/.nvm}"
 	local nvm_sh="$nvm_dir/nvm.sh"
-
 	if [[ ! -s "$nvm_sh" ]]; then
 		echo "${GRAY}not installed${NC}"
 		return 0
 	fi
-
-	print_table_header "Manager|Status" 20 20
-
+	export NVM_DIR="$nvm_dir"
+	source "$nvm_sh" >/dev/null 2>&1
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		export NVM_DIR="$nvm_dir"
-		source "$nvm_sh"
-		local current
-		current=$(nvm version current 2>/dev/null || echo "system")
-		local latest
-		latest=$(nvm version-remote --lts 2>/dev/null || echo "unknown")
-		print_table_row "nvm|$current -> $latest"
+		nvm version current 2>/dev/null || echo "system"
+		nvm version-remote --lts 2>/dev/null || echo "unknown"
 	else
-		export NVM_DIR="$nvm_dir"
-		source "$nvm_sh"
-		start_inline_spinner "Updating nvm..."
-		nvm install --lts 2>/dev/null || true
-		stop_inline_spinner
-		print_table_row "nvm|${GREEN}updated${NC}"
+		nvm install --lts 2>&1 || true
 	fi
 }
 
-upgrade_rustup() {
-	print_section_header "rustup"
-
+_fallback_upgrade_rustup() {
+	echo ""
+	echo "${PURPLE_BOLD}-- rustup${NC}"
 	if ! command -v rustup >/dev/null 2>&1; then
 		echo "${GRAY}not installed${NC}"
 		return 0
 	fi
-
-	print_table_header "Manager|Status" 20 20
-
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		local output
-		output=$(rustup check 2>&1 || true)
-		if [[ -n "$output" ]]; then
-			print_table_row "rustup|${YELLOW}needs update${NC}"
-		else
-			print_table_row "rustup|${GREEN}up to date${NC}"
-		fi
+		rustup check 2>&1 || true
 	else
-		start_inline_spinner "Updating rustup..."
-		rustup update 2>/dev/null || true
-		stop_inline_spinner
-		print_table_row "rustup|${GREEN}updated${NC}"
+		rustup update 2>&1 || true
 	fi
 }
 
-upgrade_gem() {
-	print_section_header "gem"
-
+_fallback_upgrade_gem() {
+	echo ""
+	echo "${PURPLE_BOLD}-- gem${NC}"
 	if ! command -v gem >/dev/null 2>&1; then
 		echo "${GRAY}not installed${NC}"
 		return 0
 	fi
-
-	print_table_header "Manager|Status" 20 20
-
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		local output
-		output=$(gem outdated 2>&1 || true)
-		if [[ -n "$output" ]]; then
-			print_table_row "gem|${YELLOW}needs update${NC}"
-		else
-			print_table_row "gem|${GREEN}up to date${NC}"
-		fi
+		gem outdated 2>&1 || true
 	else
-		start_inline_spinner "Updating gem..."
-		gem update 2>/dev/null || true
-		stop_inline_spinner
-		print_table_row "gem|${GREEN}updated${NC}"
+		gem update 2>&1 || true
 	fi
 }
 
-main() {
-	print_section_header "Upgrade Package Managers"
+# ============================================================
+# Main
+# ============================================================
 
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		echo "${YELLOW}DRY RUN MODE - no changes made${NC}"
-		echo ""
+main() {
+	if [[ -t 1 ]]; then
+		RCC_USE_GLOBAL_PROGRESS=true
+		init_global_progress 6
+	else
+		print_section_header "Upgrade Package Managers"
+		if [[ "$RCC_DRY_RUN" == "true" ]]; then
+			echo "${YELLOW}DRY RUN MODE - no changes made${NC}"
+			echo ""
+		fi
 	fi
 
-	upgrade_homebrew
-	upgrade_pip
-	upgrade_npm
-	upgrade_nvm
-	upgrade_rustup
-	upgrade_gem
+	if [[ "$RCC_USE_GLOBAL_PROGRESS" == "true" ]]; then
+		upgrade_homebrew
+		upgrade_pip
+		upgrade_npm
+		upgrade_nvm
+		upgrade_rustup
+		upgrade_gem
 
-	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+		finish_global_progress
+		echo ""
+		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	else
+		_fallback_upgrade_homebrew
+		_fallback_upgrade_pip
+		_fallback_upgrade_npm
+		_fallback_upgrade_nvm
+		_fallback_upgrade_rustup
+		_fallback_upgrade_gem
+		echo ""
+		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	fi
 }
 
 main "$@"

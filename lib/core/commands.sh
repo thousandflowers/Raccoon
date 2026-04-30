@@ -97,6 +97,8 @@ show_brand_banner() {
     echo ""
 }
 
+# Used by the bash fallback menu (when Go UI is not available)
+# SCRIPT_DIR is inherited from rcc which sources this file
 run_cmd() {
     # Reset completo del terminale prima di ogni comando
     printf '\r'
@@ -154,7 +156,107 @@ show_menu() {
     done
     
     echo ""
-    echo -e "${GRAY}↑↓ Navigate | Enter | Q Quit${NC}"
+    echo -e "${GRAY}↑↓ Navigate | Enter | / Search | Q Quit${NC}"
+}
+
+_filter_menu_items() {
+    local query="$1"
+    local lower_query
+    lower_query=$(echo "$query" | tr '[:upper:]' '[:lower:]')
+    
+    local -a filtered=()
+    local n=1
+    while [[ $n -le $TOTAL_OPTIONS ]]; do
+        local item="${MENU_ITEMS[$((n-1))]}"
+        if [[ "$item" != "---" ]]; then
+            local lower_item
+            lower_item=$(echo "$item" | tr '[:upper:]' '[:lower:]')
+            if [[ "$lower_item" == *"$lower_query"* ]]; then
+                filtered+=("$n:$item")
+            fi
+        fi
+        n=$((n+1))
+    done
+    
+    echo "${filtered[@]}"
+}
+
+_show_filtered_menu() {
+    local -a items=("$@")
+    local sel="${items[0]}"
+    items=("${items[@]:1}")
+    
+    local n=1
+    for item in "${items[@]}"; do
+        local orig_idx="${item%%:*}"
+        local rest="${item#*:}"
+        
+        if [[ $n -eq $sel ]]; then
+            echo -e "${GREEN}▶ $n. $rest${NC}"
+        else
+            echo "  $n. $rest"
+        fi
+        n=$((n+1))
+    done
+    
+    echo ""
+    echo -e "${GRAY}↑↓ Navigate | Enter | Esc Cancel${NC}"
+}
+
+_search_and_run() {
+    echo ""
+    echo -n "Search: "
+    read -r query
+    
+    if [[ -z "$query" ]]; then
+        return 1
+    fi
+    
+    local result
+    result=$(_filter_menu_items "$query")
+    local -a filtered=($result)
+    
+    if [[ ${#filtered[@]} -eq 0 ]]; then
+        echo ""
+        echo -e "${YELLOW}No matches found${NC}"
+        echo ""
+        echo -n "Press any key to continue..."
+        read -r -s -n 1
+        return 1
+    fi
+    
+    if [[ ${#filtered[@]} -eq 1 ]]; then
+        local orig_idx="${filtered[0]%%:*}"
+        run_cmd "$orig_idx"
+        return 0
+    fi
+    
+    local sel=1
+    while true; do
+        clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf $'\033[2J\033[H]'
+        show_brand_banner
+        _show_filtered_menu "$sel" "${filtered[@]}"
+        
+        read -r -s -n 1 key
+        case "$key" in
+            $'\x1b')
+                read -r -s -n 1 t
+                [[ "$t" == "[" ]] || continue
+                read -r -s -n 1 t
+                [[ "$t" == "A" ]] && ((sel > 1)) && sel=$((sel-1))
+                [[ "$t" == "B" ]] && ((sel < ${#filtered[@]})) && sel=$((sel+1))
+                ;;
+            "")
+                local chosen="${filtered[$((sel-1))]}"
+                local orig_idx="${chosen%%:*}"
+                run_cmd "$orig_idx"
+                return 0
+                ;;
+            $'\x03'|q|Q)
+                return 1
+                ;;
+        esac
+    done
 }
 
 interactive_main_menu() {
@@ -182,6 +284,9 @@ interactive_main_menu() {
                 [[ $cur -eq 7 || $cur -eq 12 ]] && [[ "$t" == "B" ]] && cur=$((cur+1))
                 ;;
             "") run_cmd $cur ;;
+            /)
+                _search_and_run
+                ;;
             q|Q) exit 0 ;;
         esac
     done

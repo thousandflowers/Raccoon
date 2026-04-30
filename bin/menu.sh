@@ -55,7 +55,7 @@ render() {
 		echo ""
 	done
 	echo ""
-	echo "${GRAY}←→ Navigate · ↑↓ Rows · Enter Run · Q Quit${NC}"
+	echo "${GRAY}←→ Navigate · ↑↓ Rows · Enter Run · / Search · Q Quit${NC}"
 }
 
 run_item() {
@@ -66,6 +66,113 @@ run_item() {
 	if [[ -n "$cmd" && -x "$BIN_PATH/$cmd" ]]; then
 		"$BIN_PATH/$cmd"
 	fi
+}
+
+_filter_items() {
+	local query="$1"
+	local lower_query
+	lower_query=$(echo "$query" | tr '[:upper:]' '[:lower:]')
+	
+	local -a filtered=()
+	local n=0
+	for item in "${items[@]}"; do
+		local lower_item
+		lower_item=$(echo "$item" | tr '[:upper:]' '[:lower:]')
+		if [[ "$lower_item" == *"$lower_query"* ]]; then
+			filtered+=("$n:$item")
+		fi
+		n=$((n+1))
+	done
+	
+	echo "${filtered[@]}"
+}
+
+_render_filtered() {
+	local sel="$1"
+	shift
+	local -a filtered=("$@")
+	
+	clear 2>/dev/null || true
+	echo ""
+	echo "${CYAN}Raccoon${NC}"
+	echo "macOS companion toolkit"
+	echo ""
+	
+	local n=1
+	for item in "${filtered[@]}"; do
+		local orig_idx="${item%%:*}"
+		local rest="${item#*:}"
+		local title="${rest%%:*}"
+		local desc="${rest#*:}"
+		desc="${desc#*:}"
+		
+		if [[ $n -eq $sel ]]; then
+			echo -e " ${GREEN}[$n] $title${NC} — $desc"
+		else
+			echo "  $n. $title — $desc"
+		fi
+		n=$((n+1))
+	done
+	
+	echo ""
+	echo -e "${GRAY}↑↓ Navigate · Enter Run · Esc Cancel${NC}"
+}
+
+_search_and_run() {
+	echo ""
+	echo -n "Search: "
+	read -r query
+	
+	if [[ -z "$query" ]]; then
+		return 1
+	fi
+	
+	local result
+	result=$(_filter_items "$query")
+	local -a filtered=($result)
+	
+	if [[ ${#filtered[@]} -eq 0 ]]; then
+		echo ""
+		echo -e "${YELLOW}No matches found${NC}"
+		echo ""
+		echo -n "Press any key to continue..."
+		read -r -s -n 1
+		return 1
+	fi
+	
+	if [[ ${#filtered[@]} -eq 1 ]]; then
+		local orig_idx="${filtered[0]%%:*}"
+		run_item "$orig_idx"
+		return 0
+	fi
+	
+	local sel=1
+	while true; do
+		_render_filtered "$sel" "${filtered[@]}"
+		
+		read -r -s -n 1 key
+		case "$key" in
+			$'\x1b')
+				read -r -s -n 1 rest || true
+				if [[ "$rest" == "[" ]]; then
+					read -r -s -n 1 arrow || true
+					case "$arrow" in
+						A) ((sel > 1)) && sel=$((sel-1)) ;;
+						B) ((sel < ${#filtered[@]})) && sel=$((sel+1)) ;;
+					esac
+				fi
+				;;
+			$'\n'|$'\r')
+				local chosen="${filtered[$((sel-1))]}"
+				local orig_idx="${chosen%%:*}"
+				run_item "$orig_idx"
+				return 0
+				;;
+			$'\x03'|q|Q)
+				return 1
+				;;
+		esac
+	done
 }
 
 main() {
@@ -92,6 +199,9 @@ main() {
 				;;
 			$'\n'|$'\r')
 				run_item $selected
+				;;
+			/)
+				_search_and_run
 				;;
 		esac
 		

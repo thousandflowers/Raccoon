@@ -13,6 +13,12 @@ WARN_count=0
 FAIL_count=0
 declare -a FIX_QUEUE=()
 
+# Global progress bar support
+ACCUMULATED_RESULTS=()
+ACCUMULATED_CATEGORIES=()
+AUDIT_SILENT_MODE=false
+CURRENT_CATEGORY=""
+
 show_audit_help() {
 	echo "Usage: rcc audit [options]"
 	echo ""
@@ -49,60 +55,75 @@ SCHEDULE_WEEKLY=false
 ALERT_ON_ISSUES=false
 NOTIFY=false
 
-for arg in "$@"; do
-	case "$arg" in
+while [[ $# -gt 0 ]]; do
+	case "$1" in
 	--help | -h)
 		show_audit_help
 		exit 0
 		;;
 	--deep)
 		DEEP_SCAN=true
+		shift
 		;;
 	--fix)
 		AUTO_FIX=true
+		shift
 		;;
 	--dry-run)
 		FIX_DRY_RUN=true
+		shift
 		;;
 	--force)
 		FIX_FORCE=true
+		shift
 		;;
 	--quiet | -q)
 		QUIET_MODE=true
 		DEEP_SCAN=true
+		shift
 		;;
 	--report)
 		REPORT_FILE="$2"
-		shift
+		shift 2
 		;;
 	--report=*)
-		REPORT_FILE="${arg#--report=}"
+		REPORT_FILE="${1#--report=}"
+		shift
 		;;
 	--html)
 		OUTPUT_FORMAT="html"
+		shift
 		;;
 	--csv)
 		OUTPUT_FORMAT="csv"
+		shift
 		;;
 	--json)
 		OUTPUT_FORMAT="json"
+		shift
 		;;
 	--history)
 		SHOW_HISTORY=true
+		shift
 		;;
 	--diff)
 		SHOW_DIFF=true
+		shift
 		;;
 	--watch)
 		SCHEDULE_WEEKLY=true
+		shift
 		;;
 	--alert)
 		ALERT_ON_ISSUES=true
+		shift
 		;;
 	--notify)
 		NOTIFY=true
+		shift
 		;;
 	*)
+		shift
 		;;
 	esac
 done
@@ -117,17 +138,27 @@ print_result() {
 	local colored_label=""
 	
 	if [[ "$status" == "pass" ]]; then
+		((PASS_count++)) || true
+	elif [[ "$status" == "warn" ]]; then
+		((WARN_count++)) || true
+	elif [[ "$status" == "fail" ]]; then
+		((FAIL_count++)) || true
+	fi
+	
+	if [[ "$AUDIT_SILENT_MODE" == "true" ]]; then
+		ACCUMULATED_RESULTS+=("$status:$CURRENT_CATEGORY:$label")
+		return
+	fi
+	
+	if [[ "$status" == "pass" ]]; then
 		icon="${GREEN}✓${NC}"
 		colored_label="${GREEN}$label${NC}"
-		((PASS_count++)) || true
 	elif [[ "$status" == "warn" ]]; then
 		icon="${YELLOW}⚠${NC}"
 		colored_label="${YELLOW}$label${NC}"
-		((WARN_count++)) || true
 	elif [[ "$status" == "fail" ]]; then
 		icon="${RED}✗${NC}"
 		colored_label="${RED}$label${NC}"
-		((FAIL_count++)) || true
 	else
 		icon="${GRAY}○${NC}"
 		colored_label="${GRAY}$label${NC}"
@@ -151,6 +182,17 @@ print_category() {
 	local name="$1"
 	shift
 	local -a items=("$@")
+	
+	if [[ "$AUDIT_SILENT_MODE" == "true" ]]; then
+		CURRENT_CATEGORY="$name"
+		ACCUMULATED_CATEGORIES+=("$name")
+		for item in "${items[@]}"; do
+			local status="$(echo "$item" | cut -d: -f1)"
+			local rest="$(echo "$item" | cut -d: -f2-)"
+			print_result "$status" "$rest"
+		done
+		return
+	fi
 	
 	local name_len=${#name}
 	local padding=$((37 - name_len))
@@ -423,6 +465,7 @@ fix_issue() {
 run_core_checks() {
 	local -a core_results=()
 	
+	update_global_progress_info "audit: FileVault..."
 	local fv_status
 	fv_status="$(sudo fdesetup status 2>/dev/null | grep -i "filevault is" | head -1)"
 	if echo "$fv_status" | grep -qi "enabled"; then
@@ -433,7 +476,9 @@ run_core_checks() {
 	else
 		core_results+=("warn:FileVault: Unknown")
 	fi
+	increment_global_progress
 	
+	update_global_progress_info "audit: SIP..."
 	local sip_status
 	sip_status="$(sudo csrutil status 2>/dev/null)"
 	if echo "$sip_status" | grep -qi "enabled"; then
@@ -443,7 +488,9 @@ run_core_checks() {
 	else
 		core_results+=("warn:SIP: Unknown")
 	fi
+	increment_global_progress
 	
+	update_global_progress_info "audit: Gatekeeper..."
 	local gk_status
 	gk_status="$(spctl --status 2>/dev/null)"
 	if echo "$gk_status" | grep -qi "enabled"; then
@@ -452,7 +499,9 @@ run_core_checks() {
 		core_results+=("fail:Gatekeeper: Disabled")
 		fix_issue "Gatekeeper" "sudo spctl --master-enable"
 	fi
+	increment_global_progress
 	
+	update_global_progress_info "audit: Firewall..."
 	local fw_status
 	fw_status="$(sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>/dev/null)"
 	if echo "$fw_status" | grep -qi "enabled"; then
@@ -461,7 +510,9 @@ run_core_checks() {
 		core_results+=("fail:Firewall: Disabled")
 		fix_issue "Firewall" "sudo /usr/libexec/ApplicationFirewall/socketfilterfw --enable"
 	fi
+	increment_global_progress
 	
+	update_global_progress_info "audit: Stealth Mode..."
 	local stealth_status
 	stealth_status="$(sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getstealthmode 2>/dev/null)"
 	if echo "$stealth_status" | grep -qi "enabled"; then
@@ -470,7 +521,9 @@ run_core_checks() {
 		core_results+=("warn:Stealth Mode: Disabled")
 		fix_issue "Stealth Mode" "sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on"
 	fi
+	increment_global_progress
 	
+	update_global_progress_info "audit: Software Updates..."
 	local updates
 	updates="$(softwareupdate -l 2>/dev/null | grep -c "Recommended Update" 2>/dev/null)"
 	[[ -z "$updates" ]] && updates="0"
@@ -479,6 +532,7 @@ run_core_checks() {
 	else
 		core_results+=("warn:Software Updates: ${updates} pending")
 	fi
+	increment_global_progress
 	
 	print_category "Core Security" "${core_results[@]}"
 }
@@ -486,6 +540,7 @@ run_core_checks() {
 run_network_checks() {
 	local -a network_results=()
 	
+	update_global_progress_info "audit: Open Ports..."
 	port_count="$(sudo lsof -i -P -n 2>/dev/null | grep LISTEN | wc -l 2>/dev/null)"
 	[[ -z "$port_count" ]] && port_count="0"
 	port_count="$(echo "$port_count" | sed 's/ *//g')"
@@ -495,7 +550,9 @@ run_network_checks() {
 		network_results+=("warn:Open Ports: ${port_count} listening")
 		fix_issue "Open Ports" "echo 'Consider reviewing open ports with: sudo lsof -i -P -n'"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: DNS Servers..."
 	local dns_servers
 	dns_servers="$(scutil --dns 2>/dev/null | grep "nameserver" | head -1 | awk '{print $NF}')"
 	if [[ -n "$dns_servers" ]]; then
@@ -504,7 +561,9 @@ run_network_checks() {
 		network_results+=("warn:DNS Servers: None configured")
 		fix_issue "DNS Servers" "networksetup -setdnsservers Wi-Fi 8.8.8.8"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: VPN..."
 	local vpn_count
 	vpn_count="$(networksetup -listallnetworkservices 2>/dev/null | grep -c "VPN" 2>/dev/null)"
 	[[ -z "$vpn_count" ]] && vpn_count="0"
@@ -514,7 +573,9 @@ run_network_checks() {
 		network_results+=("warn:VPN: ${vpn_count} configured")
 		fix_issue "VPN" "for svc in \$(networksetup -listallnetworkservices | grep VPN); do networksetup -disconnectvpn \"\$svc\" 2>/dev/null; done"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: Bluetooth..."
 	local bt_status
 	bt_status="$(blueutil status 2>/dev/null)"
 	if echo "$bt_status" | grep -qi "off"; then
@@ -530,7 +591,9 @@ run_network_checks() {
 		network_results+=("warn:Bluetooth: Unknown")
 		fix_issue "Bluetooth" "sudo defaults write /Library/Preferences/com.apple.Bluetooth ControllerPowerState -int 0 && sudo killall -HUP blued 2>/dev/null || true"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: Sharing..."
 	local sharing_count
 	sharing_count="$(sharing -l 2>/dev/null | grep -c "Share" 2>/dev/null)"
 	[[ -z "$sharing_count" ]] && sharing_count="0"
@@ -540,7 +603,9 @@ run_network_checks() {
 		network_results+=("warn:Sharing: ${sharing_count} enabled")
 		fix_issue "Sharing" "sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null; sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.smbd.plist 2>/dev/null; sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.AppleFileServer.plist 2>/dev/null; true"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: SSH Daemon..."
 	local sshd_check
 	sshd_check="$(sudo launchctl list com.openssh.sshd 2>/dev/null)"
 	if [[ -z "$sshd_check" ]] || echo "$sshd_check" | grep -q "not found"; then
@@ -549,6 +614,7 @@ run_network_checks() {
 		network_results+=("warn:SSH Daemon: Running")
 		fix_issue "SSH Daemon" "sudo launchctl unload /System/Library/LaunchDaemons/sshd.plist"
 	fi
+	increment_global_progress
 	
 	print_category "Network" "${network_results[@]}"
 }
@@ -556,6 +622,7 @@ run_network_checks() {
 run_auth_checks() {
 	local -a auth_results=()
 	
+	update_global_progress_info "audit: Auto-Login..."
 	local auto_user
 	auto_user="$(sudo defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser 2>/dev/null)"
 	if [[ -z "$auto_user" ]]; then
@@ -564,7 +631,9 @@ run_auth_checks() {
 		auth_results+=("fail:Auto-Login: User ${auto_user}")
 		fix_issue "Auto-Login" "sudo defaults delete /Library/Preferences/com.apple.loginwindow autoLoginUser"
 	fi
+	increment_global_progress
 	
+	update_global_progress_info "audit: Keychain..."
 	local keychains
 	keychains="$(security list-keychains 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$keychains" ]] && keychains="0"
@@ -574,7 +643,9 @@ run_auth_checks() {
 	else
 		auth_results+=("warn:Keychain: None found")
 	fi
+	increment_global_progress
 	
+	update_global_progress_info "audit: SSH Keys..."
 	local ssh_key_count
 	ssh_key_count="$(ls -la ~/.ssh/*.pub 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$ssh_key_count" ]] && ssh_key_count="0"
@@ -584,7 +655,9 @@ run_auth_checks() {
 	else
 		auth_results+=("pass:SSH Keys: ${ssh_key_count} key(s)")
 	fi
+	increment_global_progress
 	
+	update_global_progress_info "audit: Authorized Keys..."
 	local auth_keys_count
 	auth_keys_count="$(cat ~/.ssh/authorized_keys 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$auth_keys_count" ]] && auth_keys_count="0"
@@ -595,7 +668,9 @@ run_auth_checks() {
 		auth_results+=("warn:Authorized Keys: ${auth_keys_count} key(s)")
 		fix_issue "Authorized Keys" "rm ~/.ssh/authorized_keys"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: Sudoers..."
 	local sudoers_check
 	sudoers_check="$(sudo visudo -c 2>&1)"
 	if echo "$sudoers_check" | grep -qi "parsed"; then
@@ -603,6 +678,7 @@ run_auth_checks() {
 	else
 		auth_results+=("fail:Sudoers: Error")
 	fi
+	increment_global_progress
 	
 	print_category "User & Auth" "${auth_results[@]}"
 }
@@ -610,6 +686,7 @@ run_auth_checks() {
 run_persistence_checks() {
 	local -a persistence_results=()
 	
+	update_global_progress_info "audit: User LaunchAgents..."
 	local user_la_count
 	user_la_count="$(ls -1 ~/Library/LaunchAgents/ 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$user_la_count" ]] && user_la_count="0"
@@ -622,7 +699,9 @@ run_persistence_checks() {
 		persistence_results+=("warn:User LaunchAgents: ${user_la_count} items")
 		fix_issue "User LaunchAgents" "rm -rf ~/Library/LaunchAgents/*.plist 2>/dev/null; echo 'Removed user launch agents'"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: System LaunchAgents..."
 	local sys_la_count
 	sys_la_count="$(ls -1 /Library/LaunchAgents/ 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$sys_la_count" ]] && sys_la_count="0"
@@ -634,7 +713,9 @@ run_persistence_checks() {
 	else
 		persistence_results+=("warn:System LaunchAgents: ${sys_la_count} items")
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: LaunchDaemons..."
 	local ld_count
 	ld_count="$(ls -1 /Library/LaunchDaemons/ 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$ld_count" ]] && ld_count="0"
@@ -646,7 +727,9 @@ run_persistence_checks() {
 	else
 		persistence_results+=("warn:LaunchDaemons: ${ld_count} items")
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: Cron Jobs..."
 	local cron_count
 	cron_count="$(crontab -l 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$cron_count" ]] && cron_count="0"
@@ -657,7 +740,9 @@ run_persistence_checks() {
 		persistence_results+=("warn:Cron Jobs: ${cron_count} jobs")
 		fix_issue "Cron Jobs" "crontab -r 2>/dev/null || true"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: At Jobs..."
 	local at_count
 	at_count="$(atq 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$at_count" ]] && at_count="0"
@@ -668,7 +753,9 @@ run_persistence_checks() {
 		persistence_results+=("warn:At Jobs: ${at_count} jobs")
 		fix_issue "At Jobs" "atrm -a 2>/dev/null || true"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: Login Items..."
 	local li_count
 	li_count="$(osascript -e 'tell application "System Events" to get the name of every login item' 2>/dev/null | tr ',' '\n' | wc -l 2>/dev/null)"
 	[[ -z "$li_count" ]] && li_count="0"
@@ -681,6 +768,7 @@ run_persistence_checks() {
 		persistence_results+=("warn:Login Items: ${li_count} items")
 		fix_issue "Login Items" "osascript -e 'tell application \"System Events\" to delete every login item' 2>/dev/null || true"
 	fi
+	increment_global_progress
 	
 	print_category "Persistence" "${persistence_results[@]}"
 }
@@ -692,6 +780,7 @@ run_privacy_checks() {
 		return
 	fi
 	
+	update_global_progress_info "audit: Location Services..."
 	local location_status
 	location_status="$(system_profiler SPPrivacyDataType 2>/dev/null | grep -i "Location Services" | head -1)"
 	if echo "$location_status" | grep -qi "0"; then
@@ -701,7 +790,9 @@ run_privacy_checks() {
 	else
 		privacy_results+=("warn:Location Services: Unknown")
 	fi
+	increment_global_progress
 	
+	update_global_progress_info "audit: Analytics..."
 	local analytics
 	analytics="$(defaults read /Library/Preferences/com.apple.usage.plist Analytics.blinded 2>/dev/null)"
 	if [[ -z "$analytics" ]]; then
@@ -709,6 +800,7 @@ run_privacy_checks() {
 	else
 		privacy_results+=("warn:Analytics: Enabled")
 	fi
+	increment_global_progress
 	
 	print_category "Privacy" "${privacy_results[@]}"
 }
@@ -716,6 +808,7 @@ run_privacy_checks() {
 run_additional_checks() {
 	local -a additional_results=()
 	
+	update_global_progress_info "audit: XProtect..."
 	local xprotect
 	xprotect="$(defaults read /Library/Preferences/com.apple.XprotectFramework XProtectData 2>/dev/null | head -1)"
 	if [[ -n "$xprotect" ]]; then
@@ -723,7 +816,9 @@ run_additional_checks() {
 	else
 		additional_results+=("warn:XProtect: Unknown")
 	fi
+	increment_global_progress
 	
+	update_global_progress_info "audit: Screen Lock..."
 	local lock_timeout
 	lock_timeout="$(defaults read /Library/Preferences/com.apple.preferencepanegeneral starttimesystem 2>/dev/null)"
 	if [[ -n "$lock_timeout" ]]; then
@@ -732,7 +827,9 @@ run_additional_checks() {
 		additional_results+=("warn:Screen Lock: Default")
 		fix_issue "Screen Lock" "sudo defaults write /Library/Preferences/com.apple.screensaver askForPasswordDelay -int 0 && defaults write com.apple.screensaver askForPassword -int 1"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: .ssh Permissions..."
 	local file_perms
 	file_perms="$(ls -la ~/.ssh 2>/dev/null | head -1 | awk '{print $1}')"
 	if [[ "$file_perms" == "drwx------" ]]; then
@@ -741,7 +838,9 @@ run_additional_checks() {
 		additional_results+=("warn:.ssh Permissions: Insecure")
 		fix_issue ".ssh Permissions" "chmod 700 ~/.ssh && chmod 600 ~/.ssh/*"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: Quarantined Files..."
 	local quarantined
 	quarantined="$(xattr -lr ~/Downloads 2>/dev/null | grep -c "com.apple.quarantine" || echo "0")"
 	if [[ "$quarantined" -eq 0 ]]; then
@@ -750,7 +849,9 @@ run_additional_checks() {
 		additional_results+=("warn:Quarantined Files: ${quarantined}")
 		fix_issue "Quarantined Files" "find ~/Downloads -xattr -r -d com.apple.quarantine 2>/dev/null || true"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: Kernel Extensions..."
 	local kext_count
 	kext_count="$(kextstat 2>/dev/null | grep -v "com.apple" | wc -l 2>/dev/null | sed 's/ *//g')"
 	[[ -z "$kext_count" ]] && kext_count="0"
@@ -762,7 +863,9 @@ run_additional_checks() {
 		additional_results+=("warn:Kernel Extensions: ${kext_count} (third-party)")
 		fix_issue "Kernel Extensions" "echo 'Warning: Removing kernel extensions requires SIP disabled. Manual review recommended.'"
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: Sudo Access..."
 	local sudo_last
 	sudo_last="$(sudo -l 2>/dev/null | head -1)"
 	if [[ -n "$sudo_last" && "$sudo_last" != "Sorry" ]]; then
@@ -770,7 +873,9 @@ run_additional_checks() {
 	else
 		additional_results+=("pass:Sudo Access: Limited")
 	fi
+	increment_global_progress
 
+	update_global_progress_info "audit: DNS-over-HTTPS..."
 	local doh
 	doh="$(scutil --dns 2>/dev/null | grep "DOT" | head -1)"
 	if [[ -n "$doh" ]]; then
@@ -779,8 +884,57 @@ run_additional_checks() {
 		additional_results+=("warn:DNS-over-HTTPS: Disabled")
 					FIX_QUEUE+=("DNS-over-HTTPS|MANUAL:requires manual setup in System Settings → Network → Advanced → DNS")
 	fi
+	increment_global_progress
 	
 	print_category "Additional" "${additional_results[@]}"
+}
+
+render_accumulated_results() {
+	for cat_name in "${ACCUMULATED_CATEGORIES[@]}"; do
+		local name_len=${#cat_name}
+		local padding=$((37 - name_len))
+		local pad_str
+		pad_str=$(printf '%*s' "$padding" '')
+		
+		echo ""
+		echo "+---------------------------------------+"
+		echo "| ${CYAN}${cat_name}${NC}${pad_str}|"
+		echo "+---------------------------------------+"
+		
+		for result in "${ACCUMULATED_RESULTS[@]}"; do
+			local r_cat="$(echo "$result" | cut -d: -f2)"
+			[[ "$r_cat" != "$cat_name" ]] && continue
+			local status="$(echo "$result" | cut -d: -f1)"
+			local label="$(echo "$result" | cut -d: -f3-)"
+			
+			local icon=""
+			local colored_label=""
+			if [[ "$status" == "pass" ]]; then
+				icon="${GREEN}✓${NC}"
+				colored_label="${GREEN}$label${NC}"
+			elif [[ "$status" == "warn" ]]; then
+				icon="${YELLOW}⚠${NC}"
+				colored_label="${YELLOW}$label${NC}"
+			elif [[ "$status" == "fail" ]]; then
+				icon="${RED}✗${NC}"
+				colored_label="${RED}$label${NC}"
+			else
+				icon="${GRAY}○${NC}"
+				colored_label="${GRAY}$label${NC}"
+			fi
+			
+			local raw_len=${#label}
+			local pad_len=$((34 - raw_len))
+			local ppadding
+			ppadding=$(printf '%*s' "$pad_len")
+			
+			printf "│ %s %s%s%s │\n" "$icon" "$colored_label" "$ppadding"
+		done
+		
+		echo "+---------------------------------------+"
+	done
+	
+	print_summary
 }
 
 main() {
@@ -817,6 +971,22 @@ main() {
 		sudo -v 2>/dev/null || true
 	fi
 	
+	local use_global_progress=false
+	if [[ -t 1 && "$QUIET_MODE" != "true" && "$OUTPUT_FORMAT" == "text" && "$SHOW_HISTORY" != "true" && "$SHOW_DIFF" != "true" && "$SCHEDULE_WEEKLY" != "true" ]]; then
+		if [[ "$AUTO_FIX" == "true" && "$FIX_FORCE" != "true" ]]; then
+			use_global_progress=false
+		else
+			use_global_progress=true
+		fi
+	fi
+	
+	if [[ "$use_global_progress" == "true" ]]; then
+		AUDIT_SILENT_MODE=true
+		local total_checks=30
+		[[ "$DEEP_SCAN" == "true" ]] && total_checks=32
+		init_global_progress "$total_checks"
+	fi
+	
 	if [[ "$QUIET_MODE" == "true" ]]; then
 		{
 			run_core_checks
@@ -837,7 +1007,13 @@ main() {
 	run_privacy_checks
 	run_additional_checks
 	
-	print_summary
+	if [[ "$use_global_progress" == "true" ]]; then
+		finish_global_progress
+		AUDIT_SILENT_MODE=false
+		render_accumulated_results
+	else
+		print_summary
+	fi
 
 	if [[ ${#FIX_QUEUE[@]} -gt 0 && "$AUTO_FIX" != "true" && "$OUTPUT_FORMAT" == "text" && "$QUIET_MODE" != "true" ]]; then
 		echo ""
