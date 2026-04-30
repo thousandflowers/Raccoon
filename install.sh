@@ -49,9 +49,9 @@ VERSION=$(get_version)
 chmod +x "${INSTALL_DIR}/bin/"*.sh 2>/dev/null || true
 
 # Compile rcc-ui if Go is available
-if command -v go &>/dev/null; then
+if command -v go &>/dev/null && [[ -f "${INSTALL_DIR}/ui/main.go" ]]; then
 	echo "Compiling rcc-ui (Go UI)..."
-	cd "${INSTALL_DIR}/ui" && bash build.sh 2>/dev/null || {
+	cd "${INSTALL_DIR}/ui" && go build -o ../bin/rcc-ui main.go 2>/dev/null || {
 		echo "  Note: Go UI compilation failed, using bash menu fallback"
 	}
 else
