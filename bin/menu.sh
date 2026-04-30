@@ -64,7 +64,9 @@ run_item() {
 	local cmd="${item#*:}"
 	cmd="${cmd%%:*}"
 	if [[ -n "$cmd" && -x "$BIN_PATH/$cmd" ]]; then
+		set +e
 		"$BIN_PATH/$cmd"
+		set -e
 	fi
 }
 

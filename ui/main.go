@@ -25,6 +25,8 @@ type item struct {
 	description string
 }
 
+type cmdFinishedMsg struct{}
+
 func (m model) Init() tea.Cmd {
 	return nil
 }
@@ -73,6 +75,8 @@ func (m *model) clampSelectedIdx() {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case cmdFinishedMsg:
+		return m, nil
 	case tea.KeyMsg:
 		if m.searchMode {
 			switch msg.Type {
@@ -111,7 +115,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					scriptPath := filepath.Join(m.binPath, selected.cmd)
 					c := exec.Command("bash", scriptPath)
 					return m, tea.ExecProcess(c, func(err error) tea.Msg {
-						return tea.Quit()
+						return cmdFinishedMsg{}
 					})
 				}
 				return m, nil
@@ -164,7 +168,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				scriptPath := filepath.Join(m.binPath, selected.cmd)
 				c := exec.Command("bash", scriptPath)
 				return m, tea.ExecProcess(c, func(err error) tea.Msg {
-					return tea.Quit()
+					return cmdFinishedMsg{}
 				})
 			}
 		}

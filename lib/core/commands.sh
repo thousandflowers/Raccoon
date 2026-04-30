@@ -108,32 +108,34 @@ run_cmd() {
     stty sane
     
     local c="$1"
+    set +e
     case "$c" in
-        1) exec "${SCRIPT_DIR}/bin/upgrade.sh" ;;
-        2) exec "${SCRIPT_DIR}/bin/audit.sh" ;;
-        3) exec "${SCRIPT_DIR}/bin/audit.sh" --deep ;;
-        4) exec "${SCRIPT_DIR}/bin/network.sh" ;;
-        5) exec "${SCRIPT_DIR}/bin/disk.sh" ;;
-        6) exec "${SCRIPT_DIR}/bin/memory.sh" ;;
-        7) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --quiet ;;
-        8) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --fix ;;
-        9) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --json ;;
-        10) exec "${SCRIPT_DIR}/bin/audit.sh" --history ;;
-        11) exec "${SCRIPT_DIR}/bin/audit.sh" --watch ;;
-        13) exec "${SCRIPT_DIR}/bin/ssh.sh" ;;
-        14) exec "${SCRIPT_DIR}/bin/git.sh" ;;
-        15) exec "${SCRIPT_DIR}/bin/ports.sh" ;;
-        16) exec "${SCRIPT_DIR}/bin/battery.sh" ;;
-        17) exec "${SCRIPT_DIR}/bin/backup.sh" ;;
-        18) exec "${SCRIPT_DIR}/bin/env.sh" ;;
-        19) exec "${SCRIPT_DIR}/bin/startup.sh" ;;
-        20) exec "${SCRIPT_DIR}/bin/trash.sh" ;;
-        21) exec "${SCRIPT_DIR}/bin/fonts.sh" ;;
-        22) exec "${SCRIPT_DIR}/bin/history.sh" ;;
-        23) exec "${SCRIPT_DIR}/bin/certs.sh" ;;
-        24) exec "${SCRIPT_DIR}/bin/docker.sh" ;;
-        25) exec "${SCRIPT_DIR}/bin/xcode.sh" ;;
+        1) "${SCRIPT_DIR}/bin/upgrade.sh" ;;
+        2) "${SCRIPT_DIR}/bin/audit.sh" ;;
+        3) "${SCRIPT_DIR}/bin/audit.sh" --deep ;;
+        4) "${SCRIPT_DIR}/bin/network.sh" ;;
+        5) "${SCRIPT_DIR}/bin/disk.sh" ;;
+        6) "${SCRIPT_DIR}/bin/memory.sh" ;;
+        7) "${SCRIPT_DIR}/bin/audit.sh" --deep --quiet ;;
+        8) "${SCRIPT_DIR}/bin/audit.sh" --deep --fix ;;
+        9) "${SCRIPT_DIR}/bin/audit.sh" --deep --json ;;
+        10) "${SCRIPT_DIR}/bin/audit.sh" --history ;;
+        11) "${SCRIPT_DIR}/bin/audit.sh" --watch ;;
+        13) "${SCRIPT_DIR}/bin/ssh.sh" ;;
+        14) "${SCRIPT_DIR}/bin/git.sh" ;;
+        15) "${SCRIPT_DIR}/bin/ports.sh" ;;
+        16) "${SCRIPT_DIR}/bin/battery.sh" ;;
+        17) "${SCRIPT_DIR}/bin/backup.sh" ;;
+        18) "${SCRIPT_DIR}/bin/env.sh" ;;
+        19) "${SCRIPT_DIR}/bin/startup.sh" ;;
+        20) "${SCRIPT_DIR}/bin/trash.sh" ;;
+        21) "${SCRIPT_DIR}/bin/fonts.sh" ;;
+        22) "${SCRIPT_DIR}/bin/history.sh" ;;
+        23) "${SCRIPT_DIR}/bin/certs.sh" ;;
+        24) "${SCRIPT_DIR}/bin/docker.sh" ;;
+        25) "${SCRIPT_DIR}/bin/xcode.sh" ;;
     esac
+    set -e
 }
 
 show_menu() {
