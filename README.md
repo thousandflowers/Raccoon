@@ -13,15 +13,7 @@ Your Mac's health, network, security, and packages — all in one place.
 
 ## 🎬 See it in action
 
-<!-- PLACEHOLDER: Insert GIF here (recommended: 800x450, dark terminal) -->
-<!-- 
-Suggested content:
-- Opening rcc and seeing the raccoon logo + menu
-- Typing "/" to search for "audit"
-- Running "rcc upgrade" with progress bar
-- Menu reappearing below output
--->
-![Raccoon Demo](docs/demo.gif)
+![Raccoon Demo](docs/interactive-menu.gif)
 
 **↑ This is Raccoon.** No config files. No dependencies. Just `rcc`.
 
@@ -57,9 +49,7 @@ The installer handles Go compilation automatically — no manual build step requ
 
 ## 📊 The Global Progress Bar
 
-<!-- PLACEHOLDER: Screenshot of progress bar during "rcc upgrade" -->
-<!-- Recommended: 800x450, dark terminal background, showing [██████░░] 2/6 managers -->
-![Progress Bar](docs/progress-bar.png)
+![Progress Bar](docs/progress-bar.gif)
 
 **No more messy terminal output.** Raccoon shows:
 
@@ -73,9 +63,7 @@ Commands with multi-step operations (`upgrade`, `audit`, `git`, `docker`) displa
 
 ## 🎮 Interactive Menu
 
-<!-- PLACEHOLDER: Screenshot of menu with search active (typing "/" + "up") -->
-<!-- Recommended: 800x450, dark terminal background -->
-![Interactive Menu](docs/menu-search.png)
+![Interactive Menu](docs/audit.gif)
 
 **Launch:** `rcc` with no arguments  
 **Search:** Press `/` then type (e.g., `up` → `upgrade`)  
@@ -160,13 +148,11 @@ The progress bar infrastructure lives in `lib/core/common.sh` and is used by `up
 
 ## 🔄 Update
 
-The installer handles updates automatically — just re-run the install command:
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
 ```
 
-Or, if you prefer updating manually:
+Or manually:
 
 ```bash
 cd ~/.raccoon && git pull
@@ -186,5 +172,3 @@ rm /usr/local/bin/rcc   # or ~/.local/bin/rcc
 ## 📜 License
 
 MIT © [thousandflowers](https://github.com/thousandflowers)
-
----
