@@ -1,20 +1,44 @@
+     _
+   / \_/\_   
+  ( o.o )   
+   > ^ <    
+
 # 🦝 Raccoon
 
-> A macOS companion toolkit for power users.
+[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/thousandflowers/Raccoon)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![macOS](https://img.shields.io/badge/macOS-11%2B-blueviolet.svg)](https://www.apple.com/macos/)
 
-Raccoon (`rcc`) is a lightweight Bash toolkit for macOS that surfaces the information and workflows you need most — network state, hardware health, package hygiene, SSH, Git — through a single unified CLI with an interactive TUI featuring real-time progress bars and command search.
+> **The macOS companion toolkit that power users deserve.**
 
-**Version:** 0.3.0
+Single CLI. 18 commands. Real-time progress bars. Interactive search.  
+Your Mac's health, network, security, and packages — all in one place.
 
 ---
 
-## Install
+## 🎬 See it in action
+
+<!-- PLACEHOLDER: Insert GIF here (recommended: 800x450, dark terminal) -->
+<!-- 
+Suggested content:
+- Opening rcc and seeing the raccoon logo + menu
+- Typing "/" to search for "audit"
+- Running "rcc upgrade" with progress bar
+- Menu reappearing below output
+-->
+![Raccoon Demo](docs/demo.gif)
+
+**↑ This is Raccoon.** No config files. No dependencies. Just `rcc`.
+
+---
+
+## 🚀 Install in 10 seconds
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
 ```
 
-Raccoon clones itself to `~/.raccoon` and symlinks `rcc` into `/usr/local/bin` (or `~/.local/bin` if `/usr/local/bin` is not writable).
+That's it. `rcc` is now in your PATH.
 
 ### Requirements
 
@@ -26,28 +50,52 @@ The installer handles Go compilation automatically — no manual build step requ
 
 ---
 
-## Usage
+## ✨ Why Raccoon?
 
-```
-rcc [command] [options]
-```
+| ⚡ Fast | 🔍 Searchable | 📊 Visual |
+|:------:|:-----------:|:--------:|
+| One command gets you everything. | Press `/` to filter 18+ commands instantly. | Progress bars show real-time status. |
+| No config files to manage. | Case-insensitive, searches name + description. | Output scrolls cleanly below the bar. |
+| Runs on stock macOS tools. | Menu reappears after execution. | Final summary with tables & ASCII boxes. |
 
-Run `rcc` with no arguments to open the interactive menu.
+---
 
-### Interactive UI
+## 📊 The Global Progress Bar
 
-Raccoon includes an interactive menu built with Go and Bubble Tea. It launches automatically when you run `rcc` with no arguments. If Go is not available, it falls back to a bash-based menu with the same search functionality.
+<!-- PLACEHOLDER: Screenshot of progress bar during "rcc upgrade" -->
+<!-- Recommended: 800x450, dark terminal background, showing [██████░░] 2/6 managers -->
+![Progress Bar](docs/progress-bar.png)
+
+**No more messy terminal output.** Raccoon shows:
+
+- `[██████████░░] 2/6 managers` — single global bar
+- `brew: upgrade deno` — live status parsed from command output
+- `==> Downloading... 60%` — command output scrolls below
+
+Commands with multi-step operations (`upgrade`, `audit`, `git`, `docker`) display the progress bar automatically. After completion, formatted results appear as tables or ASCII boxes.
+
+---
+
+## 🎮 Interactive Menu
+
+<!-- PLACEHOLDER: Screenshot of menu with search active (typing "/" + "up") -->
+<!-- Recommended: 800x450, dark terminal background -->
+![Interactive Menu](docs/menu-search.png)
+
+**Launch:** `rcc` with no arguments  
+**Search:** Press `/` then type (e.g., `up` → `upgrade`)  
+**Navigate:** Arrow keys or `h/j/k/l`  
+**Run:** `Enter`  
+**Quit:** `q`
 
 **Features:**
-- **Search**: Press `/` to filter commands by name or description (case-insensitive)
-- **Dynamic Grid**: Columns adapt automatically based on the number of results
-- **Persistent Output**: After running a command, the output remains visible and the menu reappears below it
-- **Keyboard Navigation**: Use arrow keys or `h/j/k/l` to navigate, `Enter` to run, `q` to quit
+- **Dynamic Grid** — columns adapt automatically based on filtered results
+- **Persistent Output** — after running a command, the output remains visible and the menu reappears below it
+- **Bash Fallback** — if Go is not available, a bash-based menu with full search functionality launches automatically
 
-<!-- screenshot coming soon -->
-![Raccoon Interactive Menu](docs/screenshot.png)
+---
 
-### Commands
+## 📚 Commands
 
 | Command | Description |
 |---------|-------------|
@@ -104,25 +152,18 @@ Raccoon includes an interactive menu built with Go and Bubble Tea. It launches a
 
 ---
 
-## Global Progress Bar
+## 🏗️ How it works
 
-Commands with multi-step operations (`upgrade`, `audit`, `git`, `docker`) display a single global progress bar fixed at the top of the terminal:
+Raccoon is built with two layers:
 
-- **Real-time info**: The bar shows live status parsed from command output (e.g., "brew: upgrade deno", "audit: FileVault...")
-- **Scrolling output**: Command output scrolls cleanly below the progress bar
-- **Final summary**: After completion, formatted results appear (tables, ASCII boxes, etc.)
+- **Core (Bash)** — 18 command scripts in `bin/` plus shared utilities in `lib/core/`. Every command works standalone via `rcc <command>`.
+- **TUI (Go + Bubble Tea)** — Optional interactive menu in `ui/` that launches automatically. Compiles on install, falls back to a bash-based menu if Go is unavailable.
 
-Example:
-```
-[██████████░░] 2/6 managers
-brew: upgrade deno
-------------------------------
-==> Downloading deno... 60%
-```
+The progress bar infrastructure lives in `lib/core/common.sh` and is used by `upgrade`, `audit`, `git`, and `docker` to stream real-time output without breaking the terminal layout.
 
 ---
 
-## Update
+## 🔄 Update
 
 The installer handles updates automatically — just re-run the install command:
 
@@ -138,7 +179,7 @@ cd ~/.raccoon && git pull
 
 ---
 
-## Uninstall
+## 🗑️ Uninstall
 
 ```bash
 rm -rf ~/.raccoon
@@ -147,50 +188,12 @@ rm /usr/local/bin/rcc   # or ~/.local/bin/rcc
 
 ---
 
-## What Raccoon does
+## 📜 License
 
-Raccoon focuses on system monitoring, diagnostics, and maintenance through an interactive TUI with real-time progress bars and command search — not cleanup or optimization. It provides actionable insights into your Mac's health, network, security, and performance.
-
----
-
-## Structure
-
-```
-Raccoon/
-├── rcc              # Entry point and command dispatcher
-├── install.sh       # One-line installer
-├── bin/             # Individual command scripts
-│   ├── upgrade.sh
-│   ├── audit.sh
-│   ├── network.sh
-│   ├── disk.sh
-│   ├── memory.sh
-│   ├── ports.sh
-│   ├── battery.sh
-│   ├── backup.sh
-│   ├── ssh.sh
-│   ├── git.sh
-│   ├── docker.sh
-│   ├── xcode.sh
-│   ├── env.sh
-│   ├── startup.sh
-│   ├── trash.sh
-│   ├── fonts.sh
-│   ├── history.sh
-│   ├── certs.sh
-│   └── menu.sh      # Interactive grid menu (bash fallback)
-├── lib/
-│   └── core/
-│       ├── common.sh    # Shared utilities and banner
-│       └── commands.sh  # Version, help, menu
-└── ui/
-    ├── main.go          # Go UI with Bubble Tea
-    ├── go.mod           # Go module
-    └── build.sh         # UI build script
-```
+MIT © [thousandflowers](https://github.com/thousandflowers)
 
 ---
 
-## License
-
-MIT
+<p align="center">
+  <sub>Built with 🦝 for macOS power users.</sub>
+</p>
