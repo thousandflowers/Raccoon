@@ -188,7 +188,3 @@ rm /usr/local/bin/rcc   # or ~/.local/bin/rcc
 MIT © [thousandflowers](https://github.com/thousandflowers)
 
 ---
-
-<p align="center">
-  <sub>Built with 🦝 for macOS power users.</sub>
-</p>
