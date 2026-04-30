@@ -1,8 +1,3 @@
-     _
-   / \_/\_   
-  ( o.o )   
-   > ^ <    
-
 # 🦝 Raccoon
 
 [![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/thousandflowers/Raccoon)
