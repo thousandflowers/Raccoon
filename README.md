@@ -2,7 +2,9 @@
 
 > A macOS companion toolkit for power users.
 
-Raccoon (`rcc`) is a lightweight Bash toolkit for macOS that surfaces the information and workflows you need most — network state, hardware health, package hygiene, SSH, Git — through a single unified CLI with an optional interactive menu.
+Raccoon (`rcc`) is a lightweight Bash toolkit for macOS that surfaces the information and workflows you need most — network state, hardware health, package hygiene, SSH, Git — through a single unified CLI with an interactive TUI featuring real-time progress bars and command search.
+
+**Version:** 0.3.0
 
 ---
 
@@ -18,7 +20,9 @@ Raccoon clones itself to `~/.raccoon` and symlinks `rcc` into `/usr/local/bin` (
 
 - macOS 11+ (Big Sur or later)
 - `git` (for installation)
-- Go 1.21+ (optional, for compiling the interactive UI)
+- Go 1.21+ (only if you want to modify and recompile the UI manually)
+
+The installer handles Go compilation automatically — no manual build step required.
 
 ---
 
@@ -32,7 +36,13 @@ Run `rcc` with no arguments to open the interactive menu.
 
 ### Interactive UI
 
-Raccoon includes an optional interactive menu built with Go and Bubble Tea. It launches automatically when you run `rcc` with no arguments. If Go is not available, it falls back to a bash-based menu.
+Raccoon includes an interactive menu built with Go and Bubble Tea. It launches automatically when you run `rcc` with no arguments. If Go is not available, it falls back to a bash-based menu with the same search functionality.
+
+**Features:**
+- **Search**: Press `/` to filter commands by name or description (case-insensitive)
+- **Dynamic Grid**: Columns adapt automatically based on the number of results
+- **Persistent Output**: After running a command, the output remains visible and the menu reappears below it
+- **Keyboard Navigation**: Use arrow keys or `h/j/k/l` to navigate, `Enter` to run, `q` to quit
 
 <!-- screenshot coming soon -->
 ![Raccoon Interactive Menu](docs/screenshot.png)
@@ -94,6 +104,24 @@ Raccoon includes an optional interactive menu built with Go and Bubble Tea. It l
 
 ---
 
+## Global Progress Bar
+
+Commands with multi-step operations (`upgrade`, `audit`, `git`, `docker`) display a single global progress bar fixed at the top of the terminal:
+
+- **Real-time info**: The bar shows live status parsed from command output (e.g., "brew: upgrade deno", "audit: FileVault...")
+- **Scrolling output**: Command output scrolls cleanly below the progress bar
+- **Final summary**: After completion, formatted results appear (tables, ASCII boxes, etc.)
+
+Example:
+```
+[██████████░░] 2/6 managers
+brew: upgrade deno
+------------------------------
+==> Downloading deno... 60%
+```
+
+---
+
 ## Update
 
 The installer handles updates automatically — just re-run the install command:
@@ -121,7 +149,7 @@ rm /usr/local/bin/rcc   # or ~/.local/bin/rcc
 
 ## What Raccoon does
 
-Raccoon focuses on system monitoring, diagnostics, and maintenance — not cleanup or optimization. It provides actionable insights into your Mac's health, network, security, and performance.
+Raccoon focuses on system monitoring, diagnostics, and maintenance through an interactive TUI with real-time progress bars and command search — not cleanup or optimization. It provides actionable insights into your Mac's health, network, security, and performance.
 
 ---
 
@@ -131,7 +159,7 @@ Raccoon focuses on system monitoring, diagnostics, and maintenance — not clean
 Raccoon/
 ├── rcc              # Entry point and command dispatcher
 ├── install.sh       # One-line installer
-├─�� bin/             # Individual command scripts
+├── bin/             # Individual command scripts
 │   ├── upgrade.sh
 │   ├── audit.sh
 │   ├── network.sh
@@ -149,11 +177,16 @@ Raccoon/
 │   ├── trash.sh
 │   ├── fonts.sh
 │   ├── history.sh
-│   └── certs.sh
-└── lib/
-    └── core/
-        ├── common.sh    # Shared utilities and banner
-        └── commands.sh  # Version, help, menu
+│   ├── certs.sh
+│   └── menu.sh      # Interactive grid menu (bash fallback)
+├── lib/
+│   └── core/
+│       ├── common.sh    # Shared utilities and banner
+│       └── commands.sh  # Version, help, menu
+└── ui/
+    ├── main.go          # Go UI with Bubble Tea
+    ├── go.mod           # Go module
+    └── build.sh         # UI build script
 ```
 
 ---
