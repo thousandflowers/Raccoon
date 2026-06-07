@@ -20,11 +20,7 @@ AUDIT_SILENT_MODE=false
 CURRENT_CATEGORY=""
 
 show_audit_help() {
-	echo "Usage: rcc audit [options]"
-	echo ""
-	echo "Security audit: Comprehensive system security analysis"
-	echo ""
-	echo "Options:"
+	print_help_header "audit" "Comprehensive system security analysis" "[--deep] [--fix] [--json] [options...]"
 	echo "  --deep         Enable deep scan (full security audit, requires sudo)"
 	echo "  --fix          Attempt to fix issues automatically"
 	echo "  --fix --dry-run Show fixes without applying"
@@ -39,7 +35,7 @@ show_audit_help() {
 	echo "  --watch       Schedule weekly auto-audit"
 	echo "  --alert       Alert on new issues"
 	echo "  --notify      Send notification on issues"
-	echo "  --help, -h    Show this help"
+	echo ""
 }
 
 DEEP_SCAN=false
@@ -134,8 +130,6 @@ HISTORY_DIR="$HOME/.raccoon/audit-history"
 print_result() {
 	local status="$1"
 	local label="$2"
-	local icon=""
-	local colored_label=""
 	
 	if [[ "$status" == "pass" ]]; then
 		((PASS_count++)) || true
@@ -150,26 +144,12 @@ print_result() {
 		return
 	fi
 	
-	if [[ "$status" == "pass" ]]; then
-		icon="${GREEN}✓${NC}"
-		colored_label="${GREEN}$label${NC}"
-	elif [[ "$status" == "warn" ]]; then
-		icon="${YELLOW}⚠${NC}"
-		colored_label="${YELLOW}$label${NC}"
-	elif [[ "$status" == "fail" ]]; then
-		icon="${RED}✗${NC}"
-		colored_label="${RED}$label${NC}"
-	else
-		icon="${GRAY}○${NC}"
-		colored_label="${GRAY}$label${NC}"
-	fi
-	
-	local raw_len=${#label}
-	local pad_len=$((34 - raw_len))
-	local padding
-	padding=$(printf '%*s' "$pad_len")
-	
-	printf "│ %s %s%s%s │\n" "$icon" "$colored_label" "$padding"
+	case "$status" in
+		pass) print_success "$label" ;;
+		warn) print_warning "$label" ;;
+		fail) print_error "$label" ;;
+		*)    print_info "$label" ;;
+	esac
 }
 
 echo_result() {
@@ -193,45 +173,24 @@ print_category() {
 		done
 		return
 	fi
-	
-	local name_len=${#name}
-	local padding=$((37 - name_len))
-	local pad_str
-	pad_str=$(printf '%*s' "$padding" '')
-	
+
 	echo ""
-	echo "+---------------------------------------+"
-	echo "| ${CYAN}${name}${NC}${pad_str}|"
-	echo "+---------------------------------------+"
+	print_section_header "$name"
 
 	for item in "${items[@]}"; do
 		local status="$(echo "$item" | cut -d: -f1)"
 		local rest="$(echo "$item" | cut -d: -f2-)"
 		echo_result "$status" "$rest"
 	done
-	
-	echo "+---------------------------------------+"
 }
 
 print_summary() {
 	echo ""
-	echo "+---------------------------------------+"
-	echo "| ${PURPLE_BOLD}Summary${NC}                           |"
-	echo "+---------------------------------------+"
-	printf "| ${GREEN}Pass${NC}    | %5s                     |\n" "$PASS_count"
-	printf "| ${YELLOW}Warning${NC} | %5s                     |\n" "$WARN_count"
-	printf "| ${RED}Fail${NC}   | %5s                     |\n" "$FAIL_count"
-	echo "+---------------------------------------+"
-
-	if [[ $FAIL_count -eq 0 && $WARN_count -eq 0 ]]; then
-		echo "| ${GREEN}✓ All checks passed${NC}              |"
-	elif [[ $FAIL_count -eq 0 ]]; then
-		echo "| ${YELLOW}⚠ No critical issues${NC}           |"
-	else
-		echo "| ${RED}✗ Action required${NC}                |"
-	fi
-
-	echo "+---------------------------------------+"
+	print_section_header "Summary"
+	print_success "Pass: $PASS_count"
+	[[ $WARN_count -gt 0 ]] && print_warning "Warning: $WARN_count"
+	[[ $FAIL_count -gt 0 ]] && print_error "Fail: $FAIL_count"
+	echo ""
 }
 
 save_to_history() {
@@ -255,11 +214,10 @@ EOF
 }
 
 show_audit_history() {
-	echo "${PURPLE_BOLD}-- Audit History--${NC}"
-	echo ""
+	print_section_header "Audit History"
 	
 	if [[ ! -d "$HISTORY_DIR" ]]; then
-		echo "  No history found"
+		print_info "No history found"
 		return
 	fi
 	
@@ -267,7 +225,7 @@ show_audit_history() {
 	history_files=($(ls -t "$HISTORY_DIR"/audit_*.json 2>/dev/null | head -10))
 	
 	if [[ ${#history_files[@]} -eq 0 ]]; then
-		echo "  No history found"
+		print_info "No history found"
 		return
 	fi
 	
@@ -280,21 +238,20 @@ show_audit_history() {
 		warn="$(grep -o '"warning": [0-9]*' "$file" | grep -o '[0-9]*' || echo "0")"
 		fail="$(grep -o '"fail": [0-9]*' "$file" | grep -o '[0-9]*' || echo "0")"
 		
-		echo "  $date"
-		echo "    ${GREEN}Pass: $pass${NC} ${YELLOW}Warn: $warn${NC} ${RED}Fail: $fail${NC}"
+		print_info "$date"
+		print_info "Pass: $pass | Warn: $warn | Fail: $fail"
 		echo ""
 	done
 	
-	echo "  Run 'rcc audit --deep --diff' to compare with previous"
+	print_info "Run 'rcc audit --deep --diff' to compare with previous"
 }
 
 show_diff() {
-	echo "${PURPLE_BOLD}-- Diff with Previous Run--${NC}"
-	echo ""
+	print_section_header "Diff with Previous Run"
 	
 	local latest_link="$HISTORY_DIR/latest.json"
 	if [[ ! -L "$latest_link" ]]; then
-		echo "  No previous run found"
+		print_info "No previous run found"
 		return
 	fi
 	
@@ -310,8 +267,8 @@ show_diff() {
 	prev_warn="$(grep -o '"warning": [0-9]*' "$prev_file" | grep -o '[0-9]*' | head -1)"
 	prev_fail="$(grep -o '"fail": [0-9]*' "$prev_file" | grep -o '[0-9]*' | head -1)"
 	
-	echo "  Previous: ${GREEN}Pass: $prev_pass${NC} ${YELLOW}Warn: $prev_warn${NC} ${RED}Fail: $prev_fail${NC}"
-	echo "  Current:  ${GREEN}Pass: $curr_pass${NC} ${YELLOW}Warn: $curr_warn${NC} ${RED}Fail: $curr_fail${NC}"
+	print_info "Previous: Pass: $prev_pass | Warn: $prev_warn | Fail: $prev_fail"
+	print_info "Current:  Pass: $curr_pass | Warn: $curr_warn | Fail: $curr_fail"
 	echo ""
 	
 	local pass_diff=$((curr_pass - prev_pass))
@@ -319,21 +276,21 @@ show_diff() {
 	local fail_diff=$((curr_fail - prev_fail))
 	
 	if [[ $pass_diff -gt 0 ]]; then
-		echo "  ${GREEN}↑ $pass_diff more checks passed${NC}"
+		print_success "$pass_diff more checks passed"
 	elif [[ $pass_diff -lt 0 ]]; then
-		echo "  ${RED}↓ $((-pass_diff)) fewer checks passed${NC}"
+		print_error "$((-pass_diff)) fewer checks passed"
 	fi
 	
 	if [[ $warn_diff -gt 0 ]]; then
-		echo "  ${YELLOW}↑ $warn_diff more warnings${NC}"
+		print_warning "$warn_diff more warnings"
 	elif [[ $warn_diff -lt 0 ]]; then
-		echo "  ${GREEN}↓ $((-warn_diff)) fewer warnings${NC}"
+		print_success "$((-warn_diff)) fewer warnings"
 	fi
 	
 	if [[ $fail_diff -gt 0 ]]; then
-		echo "  ${RED}↑ $fail_diff more failures${NC}"
+		print_error "$fail_diff more failures"
 	elif [[ $fail_diff -lt 0 ]]; then
-		echo "  ${GREEN}↓ $((-fail_diff)) fewer failures${NC}"
+		print_success "$((-fail_diff)) fewer failures"
 	fi
 }
 
@@ -374,7 +331,7 @@ schedule_weekly() {
 EOFPLIST
 
 	launchctl load "$plist_file" 2>/dev/null || true
-	echo "  Weekly audit scheduled (Sundays at 9:00 AM)"
+	echo "  Weekly audit scheduled (Sundays at 9:00 literal AM)"
 }
 
 send_notification() {
@@ -443,20 +400,20 @@ fix_issue() {
 
 	if [[ "$AUTO_FIX" == "true" ]]; then
 		if [[ "$FIX_DRY_RUN" == "true" ]]; then
-			echo "  ${CYAN}→ Would fix: $check_name${NC}"
-			echo "    Command: $fix_cmd"
+			print_info "Would fix: $check_name"
+			print_info "  Command: $fix_cmd"
 			return
 		fi
 
 		if [[ "$FIX_FORCE" != "true" ]]; then
-			echo -n "  ${YELLOW}→ Fix $check_name? [y/N] ${NC}"
+			echo -n "  Fix $check_name? [y/N] "
 			read -r -n 1 -t 5 answer || answer="n"
 			echo ""
 			[[ "$answer" != "y" && "$answer" != "Y" ]] && return
 		fi
 
-		echo "  ${YELLOW}→ Fixing: $check_name${NC}"
-		eval "$fix_cmd" 2>/dev/null && echo "  ${GREEN}✓ Fixed${NC}" || echo "  ${RED}✗ Fix failed${NC}"
+		print_warning "Fixing: $check_name"
+		eval "$fix_cmd" 2>/dev/null && print_success "Fixed $check_name" || print_error "Fix failed: $check_name"
 	else
 		FIX_QUEUE+=("${check_name}|${fix_cmd}")
 	fi
@@ -891,15 +848,8 @@ run_additional_checks() {
 
 render_accumulated_results() {
 	for cat_name in "${ACCUMULATED_CATEGORIES[@]}"; do
-		local name_len=${#cat_name}
-		local padding=$((37 - name_len))
-		local pad_str
-		pad_str=$(printf '%*s' "$padding" '')
-		
 		echo ""
-		echo "+---------------------------------------+"
-		echo "| ${CYAN}${cat_name}${NC}${pad_str}|"
-		echo "+---------------------------------------+"
+		print_section_header "$cat_name"
 		
 		for result in "${ACCUMULATED_RESULTS[@]}"; do
 			local r_cat="$(echo "$result" | cut -d: -f2)"
@@ -907,31 +857,13 @@ render_accumulated_results() {
 			local status="$(echo "$result" | cut -d: -f1)"
 			local label="$(echo "$result" | cut -d: -f3-)"
 			
-			local icon=""
-			local colored_label=""
-			if [[ "$status" == "pass" ]]; then
-				icon="${GREEN}✓${NC}"
-				colored_label="${GREEN}$label${NC}"
-			elif [[ "$status" == "warn" ]]; then
-				icon="${YELLOW}⚠${NC}"
-				colored_label="${YELLOW}$label${NC}"
-			elif [[ "$status" == "fail" ]]; then
-				icon="${RED}✗${NC}"
-				colored_label="${RED}$label${NC}"
-			else
-				icon="${GRAY}○${NC}"
-				colored_label="${GRAY}$label${NC}"
-			fi
-			
-			local raw_len=${#label}
-			local pad_len=$((34 - raw_len))
-			local ppadding
-			ppadding=$(printf '%*s' "$pad_len")
-			
-			printf "│ %s %s%s%s │\n" "$icon" "$colored_label" "$ppadding"
+			case "$status" in
+				pass) print_success "$label" ;;
+				warn) print_warning "$label" ;;
+				fail) print_error "$label" ;;
+				*)    print_info "$label" ;;
+			esac
 		done
-		
-		echo "+---------------------------------------+"
 	done
 	
 	print_summary
@@ -959,7 +891,7 @@ main() {
 		print_section_header "Schedule Weekly Audit"
 		schedule_weekly
 		echo ""
-		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+		print_success "Completed"
 		return
 	fi
 	
@@ -1025,11 +957,10 @@ main() {
 				check_name="${item%%|*}"
 				fix_cmd="${item#*|}"
 				if [[ "$fix_cmd" == MANUAL:* ]]; then
-					echo "  ${YELLOW}→ Fixing: $check_name${NC}"
-					echo "  ${GRAY}ℹ Skipped: ${fix_cmd#MANUAL:}${NC}"
+					print_warning "Fixing: $check_name (manual step required: ${fix_cmd#MANUAL:})"
 				else
-					echo "  ${YELLOW}→ Fixing: $check_name${NC}"
-					eval "$fix_cmd" 2>/dev/null && echo "  ${GREEN}✓ Fixed${NC}" || echo "  ${RED}✗ Fix failed${NC}"
+					print_warning "Fixing: $check_name"
+					eval "$fix_cmd" 2>/dev/null && print_success "Fixed $check_name" || print_error "Fix failed: $check_name"
 				fi
 			done
 		fi
@@ -1061,7 +992,7 @@ main() {
 	save_to_history
 	
 	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

@@ -9,13 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_disk_help() {
-	echo "Usage: rcc disk [options]"
-	echo ""
-	echo "Show disk status, volumes, and space usage"
-	echo ""
-	echo "Options:"
+	print_help_header "disk" "Show disk status, volumes, and space usage" "[--json]"
 	echo "  --json          Output in JSON format"
-	echo "  --help, -h      Show this help"
+	echo ""
 }
 
 JSON_OUTPUT=false
@@ -37,7 +33,7 @@ done
 main() {
 	print_section_header "Disk Status"
 
-	echo "${GRAY}[1/5] Physical Disks...${NC}"
+	print_step 1 5 "Physical Disks"
 	print_table_header "Disk|Size|SMART" 10 12 10
 
 	local disk_info
@@ -55,10 +51,10 @@ main() {
 		smart_colored="${GRAY}N/A${NC}"
 	fi
 	print_table_row "disk0|$disk_size|$smart_colored" 10 12 10
-	echo "${GREEN}✓${NC}"
+	print_success "Disks scanned"
 
 	echo ""
-	echo "${GRAY}[2/5] Volumes...${NC}"
+	print_step 2 5 "Volumes"
 	print_table_header "Volume|Type|Used|Free" 18 8 10 10
 
 	root_info=$(df -h / | tail -1)
@@ -75,10 +71,10 @@ main() {
 		print_table_row "Data|APFS|$data_used|$data_free" 18 8 10 10
 	fi
 
-	echo "${GREEN}✓${NC}"
+	print_success "Volumes scanned"
 
 	echo ""
-	echo "${GRAY}[3/5] APFS Container...${NC}"
+	print_step 3 5 "APFS Container"
 	print_table_header "Container|Size|Free" 18 12 12
 
 	container_info=$(diskutil apfs list 2>/dev/null)
@@ -87,10 +83,10 @@ main() {
 	container_line=$(echo "$container_info" | grep "Capacity Not Allocated:" | head -1)
 	container_free=$(echo "$container_line" | sed 's/.*(\([0-9.]*\) GB.*/\1 GB/')
 	print_table_row "$container_ref|$container_size|$container_free" 18 12 12
-	echo "${GREEN}✓${NC}"
+	print_success "Container checked"
 
 	echo ""
-	echo "${GRAY}[4/5] Space Usage...${NC}"
+	print_step 4 5 "Space Usage"
 	print_table_header "Volume|Used|Free|Percent" 18 8 10 10
 
 	print_table_row "System|$root_used|$root_free|$root_pct" 18 8 10 10
@@ -98,21 +94,21 @@ main() {
 		print_table_row "Data|$data_used|$data_free|$data_pct" 18 8 10 10
 	fi
 
-	echo "${GREEN}✓${NC}"
+	print_success "Space usage computed"
 
 	echo ""
-	echo "${GRAY}[5/5] SMART Status...${NC}"
+	print_step 5 5 "SMART Status"
 	if [[ "$smart" == "Verified" ]]; then
-		echo "  disk0: ${GREEN}Verified${NC}"
+		print_info "disk0: Verified"
 	elif [[ "$smart" == "Failing" ]]; then
-		echo "  disk0: ${RED}Failing${NC}"
+		print_error "disk0: Failing"
 	else
-		echo "  disk0: ${GRAY}N/A${NC}"
+		print_info "disk0: N/A"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "SMART checked"
 
 	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

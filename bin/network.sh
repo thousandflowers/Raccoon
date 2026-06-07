@@ -9,13 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_network_help() {
-	echo "Usage: rcc network [options]"
-	echo ""
-	echo "Show network status with multi-scan confidence scoring"
-	echo ""
-	echo "Options:"
+	print_help_header "network" "Network status with multi-scan confidence scoring" "[--json]"
 	echo "  --json          Output in JSON format"
-	echo "  --help, -h      Show this help"
+	echo ""
 }
 
 JSON_OUTPUT=false
@@ -99,7 +95,7 @@ get_latency() {
 main() {
 	print_section_header "Network Status"
 
-	print_section_header "[1/10] Interfaces"
+	print_step 1 10 "Interfaces"
 	print_table_header "Name|Type|Value" 12 15 30
 	for iface in lo0 en0 en1 utun0 utun1 utun2 utun3 utun4 utun5; do
 		local ip
@@ -123,9 +119,9 @@ main() {
 			fi
 		fi
 	done
-	echo "${GREEN}✓${NC}"
+	print_success "Interfaces scanned"
 
-	print_section_header "[2/10] Listening Ports"
+	print_step 2 10 "Listening Ports"
 	print_table_header "Port|Service|Description" 8 15 30
 	local port_found=0
 	local ports
@@ -151,11 +147,11 @@ main() {
 		fi
 	done <<< "$ports"
 	if [[ $port_found -eq 0 ]]; then
-		echo "  ${GRAY}no proxy/VPN ports detected${NC}"
+		print_info "no proxy/VPN ports detected"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "Ports checked"
 
-	print_section_header "[3/10] Processes..."
+	print_step 3 10 "Processes"
 	echo "  ${GRAY}Detected:${NC}"
 	local proc_found=0
 	local procs
@@ -171,11 +167,11 @@ main() {
 		fi
 	done <<< "$procs"
 	if [[ $proc_found -eq 0 ]]; then
-		echo "  ${GRAY}no proxy/VPN processes found${NC}"
+		print_info "no proxy/VPN processes found"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "Processes checked"
 
-	print_section_header "[4/10] Environment Proxies..."
+	print_step 4 10 "Environment Proxies"
 	echo "  ${GRAY}Detected:${NC}"
 	local env_found=0
 	local proxies
@@ -187,11 +183,11 @@ main() {
 		add_confidence
 	done <<< "$proxies"
 	if [[ $env_found -eq 0 ]]; then
-		echo "  ${GRAY}no environment proxies set${NC}"
+		print_info "no environment proxies set"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "Env proxies checked"
 
-	print_section_header "[5/10] NO_PROXY Config..."
+	print_step 5 10 "NO_PROXY Config"
 	echo "  ${GRAY}Exclusions:${NC}"
 	local noproxy_found=0
 	local noproxy
@@ -201,11 +197,11 @@ main() {
 		noproxy_found=1
 		add_confidence
 	else
-		echo "  ${GRAY}no NO_PROXY configured${NC}"
+		print_info "no NO_PROXY configured"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "NO_PROXY checked"
 
-	print_section_header "[6/10] VPNs (scutil --nc)..."
+	print_step 6 10 "VPNs (scutil --nc)"
 	echo "  ${GRAY}Configured:${NC}"
 	local vpn_found=0
 	local vpns
@@ -223,11 +219,11 @@ main() {
 		fi
 	done <<< "$vpns"
 	if [[ $vpn_found -eq 0 ]]; then
-		echo "  ${GRAY}no active VPNs${NC}"
+		print_info "no active VPNs"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "VPNs checked"
 
-	print_section_header "[7/10] DNS Servers"
+	print_step 7 10 "DNS Servers"
 	print_table_header "Server|Label" 24 30
 	local dns_found=0
 	local dns_list=""
@@ -247,11 +243,11 @@ main() {
 		add_confidence
 	done <<< "$dns_list"
 	if [[ $dns_found -eq 0 ]]; then
-		echo "  ${GRAY}none found${NC}"
+		print_info "none found"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "DNS checked"
 
-	print_section_header "[8/10] Firewall Status..."
+	print_step 8 10 "Firewall Status"
 	echo "  ${GRAY}Status:${NC}"
 	local fw_found=0
 	local awlf
@@ -269,11 +265,11 @@ main() {
 		add_confidence
 	fi
 	if [[ $fw_found -eq 0 ]]; then
-		echo "  ${GRAY}firewall not managed by pfctl${NC}"
+		print_info "firewall not managed by pfctl"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "Firewall checked"
 
-	print_section_header "[9/10] Latency & Connections"
+	print_step 9 10 "Latency & Connections"
 	print_table_header "Server|Latency|Status" 12 8 10
 	local l8=$(get_latency "8.8.8.8")
 	local l1=$(get_latency "1.1.1.1")
@@ -285,9 +281,9 @@ main() {
 	printf "%-12s %-8s %s\n" "1.1.1.1" "$l1" "${GREEN}✓${NC}"
 	printf "%-24s %s\n" "Active:" "$connections connections"
 	[[ "$l8" != "N/A" || "$l1" != "N/A" ]] && add_confidence
-	echo "${GREEN}✓${NC}"
+	print_success "Latency checked"
 
-	print_section_header "[10/10] Summary..."
+	print_step 10 10 "Summary"
 	local pct=$(( (confidence_score * 100) / 10 ))
 	local level
 	if [[ $pct -ge 80 ]]; then level="Certain"
@@ -304,7 +300,7 @@ main() {
 	done | sort -u | tr '\n' ',' | sed 's/,$//')
 	echo "  ${GRAY}Status:${NC} $level ($confidence_score/10 scans)"
 	echo "  ${GRAY}Detected:${NC} ${detected:-none}"
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

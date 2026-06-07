@@ -54,6 +54,59 @@ print_section_header() {
     echo ""
 }
 
+# Standardized message helpers
+print_success() {
+    echo "${GREEN}${ICON_SUCCESS}${NC} $*"
+}
+
+print_error() {
+    echo "${RED}${ICON_ERROR}${NC} $*" >&2
+}
+
+print_warning() {
+    echo "${YELLOW}⚠${NC} $*"
+}
+
+print_info() {
+    echo "${GRAY}○${NC} $*"
+}
+
+print_step() {
+    local n="$1" total="$2" label="$3"
+    echo "${GRAY}[${n}/${total}]${NC} ${label}..."
+}
+
+# Confirm action with y/N prompt (auto-no with 10s timeout)
+confirm_action() {
+    local prompt="${1:-Proceed?}"
+    local timeout="${2:-10}"
+    local answer
+    echo -n "${YELLOW}${prompt} [y/N]${NC} "
+    read -r -n 1 -t "$timeout" answer || true
+    echo ""
+    [[ "$answer" == "y" || "$answer" == "Y" ]]
+}
+
+# Pause until user presses a key
+pause_for_user() {
+    local msg="${1:-Press any key to continue...}"
+    echo ""
+    echo -n "${GRAY}${msg}${NC}"
+    read -r -s -n 1
+    echo ""
+}
+
+# Print a small help header consistent across all commands
+print_help_header() {
+    local cmd="$1" desc="$2" extra="${3:-}"
+    echo "Usage: rcc ${cmd}${extra:+ ${extra}}"
+    echo ""
+    echo "${desc}"
+    echo ""
+    echo "Options:"
+    echo "  --help, -h      Show this help"
+}
+
 # Cursor control
 clear_screen() { printf '\033[2J\033[H'; }
 hide_cursor() { [[ -t 1 ]] && printf '\033[?25l' >&2 || true; }
@@ -311,6 +364,8 @@ init_global_progress() {
         printf '\033[2J\033[H'
         printf '\033[?25l'
         _rcc_redraw_global_progress
+    else
+        echo "__RCC_PROGRESS__:0:${total}:Initializing..."
     fi
 }
 
@@ -318,11 +373,17 @@ update_global_progress_info() {
     local info="$1"
     RCC_PROGRESS_INFO="$info"
     _rcc_maybe_redraw_global_progress
+    if [[ "$RCC_PROGRESS_ACTIVE" == "true" && ! -t 1 ]]; then
+        echo "__RCC_PROGRESS__:${RCC_PROGRESS_CURRENT}:${RCC_PROGRESS_TOTAL}:${info}"
+    fi
 }
 
 increment_global_progress() {
     RCC_PROGRESS_CURRENT=$((RCC_PROGRESS_CURRENT + 1))
     _rcc_maybe_redraw_global_progress
+    if [[ "$RCC_PROGRESS_ACTIVE" == "true" && ! -t 1 ]]; then
+        echo "__RCC_PROGRESS__:${RCC_PROGRESS_CURRENT}:${RCC_PROGRESS_TOTAL}:${RCC_PROGRESS_INFO}"
+    fi
 }
 
 append_progress_output() {
@@ -332,11 +393,14 @@ append_progress_output() {
         RCC_PROGRESS_BUFFER=("${RCC_PROGRESS_BUFFER[@]:1}")
     fi
     _rcc_maybe_redraw_global_progress
+    if [[ ! -t 1 ]]; then
+        echo "$line"
+    fi
 }
 
 _rcc_maybe_redraw_global_progress() {
-    [[ "$RCC_PROGRESS_ACTIVE" != "true" ]] && return
-    [[ -t 1 ]] || return
+    if [[ "$RCC_PROGRESS_ACTIVE" != "true" ]]; then return; fi
+    if ! [[ -t 1 ]]; then return; fi
 
     local now
     now=$(_rcc_get_ms)
@@ -348,7 +412,7 @@ _rcc_maybe_redraw_global_progress() {
 }
 
 _rcc_redraw_global_progress() {
-    [[ -t 1 ]] || return
+    if ! [[ -t 1 ]]; then return; fi
 
     local total=$RCC_PROGRESS_TOTAL
     local current=$RCC_PROGRESS_CURRENT
@@ -399,7 +463,7 @@ _rcc_redraw_global_progress() {
 }
 
 finish_global_progress() {
-    [[ "$RCC_PROGRESS_ACTIVE" != "true" ]] && return
+    if [[ "$RCC_PROGRESS_ACTIVE" != "true" ]]; then return; fi
 
     RCC_PROGRESS_CURRENT=$RCC_PROGRESS_TOTAL
     RCC_PROGRESS_INFO="Completed"
@@ -411,6 +475,26 @@ finish_global_progress() {
     fi
 
     RCC_PROGRESS_ACTIVE=false
+}
+
+# =====================================================================
+# Pipe helper: in TTY mode -> buffer for progress overlay
+#              in non-TTY mode -> pass through to stdout (for Go TUI)
+# Usage: command 2>&1 | progress_pipe
+# =====================================================================
+
+progress_pipe() {
+    local parser_fn="${1:-}"
+    if [[ ! -t 1 ]]; then
+        cat
+    else
+        while IFS= read -r line; do
+            append_progress_output "$line"
+            if [[ -n "$parser_fn" ]]; then
+                "$parser_fn" "$line"
+            fi
+        done
+    fi
 }
 
 # =====================================================================
@@ -427,9 +511,7 @@ run_step() {
 
     set +e
     set +o pipefail
-    eval "$cmd" 2>&1 | while IFS= read -r line; do
-        append_progress_output "$line"
-    done
+    eval "$cmd" 2>&1 | progress_pipe
     set -e
     set -o pipefail
 
@@ -450,9 +532,7 @@ run_check() {
 
     set +e
     set +o pipefail
-    $check_fn 2>&1 | while IFS= read -r line; do
-        append_progress_output "$line"
-    done
+    $check_fn 2>&1 | progress_pipe
     set -e
     set -o pipefail
 

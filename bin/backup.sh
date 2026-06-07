@@ -9,12 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_backup_help() {
-	echo "Usage: rcc backup [options]"
+	print_help_header "backup" "Check Time Machine backup status" ""
 	echo ""
-	echo "Check Time Machine backup status"
-	echo ""
-	echo "Options:"
-	echo "  --help, -h      Show this help"
 }
 
 for arg in "$@"; do
@@ -79,7 +75,7 @@ main() {
 	check_last_backup
 
 	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

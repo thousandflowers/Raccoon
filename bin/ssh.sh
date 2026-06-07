@@ -11,12 +11,8 @@ source "$SCRIPT_DIR/../lib/core/common.sh"
 SSH_DIR="$HOME/.ssh"
 
 show_ssh_help() {
-	echo "Usage: rcc ssh [options]"
+	print_help_header "ssh" "Check SSH keys and configuration" ""
 	echo ""
-	echo "Check SSH keys and configuration"
-	echo ""
-	echo "Options:"
-	echo "  --help, -h      Show this help"
 }
 
 for arg in "$@"; do
@@ -31,8 +27,7 @@ for arg in "$@"; do
 done
 
 check_unprotected_keys() {
-	echo ""
-	echo "Unprotected Keys"
+	print_section_header "Unprotected Keys"
 	print_table_header "Key|Type|Status" 30 15 15
 
 	local found=0
@@ -63,8 +58,7 @@ check_unprotected_keys() {
 }
 
 check_orphan_keys() {
-	echo ""
-	echo "Orphan Keys"
+	print_section_header "Orphan Keys"
 	print_table_header "Key|Status" 30 15
 
 	local found=0
@@ -89,8 +83,7 @@ check_orphan_keys() {
 }
 
 check_key_permissions() {
-	echo ""
-	echo "Key Permissions"
+	print_section_header "Key Permissions"
 	print_table_header "Key|Perms|Status" 30 10 15
 
 	local found=0
@@ -121,7 +114,7 @@ main() {
 	check_key_permissions
 
 	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

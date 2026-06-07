@@ -9,11 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_upgrade_help() {
-	echo "Usage: rcc upgrade [options]"
-	echo ""
-	echo "Update package managers: Homebrew, pip, npm, nvm, rustup, gem"
-	echo ""
-	echo "Options:"
+	print_help_header "upgrade" "Update package managers: Homebrew, pip, npm, nvm, rustup, gem" "[--dry-run]"
 	echo "  --dry-run, -n    Show what would be upgraded without updating"
 	echo ""
 }
@@ -134,9 +130,14 @@ _parse_gem() {
 upgrade_homebrew() {
 	update_global_progress_info "brew: checking..."
 
+	export HOMEBREW_NO_AUTO_UPDATE=1
+	export GIT_TERMINAL_PROMPT=0
+
 	if ! command -v brew >/dev/null 2>&1; then
 		update_global_progress_info "brew: not installed"
 		append_progress_output "brew: not installed"
+		increment_global_progress
+		increment_global_progress
 		increment_global_progress
 		return 0
 	fi
@@ -154,26 +155,26 @@ upgrade_homebrew() {
 			append_progress_output "brew: up to date"
 		fi
 		increment_global_progress
+		increment_global_progress
+		increment_global_progress
 		return 0
 	fi
+
+	increment_global_progress
 
 	update_global_progress_info "brew: updating..."
 	set +e
 	set +o pipefail
-	brew update 2>&1 | while IFS= read -r line; do
-		append_progress_output "$line"
-		_parse_brew_update "$line"
-	done
+	brew update 2>&1 </dev/null | progress_pipe _parse_brew_update
 	set -e
 	set -o pipefail
+
+	increment_global_progress
 
 	update_global_progress_info "brew: upgrading..."
 	set +e
 	set +o pipefail
-	brew upgrade 2>&1 | while IFS= read -r line; do
-		append_progress_output "$line"
-		_parse_brew_upgrade "$line"
-	done
+	GIT_TERMINAL_PROMPT=0 brew upgrade 2>&1 </dev/null | progress_pipe _parse_brew_upgrade
 	set -e
 	set -o pipefail
 
@@ -192,8 +193,12 @@ upgrade_pip() {
 		update_global_progress_info "pip: not installed"
 		append_progress_output "pip: not installed"
 		increment_global_progress
+		increment_global_progress
+		increment_global_progress
 		return 0
 	fi
+
+	increment_global_progress
 
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "pip: dry run"
@@ -208,8 +213,11 @@ upgrade_pip() {
 			append_progress_output "pip: up to date"
 		fi
 		increment_global_progress
+		increment_global_progress
 		return 0
 	fi
+
+	increment_global_progress
 
 	update_global_progress_info "pip: checking outdated..."
 	local pkgs
@@ -227,10 +235,7 @@ upgrade_pip() {
 		update_global_progress_info "pip: upgrade $pkg"
 		set +e
 		set +o pipefail
-		$pip_cmd install --upgrade "$pkg" 2>&1 | while IFS= read -r line; do
-			append_progress_output "$line"
-			_parse_pip "$line"
-		done
+		$pip_cmd install --upgrade "$pkg" 2>&1 | progress_pipe _parse_pip
 		set -e
 		set -o pipefail
 	done <<< "$pkgs"
@@ -245,18 +250,21 @@ upgrade_npm() {
 		update_global_progress_info "npm: not installed"
 		append_progress_output "npm: not installed"
 		increment_global_progress
+		increment_global_progress
+		increment_global_progress
 		return 0
 	fi
+
+	increment_global_progress
 
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "npm: dry run"
 		set +e
 		set +o pipefail
-		npm outdated -g 2>&1 | while IFS= read -r line; do
-			append_progress_output "$line"
-		done
+		npm outdated -g 2>&1 | progress_pipe
 		set -e
 		set -o pipefail
+		increment_global_progress
 		increment_global_progress
 		return 0
 	fi
@@ -264,13 +272,11 @@ upgrade_npm() {
 	update_global_progress_info "npm: updating..."
 	set +e
 	set +o pipefail
-	npm update -g 2>&1 | while IFS= read -r line; do
-		append_progress_output "$line"
-		_parse_npm "$line"
-	done
+	npm update -g 2>&1 | progress_pipe _parse_npm
 	set -e
 	set -o pipefail
 
+	increment_global_progress
 	increment_global_progress
 }
 
@@ -283,6 +289,8 @@ upgrade_nvm() {
 	if [[ ! -s "$nvm_sh" ]]; then
 		update_global_progress_info "nvm: not installed"
 		append_progress_output "nvm: not installed"
+		increment_global_progress
+		increment_global_progress
 		increment_global_progress
 		return 0
 	fi
@@ -297,19 +305,21 @@ upgrade_nvm() {
 		latest=$(nvm version-remote --lts 2>/dev/null || echo "unknown")
 		append_progress_output "nvm: $current -> $latest"
 		increment_global_progress
+		increment_global_progress
+		increment_global_progress
 		return 0
 	fi
+
+	increment_global_progress
 
 	update_global_progress_info "nvm: updating..."
 	set +e
 	set +o pipefail
-	nvm install --lts 2>&1 | while IFS= read -r line; do
-		append_progress_output "$line"
-		_parse_nvm "$line"
-	done
+	nvm install --lts 2>&1 | progress_pipe _parse_nvm
 	set -e
 	set -o pipefail
 
+	increment_global_progress
 	increment_global_progress
 }
 
@@ -320,8 +330,12 @@ upgrade_rustup() {
 		update_global_progress_info "rustup: not installed"
 		append_progress_output "rustup: not installed"
 		increment_global_progress
+		increment_global_progress
+		increment_global_progress
 		return 0
 	fi
+
+	increment_global_progress
 
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "rustup: dry run"
@@ -336,16 +350,16 @@ upgrade_rustup() {
 			append_progress_output "rustup: up to date"
 		fi
 		increment_global_progress
+		increment_global_progress
 		return 0
 	fi
+
+	increment_global_progress
 
 	update_global_progress_info "rustup: updating..."
 	set +e
 	set +o pipefail
-	rustup update 2>&1 | while IFS= read -r line; do
-		append_progress_output "$line"
-		_parse_rustup "$line"
-	done
+	rustup update 2>&1 | progress_pipe _parse_rustup
 	set -e
 	set -o pipefail
 
@@ -359,8 +373,12 @@ upgrade_gem() {
 		update_global_progress_info "gem: not installed"
 		append_progress_output "gem: not installed"
 		increment_global_progress
+		increment_global_progress
+		increment_global_progress
 		return 0
 	fi
+
+	increment_global_progress
 
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "gem: dry run"
@@ -375,16 +393,16 @@ upgrade_gem() {
 			append_progress_output "gem: up to date"
 		fi
 		increment_global_progress
+		increment_global_progress
 		return 0
 	fi
+
+	increment_global_progress
 
 	update_global_progress_info "gem: updating..."
 	set +e
 	set +o pipefail
-	gem update 2>&1 | while IFS= read -r line; do
-		append_progress_output "$line"
-		_parse_gem "$line"
-	done
+	gem update 2>&1 | progress_pipe _parse_gem
 	set -e
 	set -o pipefail
 
@@ -397,9 +415,9 @@ upgrade_gem() {
 
 _fallback_upgrade_homebrew() {
 	echo ""
-	echo "${PURPLE_BOLD}-- Homebrew${NC}"
+	print_section_header "Homebrew"
 	if ! command -v brew >/dev/null 2>&1; then
-		echo "${GRAY}not installed${NC}"
+		print_info "not installed"
 		return 0
 	fi
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
@@ -412,14 +430,14 @@ _fallback_upgrade_homebrew() {
 
 _fallback_upgrade_pip() {
 	echo ""
-	echo "${PURPLE_BOLD}-- pip${NC}"
+	print_section_header "pip"
 	local pip_cmd=""
 	if command -v pip3 >/dev/null 2>&1; then
 		pip_cmd="pip3"
 	elif command -v pip >/dev/null 2>&1; then
 		pip_cmd="pip"
 	else
-		echo "${GRAY}not installed${NC}"
+		print_info "not installed"
 		return 0
 	fi
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
@@ -433,9 +451,9 @@ _fallback_upgrade_pip() {
 
 _fallback_upgrade_npm() {
 	echo ""
-	echo "${PURPLE_BOLD}-- npm${NC}"
+	print_section_header "npm"
 	if ! command -v npm >/dev/null 2>&1; then
-		echo "${GRAY}not installed${NC}"
+		print_info "not installed"
 		return 0
 	fi
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
@@ -447,11 +465,11 @@ _fallback_upgrade_npm() {
 
 _fallback_upgrade_nvm() {
 	echo ""
-	echo "${PURPLE_BOLD}-- nvm${NC}"
+	print_section_header "nvm"
 	local nvm_dir="${NVM_DIR:-$HOME/.nvm}"
 	local nvm_sh="$nvm_dir/nvm.sh"
 	if [[ ! -s "$nvm_sh" ]]; then
-		echo "${GRAY}not installed${NC}"
+		print_info "not installed"
 		return 0
 	fi
 	export NVM_DIR="$nvm_dir"
@@ -466,9 +484,9 @@ _fallback_upgrade_nvm() {
 
 _fallback_upgrade_rustup() {
 	echo ""
-	echo "${PURPLE_BOLD}-- rustup${NC}"
+	print_section_header "rustup"
 	if ! command -v rustup >/dev/null 2>&1; then
-		echo "${GRAY}not installed${NC}"
+		print_info "not installed"
 		return 0
 	fi
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
@@ -480,9 +498,9 @@ _fallback_upgrade_rustup() {
 
 _fallback_upgrade_gem() {
 	echo ""
-	echo "${PURPLE_BOLD}-- gem${NC}"
+	print_section_header "gem"
 	if ! command -v gem >/dev/null 2>&1; then
-		echo "${GRAY}not installed${NC}"
+		print_info "not installed"
 		return 0
 	fi
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
@@ -497,38 +515,24 @@ _fallback_upgrade_gem() {
 # ============================================================
 
 main() {
-	if [[ -t 1 ]]; then
-		RCC_USE_GLOBAL_PROGRESS=true
-		init_global_progress 6
-	else
-		print_section_header "Upgrade Package Managers"
-		if [[ "$RCC_DRY_RUN" == "true" ]]; then
-			echo "${YELLOW}DRY RUN MODE - no changes made${NC}"
-			echo ""
-		fi
+	RCC_USE_GLOBAL_PROGRESS=true
+	init_global_progress 18
+
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		echo "${YELLOW}DRY RUN MODE - no changes made${NC}"
+		echo ""
 	fi
 
-	if [[ "$RCC_USE_GLOBAL_PROGRESS" == "true" ]]; then
-		upgrade_homebrew
-		upgrade_pip
-		upgrade_npm
-		upgrade_nvm
-		upgrade_rustup
-		upgrade_gem
+	upgrade_homebrew
+	upgrade_pip
+	upgrade_npm
+	upgrade_nvm
+	upgrade_rustup
+	upgrade_gem
 
-		finish_global_progress
-		echo ""
-		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
-	else
-		_fallback_upgrade_homebrew
-		_fallback_upgrade_pip
-		_fallback_upgrade_npm
-		_fallback_upgrade_nvm
-		_fallback_upgrade_rustup
-		_fallback_upgrade_gem
-		echo ""
-		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
-	fi
+	finish_global_progress
+	echo ""
+	print_success "Completed"
 }
 
 main "$@"

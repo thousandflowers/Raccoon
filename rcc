@@ -9,10 +9,13 @@ source "${SCRIPT_DIR}/lib/core/common.sh"
 source "${SCRIPT_DIR}/lib/core/commands.sh"
 
 main() {
-case "${1:-""}" in
+	case "${1:-""}" in
 		"")
-			if [[ -x "$UI_BINARY" ]] && [[ -t 0 || -t 1 ]]; then
-				"$UI_BINARY"
+			if [[ -x "$UI_BINARY" ]] && [[ -t 1 ]]; then
+				"$UI_BINARY" || {
+					printf '\033[?25h\033[0m\033[2J\033[H' 2>/dev/null || true
+					interactive_main_menu
+				}
 			else
 				show_brand_banner
 				interactive_main_menu

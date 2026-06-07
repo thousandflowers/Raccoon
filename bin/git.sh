@@ -9,12 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_git_help() {
-	echo "Usage: rcc git [options]"
+	print_help_header "git" "Check local git repositories for issues" ""
 	echo ""
-	echo "Check local git repositories for issues"
-	echo ""
-	echo "Options:"
-	echo "  --help, -h      Show this help"
 }
 
 for arg in "$@"; do
@@ -156,7 +152,7 @@ main() {
 		if [[ "$use_global_progress" == "true" ]]; then
 			finish_global_progress
 		fi
-		echo "${GRAY}No repositories found${NC}"
+		print_info "No repositories found"
 	else
 		print_table_header "Repository|Issues" 40 20
 		if [[ $repos_with_issues -eq 0 ]]; then
@@ -171,7 +167,7 @@ main() {
 	fi
 
 	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

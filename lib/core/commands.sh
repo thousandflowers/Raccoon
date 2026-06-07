@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="0.3.0"
+VERSION="0.5.0"
 TAGLINE="macOS companion toolkit"
 
 reset_terminal() {
@@ -146,7 +146,7 @@ show_menu() {
         local item="${MENU_ITEMS[$((n-1))]}"
         
         if [[ "$item" == "---" ]]; then
-            echo -e "${GRAY}--------------------------------${NC}"
+            echo -e "${GRAY}────────────────────────────────${NC}"
         else
             if [[ $n -eq $sel ]]; then
                 echo -e "${GREEN}▶ $n. $item${NC}"
@@ -158,7 +158,7 @@ show_menu() {
     done
     
     echo ""
-    echo -e "${GRAY}↑↓ Navigate | Enter | / Search | Q Quit${NC}"
+    echo -e "${GRAY}↑↓ Navigate · Enter Run · / Search · Q Quit${NC}"
 }
 
 _filter_menu_items() {
@@ -261,16 +261,42 @@ _search_and_run() {
     done
 }
 
+_is_separator() {
+    local idx="$1"
+    [[ $idx -ge 1 && $idx -le $TOTAL_OPTIONS ]] || return 1
+    local item="${MENU_ITEMS[$((idx-1))]}"
+    [[ "$item" == "---" ]]
+}
+
+_prev_menu_item() {
+    local cur="$1"
+    while ((cur > 1)); do
+        ((cur--))
+        _is_separator "$cur" || { echo "$cur"; return 0; }
+    done
+    echo "$cur"
+}
+
+_next_menu_item() {
+    local cur="$1"
+    while ((cur < TOTAL_OPTIONS)); do
+        ((cur++))
+        _is_separator "$cur" || { echo "$cur"; return 0; }
+    done
+    echo "$cur"
+}
+
 interactive_main_menu() {
     local cur=1
     
     trap 'exit 0' INT
     
-    clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf $'\033[2J\033[H]'
+    printf '\033[2J\033[H'
     show_brand_banner
+    show_menu $cur
     
     while true; do
-        clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf $'\033[2J\033[H]'
+        printf '\033[H\033[J'
         show_brand_banner
         show_menu $cur
         
@@ -280,14 +306,15 @@ interactive_main_menu() {
                 read -r -s -n 1 t
                 [[ "$t" == "[" ]] || continue
                 read -r -s -n 1 t
-                [[ "$t" == "A" ]] && ((cur > 1)) && cur=$((cur-1))
-                [[ "$t" == "B" ]] && ((cur < TOTAL_OPTIONS)) && cur=$((cur+1))
-                [[ $cur -eq 7 || $cur -eq 12 ]] && [[ "$t" == "A" ]] && cur=$((cur-1))
-                [[ $cur -eq 7 || $cur -eq 12 ]] && [[ "$t" == "B" ]] && cur=$((cur+1))
+                [[ "$t" == "A" ]] && cur=$(_prev_menu_item "$cur")
+                [[ "$t" == "B" ]] && cur=$(_next_menu_item "$cur")
                 ;;
             "") run_cmd $cur ;;
             /)
                 _search_and_run
+                printf '\033[2J\033[H'
+                show_brand_banner
+                show_menu $cur
                 ;;
             q|Q) exit 0 ;;
         esac

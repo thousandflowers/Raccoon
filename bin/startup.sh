@@ -9,13 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_startup_help() {
-	echo "Usage: rcc startup [options]"
-	echo ""
-	echo "Show startup items, launch agents, and login items"
-	echo ""
-	echo "Options:"
+	print_help_header "startup" "Launch agents, login items, running services, uptime" "[--json]"
 	echo "  --json          Output in JSON format"
-	echo "  --help, -h      Show this help"
+	echo ""
 }
 
 JSON_OUTPUT=false
@@ -37,9 +33,8 @@ done
 main() {
 	print_section_header "Startup Items"
 
-	echo "${GRAY}[1/6] User LaunchAgents...${NC}"
-	printf "| %-40s |\n" "~/Library/LaunchAgents/"
-	echo "${GRAY}| ${NC}$(printf '%s' "$(printf ' %.0s' {1..40})" | tr ' ' '-') | ${NC}"
+	print_step 1 6 "User LaunchAgents"
+	print_table_header "Name" 40
 
 	local user_agents
 	user_agents=$(ls -1 ~/Library/LaunchAgents/ 2>/dev/null || echo "")
@@ -49,93 +44,78 @@ main() {
 			[[ -z "$item" ]] && continue
 			local name
 			name=$(echo "$item" | sed 's/.plist//' | sed 's/com.//' | sed 's/.//')
-			printf "| %-40s |\n" "✓ $name"
+			print_table_row "$name" 40
 			((count++)) || true
 		done <<< "$user_agents"
-		printf "| ${GRAY}%-40s${NC} |\n" "Total: $count items"
+		print_info "Total: $count items"
 	else
-		printf "| ${GRAY}%-40s${NC} |\n" "no user launch agents"
+		print_info "no user launch agents"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "User LaunchAgents checked"
 
-	echo ""
-	echo "${GRAY}[2/6] System LaunchAgents...${NC}"
-	printf "| %-40s |\n" "/Library/LaunchAgents/"
-	echo "${GRAY}| ${NC}$(printf '%s' "$(printf ' %.0s' {1..40})" | tr ' ' '-') | ${NC}"
+	print_step 2 6 "System LaunchAgents"
 
 	local sys_agents
 	sys_agents=$(ls -1 /Library/LaunchAgents/ 2>/dev/null || echo "")
 	if [[ -n "$sys_agents" ]]; then
 		local count
 		count=$(echo "$sys_agents" | wc -l | xargs || echo "0")
-		printf "| %-40s |\n" "$count system launch agents"
+		print_info "$count system launch agents"
 	else
-		printf "| ${GRAY}%-40s${NC} |\n" "none found"
+		print_info "none found"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "System LaunchAgents checked"
 
-	echo ""
-	echo "${GRAY}[3/6] LaunchDaemons...${NC}"
-	printf "| %-40s |\n" "/Library/LaunchDaemons/"
-	echo "${GRAY}| ${NC}$(printf '%s' "$(printf ' %.0s' {1..40})" | tr ' ' '-') | ${NC}"
+	print_step 3 6 "LaunchDaemons"
 
 	local daemons
 	daemons=$(ls -1 /Library/LaunchDaemons/ 2>/dev/null || echo "")
 	if [[ -n "$daemons" ]]; then
 		local count
 		count=$(echo "$daemons" | wc -l | xargs || echo "0")
-		printf "| %-40s |\n" "$count launch daemons"
+		print_info "$count launch daemons"
 	else
-		printf "| ${GRAY}%-40s${NC} |\n" "none found"
+		print_info "none found"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "LaunchDaemons checked"
 
-	echo ""
-	echo "${GRAY}[4/6] Login Items...${NC}"
-	printf "| %-40s |\n" "(System Settings > Login Items)"
-	echo "${GRAY}| ${NC}$(printf '%s' "$(printf ' %.0s' {1..40})" | tr ' ' '-') | ${NC}"
+	print_step 4 6 "Login Items"
 
 	local login_items
 	login_items=$(osascript -e 'tell application "System Events" to get the name of every login item' 2>/dev/null || echo "")
 	if [[ -n "$login_items" && "$login_items" != "" ]]; then
 		echo "$login_items" | tr ',' '\n' | while read -r item; do
 			[[ -z "$item" ]] && continue
-			printf "| %-40s |\n" "✓ $item"
+			print_info "$item"
 		done
 	else
-		printf "| ${GRAY}%-40s${NC} |\n" "no login items configured"
+		print_info "no login items configured"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "Login Items checked"
 
-	echo ""
-	echo "${GRAY}[5/6] Running Services...${NC}"
-	printf "| %-40s |\n" "(launchctl list)"
-	echo "${GRAY}| ${NC}$(printf '%s' "$(printf ' %.0s' {1..40})" | tr ' ' '-') | ${NC}"
+	print_step 5 6 "Running Services"
 
 	local running
 	running=$(launchctl list 2>/dev/null | tail -n +2 | wc -l | xargs || echo "0")
-	printf "| %-40s |\n" "Running services: $running"
-	printf "| ${GRAY}%-40s${NC} |\n" "Top 5:"
-	launchctl list 2>/dev/null | tail -n +2 | head -5 | awk '{printf "| %-40s |\n", "  " $3 " (" $1 ")"}' || true
-	echo "${GREEN}✓${NC}"
+	print_info "Running services: $running"
+	print_info "Top 5:"
+	launchctl list 2>/dev/null | tail -n +2 | head -5 | awk '{print "  " $3 " (" $1 ")"}' || true
+	print_success "Services checked"
 
-	echo ""
-	echo "${GRAY}[6/6] System Uptime...${NC}"
-	printf "| %-40s |\n" "(uptime)"
-	echo "${GRAY}| ${NC}$(printf '%s' "$(printf ' %.0s' {1..40})" | tr ' ' '-') | ${NC}"
+	print_step 6 6 "System Uptime"
 
 	local uptime
 	uptime=$(uptime 2>/dev/null || echo "N/A")
 	local load
 	load=$(uptime 2>/dev/null | grep "load" | sed 's/.*load //' | sed 's/,//g' || echo "N/A")
-	printf "| %-40s |\n" "$uptime"
+	print_info "$uptime"
 	if [[ -n "$load" ]]; then
-		printf "| %-40s |\n" "Load average: $load"
+		print_info "Load average: $load"
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "Uptime checked"
 
 	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

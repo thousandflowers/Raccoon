@@ -9,13 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_ports_help() {
-	echo "Usage: rcc ports [options]"
-	echo ""
-	echo "List open TCP/UDP ports with process information"
-	echo ""
-	echo "Options:"
+	print_help_header "ports" "List open TCP/UDP ports with process information" "[--json]"
 	echo "  --json          Output in JSON format"
-	echo "  --help, -h      Show this help"
+	echo ""
 }
 
 JSON_OUTPUT=false
@@ -89,7 +85,9 @@ main() {
 	data=$(lsof -iTCP -iUDP -nP 2>/dev/null || true)
 
 	if [[ -z "$data" ]]; then
-		echo "| ${YELLOW}No ports found${NC} |"
+		print_info "No ports found"
+		echo ""
+		print_success "Completed"
 		return 0
 	fi
 
@@ -114,6 +112,7 @@ main() {
 	done <<< "$data" | sort -u -k1,1 -k3,3
 
 	echo ""
+	print_success "Completed"
 }
 
 main "$@"

@@ -9,13 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_xcode_help() {
-	echo "Usage: rcc xcode [options]"
-	echo ""
-	echo "Show Xcode simulators, derived data, and version"
-	echo ""
-	echo "Options:"
+	print_help_header "xcode" "Xcode simulators, derived data, version info" "[--json]"
 	echo "  --json          Output in JSON format"
-	echo "  --help, -h      Show this help"
+	echo ""
 }
 
 JSON_OUTPUT=false
@@ -40,11 +36,11 @@ main() {
 	if ! command -v xcrun >/dev/null 2>&1; then
 		print_table_row "${YELLOW}Xcode is not installed${NC}" 40
 		print_table_row "${GRAY}Install from App Store${NC}" 40
-		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+		print_success "Completed"
 		return 0
 	fi
 
-	echo "${GRAY}[1/4] iOS Simulators...${NC}"
+	print_step 1 4 "iOS Simulators"
 	print_table_header "(xcrun simctl list devices)" 40
 
 	local simulators
@@ -57,10 +53,10 @@ main() {
 	else
 		print_table_row "${GRAY}No simulators found${NC}" 40
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "Simulators listed"
 
 	echo ""
-	echo "${GRAY}[2/4] DerivedData...${NC}"
+	print_step 2 4 "DerivedData"
 
 	local derived_path="$HOME/Library/Developer/Xcode/DerivedData"
 	print_table_header "Metric|Value" 20 20
@@ -75,10 +71,10 @@ main() {
 	else
 		print_table_row "DerivedData|${GRAY}not found${NC}" 20 20
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "DerivedData checked"
 
 	echo ""
-	echo "${GRAY}[3/4] Device Support...${NC}"
+	print_step 3 4 "Device Support"
 	print_table_header "(Platforms)" 40
 
 	local xcode_path
@@ -90,10 +86,10 @@ main() {
 	else
 		print_table_row "${GRAY}Platforms not found${NC}" 40
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "Device support listed"
 
 	echo ""
-	echo "${GRAY}[4/4] Xcode Version...${NC}"
+	print_step 4 4 "Xcode Version"
 	print_table_header "(xcodebuild -version)" 40
 
 	local xcode_version
@@ -101,12 +97,12 @@ main() {
 	if [[ -n "$xcode_version" ]]; then
 		print_table_row "$xcode_version" 40
 	else
-		printf "| ${GRAY}%-40s${NC} |\n" "Could not determine version"
+		print_table_row "${GRAY}Could not determine version${NC}" 40
 	fi
-	echo "${GREEN}✓${NC}"
+	print_success "Version checked"
 
 	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

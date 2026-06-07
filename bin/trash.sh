@@ -9,14 +9,10 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_trash_help() {
-	echo "Usage: rcc trash [options]"
+	print_help_header "trash" "Show trash contents and size" "[--empty] [--json]"
+	echo "  --empty         Empty the trash (requires confirmation)"
+	echo "  --json          Output in JSON format"
 	echo ""
-	echo "Show trash contents and size"
-	echo ""
-	echo "Options:"
-	echo "  --empty        Empty the trash (requires confirmation)"
-	echo "  --json        Output in JSON format"
-	echo "  --help, -h   Show this help"
 }
 
 JSON_OUTPUT=false
@@ -46,16 +42,16 @@ main() {
 
 	print_table_header "Setting|Value" 20 30
 	print_table_row "Path|$trash_path" 20 30
-	echo "${GREEN}✓${NC}"
+	print_success "Trash path set"
 
 	echo ""
-	echo "${GRAY}[2/3] Trash Contents...${NC}"
+	print_step 2 3 "Trash Contents"
 
 	if [[ ! -d "$trash_path" ]]; then
 		print_table_row "Status|${GRAY}Trash folder not found${NC}" 20 30
-		echo "${GREEN}✓${NC}"
+		print_success "Trash folder checked"
 		echo ""
-		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+		print_success "Completed"
 		return 0
 	fi
 
@@ -77,10 +73,10 @@ main() {
 		fi
 	fi
 
-	echo "${GREEN}✓${NC}"
+	print_success "Trash contents scanned"
 
 	echo ""
-	echo "${GRAY}[3/3] Recent Items (Last 10)...${NC}"
+	print_step 3 3 "Recent Items (Last 10)"
 	print_table_header "Item" 40
 
 	ls -lt "$trash_path" 2>/dev/null | head -11 | tail -n +2 | while read -r line; do
@@ -90,10 +86,10 @@ main() {
 		[[ -n "$item_name" ]] && print_table_row "$item_name" 40
 	done || print_table_row "${GRAY}empty${NC}" 40
 
-	echo "${GREEN}✓${NC}"
+	print_success "Recent items listed"
 
 	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

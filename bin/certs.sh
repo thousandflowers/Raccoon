@@ -7,16 +7,12 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_certs_help() {
-	echo "Usage: rcc certs [options]"
-	echo ""
-	echo "Show SSL certificates in keychain"
-	echo ""
-	echo "Options:"
+	print_help_header "certs" "SSL certificates in keychain" "[--json] [--expired] [--expiring N] [--detail]"
 	echo "  --json          Output in JSON format"
 	echo "  --expired       Show only expired certificates"
 	echo "  --expiring N   Show certificates expiring within N days"
-	echo "  --detail        Show full certificate details"
-	echo "  --help, -h      Show this help"
+	echo "  --detail        Show detailed certificate info"
+	echo ""
 }
 
 JSON_OUTPUT=false
@@ -50,7 +46,7 @@ done
 main() {
 	print_section_header "Certificates Status"
 	
-	echo "${GRAY}[1/4] User Keychain Certificates...${NC}"
+	print_step 1 4 "User Keychain Certificates"
 	
 	local details
 	details=$(security find-certificate -a -p 2>/dev/null | python3 -c "
@@ -145,17 +141,17 @@ print(f'SUMMARY:{total}|{valid}|{expiring}|{expired}|{selfsigned}')
 	fi
 	
 	printf "%-12s %12s %12s %12s %12s\n" "Total" "Valid" "Expiring" "Expired" "Self-Signed"
-	echo "${GRAY}────────────────────────────────────────────────────────────────────────────${NC}"
+	print_info "────────────────────────────────────────────────────────────────────────────"
 	printf "%-12s %12s %12s %12s %12s\n" "$total" "$valid" "$expiring" "$expired" "$selfsigned"
-	echo "${GREEN}✓${NC}"
+	print_success "Keychain certificates scanned"
 	
 	if [[ "$SHOW_DETAIL" == true ]] || [[ "$SHOW_EXPIRED" == true ]] || [[ $SHOW_EXPIRING -gt 0 ]]; then
 		echo ""
-		echo "${GRAY}[2/4] Certificate Details...${NC}"
+		print_step 2 4 "Certificate Details"
 		
 		if [[ -n "$cert_lines" ]]; then
 			printf "%-35s %-18s %-12s %-10s\n" "Certificate" "Issuer" "Expires" "Status"
-			echo "${GRAY}────────────────────────────────────────────────────────────────────────${NC}"
+			print_info "────────────────────────────────────────────────────────────────────────"
 			while IFS='|' read -r cn issuer end_date status is_self; do
 				local show=true
 				
@@ -179,18 +175,18 @@ print(f'SUMMARY:{total}|{valid}|{expiring}|{expired}|{selfsigned}')
 			done <<< "$cert_lines"
 		fi
 		
-		echo "${GREEN}✓${NC}"
+		print_success "Certificate details listed"
 	fi
 	
 	echo ""
-	echo "${GRAY}[3/4] Keychain Locations...${NC}"
-	echo "  ~/Library/Keychains/login.keychain-db"
-	echo "  /Library/Keychains/System.keychain"
-	echo "  /System/Library/Keychains/SystemRoot.keychain"
-	echo "${GREEN}✓${NC}"
+	print_step 3 4 "Keychain Locations"
+	print_info "~/Library/Keychains/login.keychain-db"
+	print_info "/Library/Keychains/System.keychain"
+	print_info "/System/Library/Keychains/SystemRoot.keychain"
+	print_success "Keychain locations listed"
 	
 	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

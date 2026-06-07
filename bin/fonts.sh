@@ -9,13 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_fonts_help() {
-	echo "Usage: rcc fonts [options]"
-	echo ""
-	echo "Show installed fonts and check for duplicates"
-	echo ""
-	echo "Options:"
+	print_help_header "fonts" "Show installed fonts and check for duplicates" "[--json]"
 	echo "  --json          Output in JSON format"
-	echo "  --help, -h      Show this help"
+	echo ""
 }
 
 JSON_OUTPUT=false
@@ -47,10 +43,10 @@ main() {
 	user_fonts=$(ls -1 ~/Library/Fonts/ 2>/dev/null | wc -l | xargs || echo "0")
 	print_table_row "~/Library/Fonts/|$user_fonts" 25 20
 
-	echo "${GREEN}✓${NC}"
+	print_success "Font sources scanned"
 
 	echo ""
-	echo "${GRAY}[3/4] FontConfig Catalog...${NC}"
+	print_step 2 4 "FontConfig Catalog"
 
 	print_table_header "Metric|Count" 25 20
 
@@ -64,10 +60,10 @@ main() {
 		print_table_row "fontconfig|${YELLOW}not installed${NC}" 25 20
 	fi
 
-	echo "${GREEN}✓${NC}"
+	print_success "FontConfig catalogued"
 
 	echo ""
-	echo "${GRAY}[4/4] Duplicate & Corrupt Check...${NC}"
+	print_step 3 4 "Duplicate & Corrupt Check"
 
 	print_table_header "Check|Result" 25 20
 
@@ -92,13 +88,12 @@ main() {
 		print_table_row "Checks|${GRAY}skipped${NC}" 25 20
 	fi
 
-	echo "${GREEN}✓${NC}"
+	print_success "Duplicates checked"
 
 	local total=$((sys_fonts + user_fonts))
 	print_table_row "${GRAY}Total installed${NC}|$total fonts" 25 20
 
-	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

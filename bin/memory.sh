@@ -9,14 +9,10 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_memory_help() {
-	echo "Usage: rcc memory [options]"
-	echo ""
-	echo "Show processes sorted by memory usage"
-	echo ""
-	echo "Options:"
+	print_help_header "memory" "Show processes sorted by memory usage" "[--json] [--top N]"
 	echo "  --json             Output in JSON format"
 	echo "  --top N            Show top N processes (default: 10)"
-	echo "  --help, -h         Show this help"
+	echo ""
 }
 
 JSON_OUTPUT=false
@@ -75,7 +71,7 @@ main() {
 	echo "| Total RSS: ${total_rss} MB |"
 
 	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

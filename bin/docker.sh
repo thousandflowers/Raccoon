@@ -9,13 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_docker_help() {
-	echo "Usage: rcc docker [options]"
-	echo ""
-	echo "Show Docker images, containers, and space usage"
-	echo ""
-	echo "Options:"
+	print_help_header "docker" "Show Docker images, containers, and space usage" "[--json]"
 	echo "  --json          Output in JSON format"
-	echo "  --help, -h      Show this help"
+	echo ""
 }
 
 JSON_OUTPUT=false
@@ -56,7 +52,7 @@ main() {
 		fi
 		print_table_row "${RED}Docker is not installed or not running${NC}" 40
 		print_table_row "${GRAY}Install Docker Desktop${NC}" 40
-		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+		print_success "Completed"
 		return 0
 	fi
 
@@ -190,7 +186,7 @@ main() {
 
 	# Output: Images
 	echo ""
-	echo "${PURPLE_BOLD}-- Docker Images${NC}"
+	print_step 1 4 "Docker Images"
 	print_table_header "Repository|Tag|Size" 25 15 10
 	if [[ ${#images_data[@]} -eq 0 ]]; then
 		print_table_row "${GRAY}No images found${NC}|-|" 25 15 10
@@ -202,7 +198,7 @@ main() {
 
 	# Output: Containers
 	echo ""
-	echo "${PURPLE_BOLD}-- Docker Containers${NC}"
+	print_step 2 4 "Docker Containers"
 	print_table_header "Container ID|Image|Status" 14 20 15
 	if [[ ${#containers_data[@]} -eq 0 ]]; then
 		print_table_row "${GRAY}No containers found${NC}|-|" 14 20 15
@@ -214,7 +210,7 @@ main() {
 
 	# Output: Volumes
 	echo ""
-	echo "${PURPLE_BOLD}-- Docker Volumes${NC}"
+	print_step 3 4 "Docker Volumes"
 	print_table_header "Volume Name|Driver" 30 15
 	if [[ ${#volumes_data[@]} -eq 0 ]]; then
 		print_table_row "${GRAY}No volumes found${NC}|" 30 15
@@ -226,7 +222,7 @@ main() {
 
 	# Output: Space
 	echo ""
-	echo "${PURPLE_BOLD}-- Docker Space Usage${NC}"
+	print_step 4 4 "Docker Space Usage"
 	print_table_header "Type|Size" 25 20
 	if [[ ${#space_data[@]} -eq 0 ]]; then
 		print_table_row "${GRAY}Could not get info${NC}|" 25 20
@@ -237,7 +233,7 @@ main() {
 	fi
 
 	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main "$@"

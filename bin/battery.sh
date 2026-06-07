@@ -9,13 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_battery_help() {
-	echo "Usage: rcc battery [options]"
-	echo ""
-	echo "Show battery health, cycle count, and charging status"
-	echo ""
-	echo "Options:"
+	print_help_header "battery" "Show battery health, cycle count, and charging status" "[--json]"
 	echo "  --json          Output in JSON format"
-	echo "  --help, -h      Show this help"
+	echo ""
 }
 
 JSON_OUTPUT=false
@@ -115,7 +111,7 @@ display_battery_status() {
 	print_table_row "Fully Charged|${full:-No}" 15 20
 
 	echo ""
-	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	print_success "Completed"
 }
 
 main() {
