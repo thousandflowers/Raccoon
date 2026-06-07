@@ -1,21 +1,34 @@
 # 🦝 Raccoon
 
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/thousandflowers/Raccoon)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](https://github.com/thousandflowers/Raccoon)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-11%2B-blueviolet.svg)](https://www.apple.com/macos/)
 
-> **The macOS companion toolkit that power users deserve.**
+> **The macOS companion toolkit with an animated raccoon TUI.**
 
-Single CLI. 18 commands. Real-time progress bars. Interactive search.  
-Your Mac's health, network, security, and packages — all in one place.
+Per-script ASCII animations. Real-time progress bar with percentage.  
+18 commands for health, network, security, packages — all in one place.
 
 ---
 
 ## 🎬 See it in action
 
-![Raccoon Demo](docs/interactive-menu.gif)
+```
+  Raccoon running upgrade              installed ✓
+       _                               ( ^.^ )
+     / \_/\_                             ╲_/\_/
+    ( o.o )─[ ]  upgrade              —————————————————
+     > ^ <                              ✓ Completed
+  —————————————————
+  ██████░░ 5/18 (27%)  brew: upgrading...
+  ───────────────── upgrade ────
+  │ ==> Updating Homebrew...
+  │ Already up-to-date.
 
-**↑ This is Raccoon.** No config files. No dependencies. Just `rcc`.
+  Running · press q to quit
+```
+
+**Every script has its own raccoon animation** — trash panda, detective, sysadmin, docker stacker, and more.
 
 ---
 
@@ -39,31 +52,39 @@ The installer handles Go compilation automatically — no manual build step requ
 
 ## ✨ Why Raccoon?
 
-| ⚡ Fast | 🔍 Searchable | 📊 Visual |
-|:------:|:-----------:|:--------:|
-| One command gets you everything. | Press `/` to filter 18+ commands instantly. | Progress bars show real-time status. |
-| No config files to manage. | Case-insensitive, searches name + description. | Output scrolls cleanly below the bar. |
-| Runs on stock macOS tools. | Menu reappears after execution. | Final summary with tables & ASCII boxes. |
+| ⚡ Fast | 🔍 Searchable | 🦝 Animated |
+|:------:|:-----------:|:----------:|
+| One command gets you everything. | Press `/` to filter 18+ commands instantly. | Each command has a unique raccoon animation. |
+| No config files to manage. | Case-insensitive, searches name + description. | Trash panda digs, detective inspects, sysadmin builds. |
+| Runs on stock macOS tools. | Menu reappears after execution. | Raccoon body moves: ears perk, arms reach, posture shifts. |
 
 ---
 
-## 📊 The Global Progress Bar
+## 📊 Real-Time Progress
 
-![Progress Bar](docs/progress-bar.gif)
+```
+» upgrade                              ← title on its own line
+   __\_/\_
+  ( -.- )─[ ]                          ← 4-line ASCII art per script
+   > ^ <
+  ─────────────────────────
+  ██████░░░ 5/18 (27%)  brew: upgrade  ← percentage + label
+                                       ← padding zone
+  ───────────────── upgrade ────       ← output separator
+  │ ==> Updating Homebrew...           ← muted output
+  │ Already up-to-date.
 
-**No more messy terminal output.** Raccoon shows:
+  Running · press q to quit
+```
 
-- `[██████████░░] 2/6 managers` — single global bar
-- `brew: upgrade deno` — live status parsed from command output
-- `==> Downloading... 60%` — command output scrolls below
-
-Commands with multi-step operations (`upgrade`, `audit`, `git`, `docker`) display the progress bar automatically. After completion, formatted results appear as tables or ASCII boxes.
+- **Granular progress** — 18 steps across 3 managers each reporting 3×
+- **Live percentage** — bar shows `5/18 (27%)` updating in real time
+- **Blank-line padding** keeps the bar zone visually separate from output
+- **Muted `│` output** reduces visual noise below the progress area
 
 ---
 
 ## 🎮 Interactive Menu
-
-![Interactive Menu](docs/audit.gif)
 
 **Launch:** `rcc` with no arguments  
 **Search:** Press `/` then type (e.g., `up` → `upgrade`)  
@@ -71,10 +92,30 @@ Commands with multi-step operations (`upgrade`, `audit`, `git`, `docker`) displa
 **Run:** `Enter`  
 **Quit:** `q`
 
-**Features:**
-- **Dynamic Grid** — columns adapt automatically based on filtered results
-- **Persistent Output** — after running a command, the output remains visible and the menu reappears below it
-- **Bash Fallback** — if Go is not available, a bash-based menu with full search functionality launches automatically
+**Per-script raccoon animations** — each of the 18 commands has 8 hand-crafted frames with unique body shapes, objects, and action sequences:
+
+| Script | Raccoon Style | What you see |
+|--------|--------------|--------------|
+| `upgrade` | sysadmin | grabs packages `[ ]` → installs `[█]` → ✓ |
+| `audit` | detective | magnifying glass `O─` scans → finds bug → ✓ |
+| `network` | antenna | signal `▽` grows → full bars → ✓ |
+| `disk` | disk doctor | disk `[=]` gets cleaned → `!>` → ✓ |
+| `memory` | RAM tech | chips `##` multiply → done → ✓ |
+| `ports` | cable wrangler | jacks `┤├` connect → link → ✓ |
+| `ssh` | locksmith | key `>-σ` turns → auth → ✓ |
+| `git` | branch weaver | branches `><` split → merge → ✓ |
+| `docker` | container stacker | boxes `┌#┐` pile up → built → ✓ |
+| `trash` | trash panda | sniffs → digs `~~` → finds treasure → ♪ |
+| `startup` | sleepyhead | curled `(-.-)z` → wakes → stretches → ✓ |
+| `xcode` | builder | build arrow `=>` accelerates → ✓ |
+| `battery` | charger | power `══` fills up → full |
+| `backup` | time traveler | capsule `(())` spins → ◐ → ✓ |
+| `history` | archivist | scrolls `@@` pile → organize → ✓ |
+| `certs` | shield bearer | shield `<~>` verifies → ✓ |
+| `fonts` | typographer | letters `Aa` compare → ✓ |
+| `env` | pathfinder | shell `$%` navigates maze → ✓ |
+
+Each animation cycles at 300ms with 8 frames — ears tilt, body leans, arms reach, eyes change expression.
 
 ---
 
@@ -140,9 +181,13 @@ Commands with multi-step operations (`upgrade`, `audit`, `git`, `docker`) displa
 Raccoon is built with two layers:
 
 - **Core (Bash)** — 18 command scripts in `bin/` plus shared utilities in `lib/core/`. Every command works standalone via `rcc <command>`.
-- **TUI (Go + Bubble Tea)** — Optional interactive menu in `ui/` that launches automatically. Compiles on install, falls back to a bash-based menu if Go is unavailable.
+- **TUI (Go + Bubble Tea)** — Interactive menu in `ui/` that launches when you run `rcc`. Compiles on install, falls back to a bash-based menu if Go is unavailable.
 
-The progress bar infrastructure lives in `lib/core/common.sh` and is used by `upgrade`, `audit`, `git`, and `docker` to stream real-time output without breaking the terminal layout.
+**Animation system** (`ui/main.go`): Each of the 18 scripts has a hand-crafted `raccoonAnimation` — 8 frames of 4-line ASCII art. The frames are cycled at 300ms by a `tea.Tick` command. The raccoon's body, ears, arms, and props change per frame to tell a mini-story for that command (e.g., trash panda sniffs → digs → finds treasure → sleeps).
+
+**Progress bar** (`lib/core/common.sh`): Bash scripts emit `__RCC_PROGRESS__:current:total:label` markers. The Go TUI parses these to render a real-time progress bar with percentage (`5/18 (27%)`). Works with `upgrade`, `audit`, `git`, and `docker`.
+
+**Bash 3.2 compat**: All `[[ cond ]] || return` guards were rewritten to `if ! [[ cond ]]; then return; fi` — macOS default bash doesn't suppress errexit with `||` after `[[ ]]` inside functions.
 
 ---
 
