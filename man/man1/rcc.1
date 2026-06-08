@@ -1,0 +1,131 @@
+.TH RCC 1 "2026-06-08" "0.2.0" "Raccoon Manual"
+.SH NAME
+rcc \- macOS companion toolkit
+.SH SYNOPSIS
+.B rcc
+[\fIcommand\fR] [\fIoptions\fR]
+.SH DESCRIPTION
+Raccoon is a lightweight Bash toolkit for macOS that surfaces system diagnostics,
+security audits, hardware health, network state, and developer workflows through
+a single CLI with an optional Bubble Tea TUI.
+.SH COMMANDS
+.SS Core Tools
+.TP
+.B upgrade
+Update Homebrew, pip, npm, gem, rustup, nvm.
+.RS
+.TP
+\fB\-\-dry-run\fR, \fB\-n\fR
+Show what would be upgraded.
+.RE
+.TP
+.B audit
+Security audit (30+ checks).
+.RS
+.TP
+\fB\-\-deep\fR
+Full audit with all checks (requires sudo).
+.TP
+\fB\-\-fix\fR
+Auto\-fix issues where possible.
+.TP
+\fB\-\-dry-run\fR
+Show fixes without applying.
+.TP
+\fB\-\-force\fR
+Apply fixes without confirmation.
+.TP
+\fB\-\-quiet\fR
+Output just pass/warn/fail counts.
+.TP
+\fB\-\-json\fR, \fB\-\-csv\fR, \fB\-\-html\fR
+Output format.
+.TP
+\fB\-\-report\fR \fIFILE\fR
+Save report to file.
+.TP
+\fB\-\-history\fR
+Show previous audit runs.
+.TP
+\fB\-\-diff\fR
+Compare with previous run.
+.TP
+\fB\-\-watch\fR
+Schedule weekly audit via LaunchAgent.
+.TP
+\fB\-\-notify\fR
+Send notification on completion.
+.RE
+.SS System
+.TP
+.B network
+Network interfaces, Wi\-Fi signal, DNS, routing.
+.TP
+.B disk
+Disk space, APFS container, SMART status.
+.TP
+.B memory
+Processes sorted by memory usage.
+.TP
+.B ports
+Open ports and listening services.
+.TP
+.B battery
+Battery health, cycle count, temperature.
+.TP
+.B backup
+Time Machine status and last backup date.
+.SS Developer
+.TP
+.B ssh
+SSH key generation and management.
+.TP
+.B git
+Git status, branches, stash, cleanup.
+.TP
+.B docker
+Docker images, containers, volumes.
+.TP
+.B xcode
+Simulators, derived data, SPM packages.
+.SS Maintenance
+.TP
+.B env
+Shell environment and PATH summary.
+.TP
+.B startup
+Launch agents and login items.
+.TP
+.B trash
+Trash contents and size.
+.TP
+.B fonts
+Font duplicates and corrupted fonts.
+.TP
+.B history
+Shell command history analysis.
+.TP
+.B certs
+SSL certificates and expiration.
+.SH OPTIONS
+.TP
+.B \-\-version, \-V
+Print version.
+.TP
+.B help, \-\-help, \-h
+Show help.
+.SH FILES
+.TP
+.I ~/.raccoon/
+Installation directory.
+.TP
+.I ~/.raccoon/audit-history/
+Audit history JSON files.
+.SH ENVIRONMENT
+.TP
+.B SCRIPT_DIR
+Set by the rcc entrypoint; used internally by commands.
+.SH BUGS
+Report issues at https://github.com/thousandflowers/Raccoon/issues
+.SH LICENSE
+MIT

@@ -14,7 +14,8 @@ show_network_help() {
 	echo ""
 }
 
-JSON_OUTPUT=false
+# shellcheck disable=SC2034
+	JSON_OUTPUT=false
 confidence_score=0
 
 for arg in "$@"; do
@@ -24,7 +25,6 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
-		JSON_OUTPUT=true
 		;;
 	*)
 		;;
@@ -155,6 +155,7 @@ main() {
 	echo "  ${GRAY}Detected:${NC}"
 	local proc_found=0
 	local procs
+	# shellcheck disable=SC2009
 	procs=$(ps aux 2>/dev/null | grep -iE "proxy|vpn|tunnel|wireguard|tailscale|shadowsock|vless|vmess|hysteria|clash|surge|outline|v2ray|xray|rapportd" | grep -v grep | awk '{print $11}' | sort -u || true)
 	while IFS= read -r cmd; do
 		[[ -z "$cmd" ]] && continue
@@ -189,12 +190,12 @@ main() {
 
 	print_step 5 10 "NO_PROXY Config"
 	echo "  ${GRAY}Exclusions:${NC}"
+	# shellcheck disable=SC2034
 	local noproxy_found=0
 	local noproxy
 	noproxy=$(env 2>/dev/null | grep -i "NO_PROXY\|no_proxy" | cut -d= -f2- || true)
 	if [[ -n "$noproxy" ]]; then
 		echo "    ✓ $noproxy"
-		noproxy_found=1
 		add_confidence
 	else
 		print_info "no NO_PROXY configured"
@@ -271,8 +272,10 @@ main() {
 
 	print_step 9 10 "Latency & Connections"
 	print_table_header "Server|Latency|Status" 12 8 10
-	local l8=$(get_latency "8.8.8.8")
-	local l1=$(get_latency "1.1.1.1")
+	local l8
+	l8=$(get_latency "8.8.8.8")
+	local l1
+	l1=$(get_latency "1.1.1.1")
 	local connections
 	connections=$(netstat -an 2>/dev/null | grep -c "ESTABLISHED" || echo "0")
 	printf "%-12s %-8s %s\n" "Server" "Latency" "Status"

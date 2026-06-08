@@ -1,0 +1,76 @@
+#compdef rcc
+# shellcheck shell=zsh
+
+# shellcheck disable=SC2154
+(( $+functions[_rcc_audit_opts] )) ||
+_rcc_audit_opts() {
+  # shellcheck disable=SC2034
+  local -a opts=(
+    '--deep:full security audit (requires sudo)'
+    '--fix:auto-fix issues where possible'
+    '--dry-run:show fixes without applying'
+    '--force:apply fixes without confirmation'
+    '--quiet:suppress non-essential output'
+    '--report:save report to file'
+    '--json:JSON format'
+    '--csv:CSV format'
+    '--html:HTML report'
+    '--history:show previous audit runs'
+    '--diff:compare with previous run'
+    '--watch:schedule weekly auto-audit'
+    '--alert:alert on new issues'
+    '--notify:send notification on issues'
+  )
+  _describe 'audit options' opts
+}
+
+_rcc() {
+  local curcontext="$curcontext" state line
+  # shellcheck disable=SC2034
+  typeset -A opt_args
+
+  _arguments -C \
+    '--version[print version]' \
+    '-V[print version]' \
+    '--help[show help]' \
+    '-h[show help]' \
+    '1: :->command' \
+    '*:: :->args'
+
+  case "$state" in
+    command)
+      # shellcheck disable=SC2034
+      local -a commands=(
+        'upgrade:update package managers'
+        'audit:security audit'
+        'network:network interfaces and info'
+        'disk:disk space and health'
+        'memory:process memory usage'
+        'ports:open ports and listeners'
+        'battery:battery health and cycles'
+        'backup:Time Machine status'
+        'env:shell environment'
+        'startup:launch agents and login items'
+        'trash:trash contents'
+        'fonts:font duplicates'
+        'history:shell history analysis'
+        'certs:SSL certificates'
+        'docker:Docker status'
+        'xcode:Xcode simulators'
+        'ssh:SSH key management'
+        'git:Git workflow helpers'
+        'help:show help'
+      )
+      _describe 'command' commands
+      ;;
+    args)
+      # shellcheck disable=SC1087,SC2195
+      case "$line[1]" in
+        audit)  _rcc_audit_opts ;;
+        upgrade) _arguments '--dry-run[show what would be upgraded]' '-n[show what would be upgraded]' ;;
+      esac
+      ;;
+  esac
+}
+
+_rcc "$@"

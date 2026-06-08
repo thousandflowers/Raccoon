@@ -23,7 +23,6 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
-		JSON_OUTPUT=true
 		;;
 	esac
 done

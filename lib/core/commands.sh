@@ -216,7 +216,7 @@ _search_and_run() {
     
     local result
     result=$(_filter_menu_items "$query")
-    local -a filtered=($result)
+    read -ra filtered <<< "$result"
     
     if [[ ${#filtered[@]} -eq 0 ]]; then
         echo ""
@@ -298,7 +298,7 @@ interactive_main_menu() {
     while true; do
         printf '\033[H\033[J'
         show_brand_banner
-        show_menu $cur
+        show_menu "$cur"
         
         read -r -s -n 1 key
         case "$key" in
@@ -309,12 +309,12 @@ interactive_main_menu() {
                 [[ "$t" == "A" ]] && cur=$(_prev_menu_item "$cur")
                 [[ "$t" == "B" ]] && cur=$(_next_menu_item "$cur")
                 ;;
-            "") run_cmd $cur ;;
+            "") run_cmd "$cur" ;;
             /)
                 _search_and_run
                 printf '\033[2J\033[H'
                 show_brand_banner
-                show_menu $cur
+                show_menu "$cur"
                 ;;
             q|Q) exit 0 ;;
         esac

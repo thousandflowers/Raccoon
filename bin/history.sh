@@ -14,6 +14,7 @@ show_history_help() {
 	echo ""
 }
 
+# shellcheck disable=SC2034
 JSON_OUTPUT=false
 
 for arg in "$@"; do
@@ -23,7 +24,6 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
-		JSON_OUTPUT=true
 		;;
 	*)
 		;;

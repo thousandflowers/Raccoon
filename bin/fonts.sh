@@ -14,7 +14,8 @@ show_fonts_help() {
 	echo ""
 }
 
-JSON_OUTPUT=false
+# shellcheck disable=SC2034
+	JSON_OUTPUT=false
 
 for arg in "$@"; do
 	case "$arg" in
@@ -23,7 +24,6 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
-		JSON_OUTPUT=true
 		;;
 	*)
 		;;
@@ -36,12 +36,12 @@ main() {
 	print_table_header "Source|Count" 25 20
 
 	local sys_fonts
-	sys_fonts=$(ls -1 /Library/Fonts/ 2>/dev/null | wc -l | xargs || echo "0")
+	sys_fonts=$(find /Library/Fonts/ -maxdepth 1 2>/dev/null | wc -l | xargs || echo "0")
 	print_table_row "/Library/Fonts/|$sys_fonts" 25 20
 
 	local user_fonts
-	user_fonts=$(ls -1 ~/Library/Fonts/ 2>/dev/null | wc -l | xargs || echo "0")
-	print_table_row "~/Library/Fonts/|$user_fonts" 25 20
+	user_fonts=$(find "$HOME/Library/Fonts/" -maxdepth 1 2>/dev/null | wc -l | xargs || echo "0")
+	print_table_row "$HOME/Library/Fonts/|$user_fonts" 25 20
 
 	print_success "Font sources scanned"
 
@@ -78,7 +78,7 @@ main() {
 
 		local corrupted=0
 		local all_fonts
-		all_fonts=$(ls /Library/Fonts/*.{ttf,otf} ~/Library/Fonts/*.{ttf,otf} 2>/dev/null || true)
+		all_fonts=$(ls /Library/Fonts/*.{ttf,otf} "$HOME"/Library/Fonts/*.{ttf,otf} 2>/dev/null || true)
 		for font in $all_fonts; do
 			[[ ! -f "$font" ]] && continue
 			fc-scan "$font" >/dev/null 2>&1 || ((corrupted++))

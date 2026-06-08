@@ -15,6 +15,7 @@ show_certs_help() {
 	echo ""
 }
 
+# shellcheck disable=SC2034
 JSON_OUTPUT=false
 SHOW_EXPIRED=false
 SHOW_EXPIRING=0
@@ -27,7 +28,6 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
-		JSON_OUTPUT=true
 		;;
 	--expired)
 		SHOW_EXPIRED=true
@@ -152,7 +152,7 @@ print(f'SUMMARY:{total}|{valid}|{expiring}|{expired}|{selfsigned}')
 		if [[ -n "$cert_lines" ]]; then
 			printf "%-35s %-18s %-12s %-10s\n" "Certificate" "Issuer" "Expires" "Status"
 			print_info "────────────────────────────────────────────────────────────────────────"
-			while IFS='|' read -r cn issuer end_date status is_self; do
+			while IFS='|' read -r cn issuer end_date status _; do
 				local show=true
 				
 				if [[ "$SHOW_EXPIRED" == true ]] && [[ "$status" != "expired" ]]; then
@@ -180,7 +180,7 @@ print(f'SUMMARY:{total}|{valid}|{expiring}|{expired}|{selfsigned}')
 	
 	echo ""
 	print_step 3 4 "Keychain Locations"
-	print_info "~/Library/Keychains/login.keychain-db"
+	print_info "$HOME/Library/Keychains/login.keychain-db"
 	print_info "/Library/Keychains/System.keychain"
 	print_info "/System/Library/Keychains/SystemRoot.keychain"
 	print_success "Keychain locations listed"

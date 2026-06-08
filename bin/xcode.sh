@@ -14,7 +14,8 @@ show_xcode_help() {
 	echo ""
 }
 
-JSON_OUTPUT=false
+# shellcheck disable=SC2034
+	JSON_OUTPUT=false
 
 for arg in "$@"; do
 	case "$arg" in
@@ -23,7 +24,6 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
-		JSON_OUTPUT=true
 		;;
 	*)
 		;;
@@ -65,7 +65,7 @@ main() {
 		local derived_size
 		derived_size=$(du -sh "$derived_path" 2>/dev/null | awk '{print $1}' || echo "unknown")
 		local project_count
-		project_count=$(ls -1 "$derived_path" 2>/dev/null | wc -l | xargs || echo "0")
+		project_count=$(find "$derived_path" -maxdepth 1 2>/dev/null | wc -l | xargs || echo "0")
 		print_table_row "Size|$derived_size" 20 20
 		print_table_row "Projects|$project_count" 20 20
 	else
@@ -80,7 +80,7 @@ main() {
 	local xcode_path
 	xcode_path=$(xcode-select -p 2>/dev/null | sed 's/\/Contents\/Developer//')
 	if [[ -n "$xcode_path" && -d "$xcode_path/Platforms" ]]; then
-		ls -1 "$xcode_path/Platforms" 2>/dev/null | while read -r platform; do
+		find "$xcode_path/Platforms" -maxdepth 1 2>/dev/null | while read -r platform; do
 			[[ -n "$platform" ]] && print_table_row "$platform" 40
 		done
 	else

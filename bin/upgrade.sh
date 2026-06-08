@@ -15,7 +15,6 @@ show_upgrade_help() {
 }
 
 RCC_DRY_RUN=false
-RCC_USE_GLOBAL_PROGRESS=false
 
 for arg in "$@"; do
 	case "$arg" in
@@ -296,6 +295,7 @@ upgrade_nvm() {
 	fi
 
 	export NVM_DIR="$nvm_dir"
+	# shellcheck disable=SC1090
 	source "$nvm_sh" >/dev/null 2>&1
 
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
@@ -473,6 +473,7 @@ _fallback_upgrade_nvm() {
 		return 0
 	fi
 	export NVM_DIR="$nvm_dir"
+	# shellcheck disable=SC1090
 	source "$nvm_sh" >/dev/null 2>&1
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		nvm version current 2>/dev/null || echo "system"
@@ -515,7 +516,6 @@ _fallback_upgrade_gem() {
 # ============================================================
 
 main() {
-	RCC_USE_GLOBAL_PROGRESS=true
 	init_global_progress 18
 
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then

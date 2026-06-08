@@ -111,6 +111,7 @@ while [[ $# -gt 0 ]]; do
 		shift
 		;;
 	--alert)
+		# shellcheck disable=SC2034
 		ALERT_ON_ISSUES=true
 		shift
 		;;
@@ -167,8 +168,8 @@ print_category() {
 		CURRENT_CATEGORY="$name"
 		ACCUMULATED_CATEGORIES+=("$name")
 		for item in "${items[@]}"; do
-			local status="$(echo "$item" | cut -d: -f1)"
-			local rest="$(echo "$item" | cut -d: -f2-)"
+			# shellcheck disable=SC2155
+			local status="$(echo "$item" | cut -d: -f1)" rest="$(echo "$item" | cut -d: -f2-)"
 			print_result "$status" "$rest"
 		done
 		return
@@ -178,8 +179,8 @@ print_category() {
 	print_section_header "$name"
 
 	for item in "${items[@]}"; do
-		local status="$(echo "$item" | cut -d: -f1)"
-		local rest="$(echo "$item" | cut -d: -f2-)"
+		# shellcheck disable=SC2155
+		local status="$(echo "$item" | cut -d: -f1)" rest="$(echo "$item" | cut -d: -f2-)"
 		echo_result "$status" "$rest"
 	done
 }
@@ -222,6 +223,7 @@ show_audit_history() {
 	fi
 	
 	local -a history_files
+	# shellcheck disable=SC2012,SC2207
 	history_files=($(ls -t "$HISTORY_DIR"/audit_*.json 2>/dev/null | head -10))
 	
 	if [[ ${#history_files[@]} -eq 0 ]]; then
@@ -413,7 +415,11 @@ fix_issue() {
 		fi
 
 		print_warning "Fixing: $check_name"
-		eval "$fix_cmd" 2>/dev/null && print_success "Fixed $check_name" || print_error "Fix failed: $check_name"
+		if eval "$fix_cmd" 2>/dev/null; then
+			print_success "Fixed $check_name"
+		else
+			print_error "Fix failed: $check_name"
+		fi
 	else
 		FIX_QUEUE+=("${check_name}|${fix_cmd}")
 	fi
@@ -498,9 +504,9 @@ run_network_checks() {
 	local -a network_results=()
 	
 	update_global_progress_info "audit: Open Ports..."
-	port_count="$(sudo lsof -i -P -n 2>/dev/null | grep LISTEN | wc -l 2>/dev/null)"
+	port_count="$(sudo lsof -i -P -n 2>/dev/null | grep -c LISTEN)"
 	[[ -z "$port_count" ]] && port_count="0"
-	port_count="$(echo "$port_count" | sed 's/ *//g')"
+	port_count="${port_count// }"
 	if [[ "$port_count" -lt 10 ]]; then
 		network_results+=("pass:Open Ports: ${port_count} listening")
 	else
@@ -594,7 +600,7 @@ run_auth_checks() {
 	local keychains
 	keychains="$(security list-keychains 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$keychains" ]] && keychains="0"
-	keychains="$(echo "$keychains" | sed 's/ *//g')"
+	keychains="${keychains// }"
 	if [[ "$keychains" -gt 0 ]]; then
 		auth_results+=("pass:Keychain: ${keychains} available")
 	else
@@ -604,9 +610,10 @@ run_auth_checks() {
 	
 	update_global_progress_info "audit: SSH Keys..."
 	local ssh_key_count
+	# shellcheck disable=SC2012
 	ssh_key_count="$(ls -la ~/.ssh/*.pub 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$ssh_key_count" ]] && ssh_key_count="0"
-	ssh_key_count="$(echo "$ssh_key_count" | sed 's/ *//g')"
+	ssh_key_count="${ssh_key_count// }"
 	if [[ "$ssh_key_count" -eq 0 ]]; then
 		auth_results+=("pass:SSH Keys: None")
 	else
@@ -618,7 +625,7 @@ run_auth_checks() {
 	local auth_keys_count
 	auth_keys_count="$(cat ~/.ssh/authorized_keys 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$auth_keys_count" ]] && auth_keys_count="0"
-	auth_keys_count="$(echo "$auth_keys_count" | sed 's/ *//g')"
+	auth_keys_count="${auth_keys_count// }"
 	if [[ "$auth_keys_count" -eq 0 ]]; then
 		auth_results+=("pass:Authorized Keys: None")
 	else
@@ -645,9 +652,10 @@ run_persistence_checks() {
 	
 	update_global_progress_info "audit: User LaunchAgents..."
 	local user_la_count
+	# shellcheck disable=SC2012
 	user_la_count="$(ls -1 ~/Library/LaunchAgents/ 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$user_la_count" ]] && user_la_count="0"
-	user_la_count="$(echo "$user_la_count" | sed 's/ *//g')"
+	user_la_count="${user_la_count// }"
 	if [[ "$user_la_count" -eq 0 ]]; then
 		persistence_results+=("pass:User LaunchAgents: None")
 	elif [[ "$user_la_count" -lt 10 ]]; then
@@ -660,9 +668,10 @@ run_persistence_checks() {
 
 	update_global_progress_info "audit: System LaunchAgents..."
 	local sys_la_count
+	# shellcheck disable=SC2012
 	sys_la_count="$(ls -1 /Library/LaunchAgents/ 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$sys_la_count" ]] && sys_la_count="0"
-	sys_la_count="$(echo "$sys_la_count" | sed 's/ *//g')"
+	sys_la_count="${sys_la_count// }"
 	if [[ "$sys_la_count" -eq 0 ]]; then
 		persistence_results+=("pass:System LaunchAgents: None")
 	elif [[ "$sys_la_count" -lt 10 ]]; then
@@ -674,9 +683,10 @@ run_persistence_checks() {
 
 	update_global_progress_info "audit: LaunchDaemons..."
 	local ld_count
+	# shellcheck disable=SC2012
 	ld_count="$(ls -1 /Library/LaunchDaemons/ 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$ld_count" ]] && ld_count="0"
-	ld_count="$(echo "$ld_count" | sed 's/ *//g')"
+	ld_count="${ld_count// }"
 	if [[ "$ld_count" -eq 0 ]]; then
 		persistence_results+=("pass:LaunchDaemons: None")
 	elif [[ "$ld_count" -lt 15 ]]; then
@@ -690,7 +700,7 @@ run_persistence_checks() {
 	local cron_count
 	cron_count="$(crontab -l 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$cron_count" ]] && cron_count="0"
-	cron_count="$(echo "$cron_count" | sed 's/ *//g')"
+	cron_count="${cron_count// }"
 	if [[ "$cron_count" -eq 0 ]]; then
 		persistence_results+=("pass:Cron Jobs: None")
 	else
@@ -703,7 +713,7 @@ run_persistence_checks() {
 	local at_count
 	at_count="$(atq 2>/dev/null | wc -l 2>/dev/null)"
 	[[ -z "$at_count" ]] && at_count="0"
-	at_count="$(echo "$at_count" | sed 's/ *//g')"
+	at_count="${at_count// }"
 	if [[ "$at_count" -eq 0 ]]; then
 		persistence_results+=("pass:At Jobs: None")
 	else
@@ -716,7 +726,7 @@ run_persistence_checks() {
 	local li_count
 	li_count="$(osascript -e 'tell application "System Events" to get the name of every login item' 2>/dev/null | tr ',' '\n' | wc -l 2>/dev/null)"
 	[[ -z "$li_count" ]] && li_count="0"
-	li_count="$(echo "$li_count" | sed 's/ *//g')"
+	li_count="${li_count// }"
 	if [[ "$li_count" -eq 0 ]]; then
 		persistence_results+=("pass:Login Items: None")
 	elif [[ "$li_count" -lt 15 ]]; then
@@ -788,6 +798,7 @@ run_additional_checks() {
 
 	update_global_progress_info "audit: .ssh Permissions..."
 	local file_perms
+	# shellcheck disable=SC2012
 	file_perms="$(ls -la ~/.ssh 2>/dev/null | head -1 | awk '{print $1}')"
 	if [[ "$file_perms" == "drwx------" ]]; then
 		additional_results+=("pass:.ssh Permissions: Secure")
@@ -810,7 +821,7 @@ run_additional_checks() {
 
 	update_global_progress_info "audit: Kernel Extensions..."
 	local kext_count
-	kext_count="$(kextstat 2>/dev/null | grep -v "com.apple" | wc -l 2>/dev/null | sed 's/ *//g')"
+	kext_count="$(kextstat 2>/dev/null | grep -cv "com.apple")"
 	[[ -z "$kext_count" ]] && kext_count="0"
 	if [[ "$kext_count" -eq 0 ]]; then
 		additional_results+=("pass:Kernel Extensions: None")
@@ -852,10 +863,9 @@ render_accumulated_results() {
 		print_section_header "$cat_name"
 		
 		for result in "${ACCUMULATED_RESULTS[@]}"; do
-			local r_cat="$(echo "$result" | cut -d: -f2)"
+			# shellcheck disable=SC2155
+			local r_cat="$(echo "$result" | cut -d: -f2)" status="$(echo "$result" | cut -d: -f1)" label="$(echo "$result" | cut -d: -f3-)"
 			[[ "$r_cat" != "$cat_name" ]] && continue
-			local status="$(echo "$result" | cut -d: -f1)"
-			local label="$(echo "$result" | cut -d: -f3-)"
 			
 			case "$status" in
 				pass) print_success "$label" ;;
@@ -960,7 +970,11 @@ main() {
 					print_warning "Fixing: $check_name (manual step required: ${fix_cmd#MANUAL:})"
 				else
 					print_warning "Fixing: $check_name"
-					eval "$fix_cmd" 2>/dev/null && print_success "Fixed $check_name" || print_error "Fix failed: $check_name"
+					if eval "$fix_cmd" 2>/dev/null; then
+					print_success "Fixed $check_name"
+				else
+					print_error "Fix failed: $check_name"
+				fi
 				fi
 			done
 		fi
@@ -995,4 +1009,6 @@ main() {
 	print_success "Completed"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+	main "$@"
+fi
