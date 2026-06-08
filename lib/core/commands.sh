@@ -36,7 +36,7 @@ MENU_ITEMS=(
     "xcode:Xcode"
 )
 
-TOTAL_OPTIONS=25
+TOTAL_OPTIONS=${#MENU_ITEMS[@]}
 
 show_version() {
     echo "Raccoon version ${VERSION}"

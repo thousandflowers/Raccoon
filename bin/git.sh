@@ -87,7 +87,7 @@ check_repos() {
 		fi
 
 		local unpushed
-		unpushed=$(git log @{u}.. --oneline 2>/dev/null | wc -l | tr -d ' ')
+		unpushed=$(git log '@{u}..' --oneline 2>/dev/null | wc -l | tr -d ' ')
 		if [[ "$unpushed" -gt 0 ]]; then
 			has_issue=1
 			issues+="${YELLOW}$unpushed unpushed${NC}, "

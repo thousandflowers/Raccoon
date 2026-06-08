@@ -6,7 +6,6 @@ RED=$'\033[0;31m'
 YELLOW=$'\033[0;33m'
 GRAY=$'\033[0;90m'
 PURPLE_BOLD=$'\033[1;35m'
-BLUE=$'\033[0;34m'
 CYAN=$'\033[0;36m'
 NC=$'\033[0m'
 
@@ -14,18 +13,12 @@ NC=$'\033[0m'
 ICON_SUCCESS="${GREEN}✓${NC}"
 ICON_ERROR="${RED}✗${NC}"
 ICON_ARROW="${PURPLE_BOLD}➤${NC}"
-ICON_SKIP="${GRAY}○${NC}"
-ICON_DRY_RUN="${YELLOW}→${NC}"
-ICON_LIST="${GRAY}▪${NC}"
-ICON_REVIEW="${YELLOW}⚐${NC}"
 
 # Spinner
 SPINNER_PID=""
-SPINNER_MSG=""
 
 start_inline_spinner() {
     local msg="${1:-Loading...}"
-    SPINNER_MSG="$msg"
     printf "%s " "$msg"
     (
         while true; do
@@ -140,7 +133,7 @@ show_progress_bar() {
 
 	local tmpfile
 	tmpfile=$(mktemp)
-	trap "rm -f $tmpfile" RETURN
+	trap 'rm -f "$tmpfile"' RETURN
 
 	local bar_width=10
 
@@ -257,7 +250,7 @@ print_table_header() {
     printf "%s" "$sep"
     for i in "${!col_arr[@]}"; do
         local w=${widths[$i]:-20}
-        printf " %${w}s %s" "$(printf '%*s' $w '' | tr ' ' '-')" "$sep"
+        printf " %${w}s %s" "$(printf '%*s' "$w" '' | tr ' ' '-')" "$sep"
     done
     echo ""
 }
@@ -272,7 +265,8 @@ print_table_row() {
     for i in "${!val_arr[@]}"; do
         local w=${widths[$i]:-20}
         local text="${val_arr[$i]}"
-        local clean=$(echo "$text" | sed -E 's/\x1b\[[0-9;]*m//g')
+        local clean
+        clean=$(echo "$text" | sed -E 's/\x1b\[[0-9;]*m//g')
         local vlen=${#clean}
         local pad=$((w - vlen))
         [[ $pad -lt 0 ]] && pad=0

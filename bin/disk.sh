@@ -18,16 +18,11 @@ show_disk_help() {
 	echo "  --help, -h      Show this help"
 }
 
-JSON_OUTPUT=false
-
 for arg in "$@"; do
 	case "$arg" in
 	--help | -h)
 		show_disk_help
 		exit 0
-		;;
-	--json)
-		JSON_OUTPUT=true
 		;;
 	*)
 		;;
@@ -85,6 +80,7 @@ main() {
 	container_ref=$(echo "$container_info" | grep "Container Reference:" | head -1 | awk '{print $NF}')
 	container_size=$(echo "$container_info" | grep "Size (Capacity Ceiling):" | head -1 | sed 's/.*(\([0-9.]*\) GB.*/\1 GB/')
 	container_line=$(echo "$container_info" | grep "Capacity Not Allocated:" | head -1)
+	# shellcheck disable=SC2001 # complex capture-group extraction
 	container_free=$(echo "$container_line" | sed 's/.*(\([0-9.]*\) GB.*/\1 GB/')
 	print_table_row "$container_ref|$container_size|$container_free" 18 12 12
 	echo "${GREEN}✓${NC}"

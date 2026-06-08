@@ -19,7 +19,6 @@ show_certs_help() {
 	echo "  --help, -h      Show this help"
 }
 
-JSON_OUTPUT=false
 SHOW_EXPIRED=false
 SHOW_EXPIRING=0
 SHOW_DETAIL=false
@@ -29,9 +28,6 @@ for arg in "$@"; do
 	--help | -h)
 		show_certs_help
 		exit 0
-		;;
-	--json)
-		JSON_OUTPUT=true
 		;;
 	--expired)
 		SHOW_EXPIRED=true
@@ -156,7 +152,7 @@ print(f'SUMMARY:{total}|{valid}|{expiring}|{expired}|{selfsigned}')
 		if [[ -n "$cert_lines" ]]; then
 			printf "%-35s %-18s %-12s %-10s\n" "Certificate" "Issuer" "Expires" "Status"
 			echo "${GRAY}────────────────────────────────────────────────────────────────────────${NC}"
-			while IFS='|' read -r cn issuer end_date status is_self; do
+			while IFS='|' read -r cn issuer end_date status _; do
 				local show=true
 				
 				if [[ "$SHOW_EXPIRED" == true ]] && [[ "$status" != "expired" ]]; then

@@ -18,16 +18,11 @@ show_fonts_help() {
 	echo "  --help, -h      Show this help"
 }
 
-JSON_OUTPUT=false
-
 for arg in "$@"; do
 	case "$arg" in
 	--help | -h)
 		show_fonts_help
 		exit 0
-		;;
-	--json)
-		JSON_OUTPUT=true
 		;;
 	*)
 		;;
@@ -38,8 +33,8 @@ main() {
 	print_section_header "Fonts Status"
 
 	local sys_fonts user_fonts
-	sys_fonts=$(ls -1 /Library/Fonts/ 2>/dev/null | wc -l | xargs || echo "0")
-	user_fonts=$(ls -1 ~/Library/Fonts/ 2>/dev/null | wc -l | xargs || echo "0")
+	sys_fonts=$(find /Library/Fonts -maxdepth 1 -type f 2>/dev/null | wc -l | xargs || echo "0")
+	user_fonts=$(find ~/Library/Fonts -maxdepth 1 -type f 2>/dev/null | wc -l | xargs || echo "0")
 
 	echo "${GRAY}[1/4] System Fonts...${NC}"
 	print_table_header "Source|Count" 25 20
@@ -50,7 +45,7 @@ main() {
 	echo ""
 	echo "${GRAY}[2/4] User Fonts...${NC}"
 	print_table_header "Source|Count" 25 20
-	print_table_row "~/Library/Fonts/|$user_fonts" 25 20
+	print_table_row "$HOME/Library/Fonts/|$user_fonts" 25 20
 
 	echo "${GREEN}✓${NC}"
 

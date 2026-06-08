@@ -1,0 +1,31 @@
+# shellcheck shell=bash
+# rcc bash completion — source this file or add to bash_completion.d
+
+_rcc_audit_opts='--deep --fix --dry-run --force --quiet --report --json --csv --html --history --diff --watch --alert --notify --help -h'
+
+_rcc() {
+	# shellcheck disable=SC2034
+	local cur prev words cword
+	_init_completion -n := || return
+
+	if [[ $cword -eq 1 ]]; then
+		# shellcheck disable=SC2207
+		COMPREPLY=($(compgen -W 'upgrade audit network disk memory ports battery backup env startup trash fonts history certs docker xcode ssh git help --version -V' -- "$cur"))
+		return
+	fi
+
+	case "${words[1]}" in
+		audit)
+			# shellcheck disable=SC2207,SC2016
+			COMPREPLY=($(compgen -W '$_rcc_audit_opts' -- "$cur"))
+			;;
+		upgrade)
+			# shellcheck disable=SC2207
+			COMPREPLY=($(compgen -W '--dry-run -n --help -h' -- "$cur"))
+			;;
+		help|--version|-V)
+			COMPREPLY=()
+			;;
+	esac
+} &&
+complete -F _rcc rcc

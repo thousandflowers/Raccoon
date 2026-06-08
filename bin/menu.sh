@@ -39,8 +39,8 @@ render() {
 	echo ""
 	
 	local idx=0
-	for row in $(seq 0 4); do
-		for col in $(seq 0 $((cols-1))); do
+	for _ in $(seq 0 4); do
+		for _ in $(seq 0 $((cols-1))); do
 			if [[ $idx -lt ${#items[@]} ]]; then
 				local item="${items[$idx]}"
 				local title="${item%%:*}"

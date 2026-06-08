@@ -33,27 +33,13 @@ if [[ ! -d "${INSTALL_DIR}" ]]; then
 	git clone --depth 1 "$REPO_URL" "${INSTALL_DIR}"
 else
 	echo "Updating existing installation..."
-	if [[ -d "${INSTALL_DIR}/.git" ]]; then
-		cd "${INSTALL_DIR}" && git pull -q
-	else
-		echo "  WARNING: ${INSTALL_DIR} exists but is not a git repo. Re-cloning..."
-		rm -rf "${INSTALL_DIR}"
-		git clone --depth 1 "$REPO_URL" "${INSTALL_DIR}"
-	fi
+	cd "${INSTALL_DIR}" && git pull -q
 fi
 
 VERSION=$(get_version)
 
 ln -sf "${INSTALL_DIR}/rcc" "${BIN_DIR}/rcc"
 echo "Linked rcc to ${BIN_DIR}"
-
-MAN_DIR="${BIN_DIR}/../share/man/man1"
-MAN_DIR="$(cd "$MAN_DIR" 2>/dev/null && pwd || echo "${BIN_DIR}/../share/man/man1")"
-mkdir -p "${MAN_DIR}" 2>/dev/null
-if [[ -d "${MAN_DIR}" ]]; then
-	ln -sf "${INSTALL_DIR}/man/man1/rcc.1" "${MAN_DIR}/rcc.1"
-	echo "Linked man page to ${MAN_DIR}"
-fi
 
 chmod +x "${INSTALL_DIR}/rcc"
 chmod +x "${BIN_DIR}/rcc"

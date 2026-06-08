@@ -13,6 +13,21 @@ WARN_count=0
 FAIL_count=0
 declare -a FIX_QUEUE=()
 
+# Count lines from stdin, return 0 on empty (avoids wc whitespace + null boilerplate)
+count_lines() {
+	local val
+	val="$(cat - | wc -l 2>/dev/null)"
+	echo "${val// }"
+}
+
+SUDO_AVAILABLE=true
+_sudo() {
+	if [[ "${SUDO_AVAILABLE:-true}" != "true" ]] && [[ "$1" != "-v" ]]; then
+		return 1
+	fi
+	sudo "$@"
+}
+
 show_audit_help() {
 	echo "Usage: rcc audit [options]"
 	echo ""
@@ -46,7 +61,6 @@ OUTPUT_FORMAT="text"
 SHOW_HISTORY=false
 SHOW_DIFF=false
 SCHEDULE_WEEKLY=false
-ALERT_ON_ISSUES=false
 NOTIFY=false
 
 while [[ $# -gt 0 ]]; do
@@ -109,7 +123,6 @@ while [[ $# -gt 0 ]]; do
 		shift
 		;;
 	--alert)
-		ALERT_ON_ISSUES=true
 		shift
 		;;
 	--notify)
@@ -151,9 +164,9 @@ print_result() {
 	local raw_len=${#label}
 	local pad_len=$((34 - raw_len))
 	local padding
-	padding=$(printf '%*s' "$pad_len")
+	padding=$(printf '%*s' "$pad_len" '')
 	
-	printf "│ %s %s%s%s │\n" "$icon" "$colored_label" "$padding"
+	printf "│ %s %s%s │\n" "$icon" "$colored_label" "$padding"
 }
 
 echo_result() {
@@ -178,8 +191,10 @@ print_category() {
 	echo "+---------------------------------------+"
 
 	for item in "${items[@]}"; do
-		local status="$(echo "$item" | cut -d: -f1)"
-		local rest="$(echo "$item" | cut -d: -f2-)"
+		local status
+		status="$(echo "$item" | cut -d: -f1)"
+		local rest
+		rest="$(echo "$item" | cut -d: -f2-)"
 		echo_result "$status" "$rest"
 	done
 	
@@ -225,6 +240,9 @@ EOF
 
 	local latest_link="$HISTORY_DIR/latest.json"
 	ln -sf "$history_file" "$latest_link" 2>/dev/null || true
+
+	# Rotate: keep last 30 audit files
+	find "$HISTORY_DIR" -name 'audit_*.json' -maxdepth 1 -exec ls -t {} + 2>/dev/null | tail -n +31 | xargs rm -f 2>/dev/null || true
 }
 
 show_audit_history() {
@@ -237,7 +255,7 @@ show_audit_history() {
 	fi
 	
 	local -a history_files
-	history_files=($(ls -t "$HISTORY_DIR"/audit_*.json 2>/dev/null | head -10))
+	mapfile -t history_files < <(find "$HISTORY_DIR" -name 'audit_*.json' -maxdepth 1 -exec ls -t {} + 2>/dev/null | head -10)
 	
 	if [[ ${#history_files[@]} -eq 0 ]]; then
 		echo "  No history found"
@@ -439,18 +457,18 @@ run_core_checks() {
 	local -a core_results=()
 	
 	local fv_status
-	fv_status="$(sudo fdesetup status 2>/dev/null | grep -i "filevault is" | head -1)"
+	fv_status="$(_sudo fdesetup status 2>/dev/null | grep -i "filevault is" | head -1)"
 	if echo "$fv_status" | grep -qi "enabled"; then
 		core_results+=("pass:FileVault: Enabled")
 	elif echo "$fv_status" | grep -qi "disabled"; then
 		core_results+=("fail:FileVault: Disabled")
-		fix_issue "FileVault" "sudo fdesetup enable -user \\$(whoami)"
+		fix_issue "FileVault" "_sudo fdesetup enable -user \\$(whoami)"
 	else
 		core_results+=("warn:FileVault: Unknown")
 	fi
 	
 	local sip_status
-	sip_status="$(sudo csrutil status 2>/dev/null)"
+	sip_status="$(_sudo csrutil status 2>/dev/null)"
 	if echo "$sip_status" | grep -qi "enabled"; then
 		core_results+=("pass:SIP: Enabled")
 	elif echo "$sip_status" | grep -qi "disabled"; then
@@ -465,25 +483,25 @@ run_core_checks() {
 		core_results+=("pass:Gatekeeper: Enabled")
 	else
 		core_results+=("fail:Gatekeeper: Disabled")
-		fix_issue "Gatekeeper" "sudo spctl --master-enable"
+		fix_issue "Gatekeeper" "_sudo spctl --master-enable"
 	fi
 	
 	local fw_status
-	fw_status="$(sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>/dev/null)"
+	fw_status="$(_sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>/dev/null)"
 	if echo "$fw_status" | grep -qi "enabled"; then
 		core_results+=("pass:Firewall: Enabled")
 	else
 		core_results+=("fail:Firewall: Disabled")
-		fix_issue "Firewall" "sudo /usr/libexec/ApplicationFirewall/socketfilterfw --enable"
+		fix_issue "Firewall" "_sudo /usr/libexec/ApplicationFirewall/socketfilterfw --enable"
 	fi
 	
 	local stealth_status
-	stealth_status="$(sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getstealthmode 2>/dev/null)"
+	stealth_status="$(_sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getstealthmode 2>/dev/null)"
 	if echo "$stealth_status" | grep -qi "enabled"; then
 		core_results+=("pass:Stealth Mode: Enabled")
 	else
 		core_results+=("warn:Stealth Mode: Disabled")
-		fix_issue "Stealth Mode" "sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on"
+		fix_issue "Stealth Mode" "_sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on"
 	fi
 	
 	local updates
@@ -501,14 +519,12 @@ run_core_checks() {
 run_network_checks() {
 	local -a network_results=()
 	
-	port_count="$(sudo lsof -i -P -n 2>/dev/null | grep LISTEN | wc -l 2>/dev/null)"
-	[[ -z "$port_count" ]] && port_count="0"
-	port_count="$(echo "$port_count" | sed 's/ *//g')"
+	port_count="$(_sudo lsof -i -P -n 2>/dev/null | grep LISTEN | count_lines)"
 	if [[ "$port_count" -lt 10 ]]; then
 		network_results+=("pass:Open Ports: ${port_count} listening")
 	else
 		network_results+=("warn:Open Ports: ${port_count} listening")
-		fix_issue "Open Ports" "echo 'Consider reviewing open ports with: sudo lsof -i -P -n'"
+		fix_issue "Open Ports" "echo 'Consider reviewing open ports with: _sudo lsof -i -P -n'"
 	fi
 
 	local dns_servers
@@ -540,10 +556,10 @@ run_network_checks() {
 		else
 			network_results+=("pass:Bluetooth: On")
 		fi
-		fix_issue "Bluetooth" "sudo defaults write /Library/Preferences/com.apple.Bluetooth ControllerPowerState -int 0 && sudo killall -HUP blued 2>/dev/null || true"
+		fix_issue "Bluetooth" "_sudo defaults write /Library/Preferences/com.apple.Bluetooth ControllerPowerState -int 0 && _sudo killall -HUP blued 2>/dev/null || true"
 	else
 		network_results+=("warn:Bluetooth: Unknown")
-		fix_issue "Bluetooth" "sudo defaults write /Library/Preferences/com.apple.Bluetooth ControllerPowerState -int 0 && sudo killall -HUP blued 2>/dev/null || true"
+		fix_issue "Bluetooth" "_sudo defaults write /Library/Preferences/com.apple.Bluetooth ControllerPowerState -int 0 && _sudo killall -HUP blued 2>/dev/null || true"
 	fi
 
 	local sharing_count
@@ -553,16 +569,16 @@ run_network_checks() {
 		network_results+=("pass:Sharing: None enabled")
 	else
 		network_results+=("warn:Sharing: ${sharing_count} enabled")
-		fix_issue "Sharing" "sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null; sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.smbd.plist 2>/dev/null; sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.AppleFileServer.plist 2>/dev/null; true"
+		fix_issue "Sharing" "_sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null; _sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.smbd.plist 2>/dev/null; _sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.AppleFileServer.plist 2>/dev/null; true"
 	fi
 
 	local sshd_check
-	sshd_check="$(sudo launchctl list com.openssh.sshd 2>/dev/null)"
+	sshd_check="$(_sudo launchctl list com.openssh.sshd 2>/dev/null)"
 	if [[ -z "$sshd_check" ]] || echo "$sshd_check" | grep -q "not found"; then
 		network_results+=("pass:SSH Daemon: Disabled")
 	else
 		network_results+=("warn:SSH Daemon: Running")
-		fix_issue "SSH Daemon" "sudo launchctl unload /System/Library/LaunchDaemons/sshd.plist"
+		fix_issue "SSH Daemon" "_sudo launchctl unload /System/Library/LaunchDaemons/sshd.plist"
 	fi
 	
 	print_category "Network" "${network_results[@]}"
@@ -572,18 +588,16 @@ run_auth_checks() {
 	local -a auth_results=()
 	
 	local auto_user
-	auto_user="$(sudo defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser 2>/dev/null)"
+	auto_user="$(_sudo defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser 2>/dev/null)"
 	if [[ -z "$auto_user" ]]; then
 		auth_results+=("pass:Auto-Login: Disabled")
 	else
 		auth_results+=("fail:Auto-Login: User ${auto_user}")
-		fix_issue "Auto-Login" "sudo defaults delete /Library/Preferences/com.apple.loginwindow autoLoginUser"
+		fix_issue "Auto-Login" "_sudo defaults delete /Library/Preferences/com.apple.loginwindow autoLoginUser"
 	fi
 	
 	local keychains
-	keychains="$(security list-keychains 2>/dev/null | wc -l 2>/dev/null)"
-	[[ -z "$keychains" ]] && keychains="0"
-	keychains="$(echo "$keychains" | sed 's/ *//g')"
+	keychains="$(security list-keychains 2>/dev/null | count_lines)"
 	if [[ "$keychains" -gt 0 ]]; then
 		auth_results+=("pass:Keychain: ${keychains} available")
 	else
@@ -591,9 +605,7 @@ run_auth_checks() {
 	fi
 	
 	local ssh_key_count
-	ssh_key_count="$(ls -la ~/.ssh/*.pub 2>/dev/null | wc -l 2>/dev/null)"
-	[[ -z "$ssh_key_count" ]] && ssh_key_count="0"
-	ssh_key_count="$(echo "$ssh_key_count" | sed 's/ *//g')"
+	ssh_key_count="$(find ~/.ssh -name '*.pub' -maxdepth 1 2>/dev/null | count_lines)"
 	if [[ "$ssh_key_count" -eq 0 ]]; then
 		auth_results+=("pass:SSH Keys: None")
 	else
@@ -601,9 +613,7 @@ run_auth_checks() {
 	fi
 	
 	local auth_keys_count
-	auth_keys_count="$(cat ~/.ssh/authorized_keys 2>/dev/null | wc -l 2>/dev/null)"
-	[[ -z "$auth_keys_count" ]] && auth_keys_count="0"
-	auth_keys_count="$(echo "$auth_keys_count" | sed 's/ *//g')"
+	auth_keys_count="$(cat ~/.ssh/authorized_keys 2>/dev/null | count_lines)"
 	if [[ "$auth_keys_count" -eq 0 ]]; then
 		auth_results+=("pass:Authorized Keys: None")
 	else
@@ -612,7 +622,7 @@ run_auth_checks() {
 	fi
 
 	local sudoers_check
-	sudoers_check="$(sudo visudo -c 2>&1)"
+	sudoers_check="$(_sudo visudo -c 2>&1)"
 	if echo "$sudoers_check" | grep -qi "parsed"; then
 		auth_results+=("pass:Sudoers: OK")
 	else
@@ -626,9 +636,7 @@ run_persistence_checks() {
 	local -a persistence_results=()
 	
 	local user_la_count
-	user_la_count="$(ls -1 ~/Library/LaunchAgents/ 2>/dev/null | wc -l 2>/dev/null)"
-	[[ -z "$user_la_count" ]] && user_la_count="0"
-	user_la_count="$(echo "$user_la_count" | sed 's/ *//g')"
+	user_la_count="$(find ~/Library/LaunchAgents -maxdepth 1 2>/dev/null | count_lines)"
 	if [[ "$user_la_count" -eq 0 ]]; then
 		persistence_results+=("pass:User LaunchAgents: None")
 	elif [[ "$user_la_count" -lt 10 ]]; then
@@ -639,9 +647,7 @@ run_persistence_checks() {
 	fi
 
 	local sys_la_count
-	sys_la_count="$(ls -1 /Library/LaunchAgents/ 2>/dev/null | wc -l 2>/dev/null)"
-	[[ -z "$sys_la_count" ]] && sys_la_count="0"
-	sys_la_count="$(echo "$sys_la_count" | sed 's/ *//g')"
+	sys_la_count="$(find /Library/LaunchAgents -maxdepth 1 2>/dev/null | count_lines)"
 	if [[ "$sys_la_count" -eq 0 ]]; then
 		persistence_results+=("pass:System LaunchAgents: None")
 	elif [[ "$sys_la_count" -lt 10 ]]; then
@@ -651,9 +657,7 @@ run_persistence_checks() {
 	fi
 
 	local ld_count
-	ld_count="$(ls -1 /Library/LaunchDaemons/ 2>/dev/null | wc -l 2>/dev/null)"
-	[[ -z "$ld_count" ]] && ld_count="0"
-	ld_count="$(echo "$ld_count" | sed 's/ *//g')"
+	ld_count="$(find /Library/LaunchDaemons -maxdepth 1 2>/dev/null | count_lines)"
 	if [[ "$ld_count" -eq 0 ]]; then
 		persistence_results+=("pass:LaunchDaemons: None")
 	elif [[ "$ld_count" -lt 15 ]]; then
@@ -663,9 +667,7 @@ run_persistence_checks() {
 	fi
 
 	local cron_count
-	cron_count="$(crontab -l 2>/dev/null | wc -l 2>/dev/null)"
-	[[ -z "$cron_count" ]] && cron_count="0"
-	cron_count="$(echo "$cron_count" | sed 's/ *//g')"
+	cron_count="$(crontab -l 2>/dev/null | count_lines)"
 	if [[ "$cron_count" -eq 0 ]]; then
 		persistence_results+=("pass:Cron Jobs: None")
 	else
@@ -674,9 +676,7 @@ run_persistence_checks() {
 	fi
 
 	local at_count
-	at_count="$(atq 2>/dev/null | wc -l 2>/dev/null)"
-	[[ -z "$at_count" ]] && at_count="0"
-	at_count="$(echo "$at_count" | sed 's/ *//g')"
+	at_count="$(atq 2>/dev/null | count_lines)"
 	if [[ "$at_count" -eq 0 ]]; then
 		persistence_results+=("pass:At Jobs: None")
 	else
@@ -685,9 +685,7 @@ run_persistence_checks() {
 	fi
 
 	local li_count
-	li_count="$(osascript -e 'tell application "System Events" to get the name of every login item' 2>/dev/null | tr ',' '\n' | wc -l 2>/dev/null)"
-	[[ -z "$li_count" ]] && li_count="0"
-	li_count="$(echo "$li_count" | sed 's/ *//g')"
+	li_count="$(osascript -e 'tell application "System Events" to get the name of every login item' 2>/dev/null | tr ',' '\n' | count_lines)"
 	if [[ "$li_count" -eq 0 ]]; then
 		persistence_results+=("pass:Login Items: None")
 	elif [[ "$li_count" -lt 15 ]]; then
@@ -745,11 +743,11 @@ run_additional_checks() {
 		additional_results+=("pass:Screen Lock: ${lock_timeout}s timeout")
 	else
 		additional_results+=("warn:Screen Lock: Default")
-		fix_issue "Screen Lock" "sudo defaults write /Library/Preferences/com.apple.screensaver askForPasswordDelay -int 0 && defaults write com.apple.screensaver askForPassword -int 1"
+		fix_issue "Screen Lock" "_sudo defaults write /Library/Preferences/com.apple.screensaver askForPasswordDelay -int 0 && defaults write com.apple.screensaver askForPassword -int 1"
 	fi
 
 	local file_perms
-	file_perms="$(ls -la ~/.ssh 2>/dev/null | head -1 | awk '{print $1}')"
+	file_perms="$(find ~/.ssh -maxdepth 0 -exec ls -ld {} \; 2>/dev/null | awk '{print $1}')"
 	if [[ "$file_perms" == "drwx------" ]]; then
 		additional_results+=("pass:.ssh Permissions: Secure")
 	else
@@ -767,7 +765,7 @@ run_additional_checks() {
 	fi
 
 	local kext_count
-	kext_count="$(kextstat 2>/dev/null | grep -v "com.apple" | wc -l 2>/dev/null | sed 's/ *//g')"
+	kext_count="$(kextstat 2>/dev/null | grep -v "com.apple" | count_lines)"
 	[[ -z "$kext_count" ]] && kext_count="0"
 	if [[ "$kext_count" -eq 0 ]]; then
 		additional_results+=("pass:Kernel Extensions: None")
@@ -779,7 +777,7 @@ run_additional_checks() {
 	fi
 
 	local sudo_last
-	sudo_last="$(sudo -l 2>/dev/null | head -1)"
+	sudo_last="$(_sudo -l 2>/dev/null | head -1)"
 	if [[ -n "$sudo_last" && "$sudo_last" != "Sorry" ]]; then
 		additional_results+=("pass:Sudo Access: Available")
 	else
@@ -806,6 +804,15 @@ main() {
 	local -a privacy_results=()
 	local -a additional_results=()
 	
+	if ! _sudo -n true 2>/dev/null; then
+		if [[ -t 0 ]]; then
+			_sudo -v 2>/dev/null || true
+		else
+			echo "${YELLOW}⚠ Non-interactive: skip sudo-requiring checks${NC}" >&2
+			SUDO_AVAILABLE=false
+		fi
+	fi
+	
 	if [[ "$SHOW_HISTORY" == "true" ]]; then
 		show_audit_history
 		return
@@ -829,7 +836,11 @@ main() {
 	fi
 	
 	if [[ "$DEEP_SCAN" == "true" ]]; then
-		sudo -v 2>/dev/null || true
+		if [[ "$SUDO_AVAILABLE" != "true" ]]; then
+			echo "${RED}✗ Deep scan requires sudo — skipped${NC}" >&2
+			echo "${YELLOW}  Run from an interactive terminal or cache sudo first${NC}" >&2
+			exit 0
+		fi
 	fi
 	
 	if [[ "$QUIET_MODE" == "true" ]]; then
@@ -903,4 +914,6 @@ main() {
 	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+	main "$@"
+fi

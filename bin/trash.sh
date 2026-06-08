@@ -19,7 +19,6 @@ show_trash_help() {
 	echo "  --help, -h   Show this help"
 }
 
-JSON_OUTPUT=false
 EMPTY_TRASH=false
 
 for arg in "$@"; do
@@ -27,9 +26,6 @@ for arg in "$@"; do
 	--help | -h)
 		show_trash_help
 		exit 0
-		;;
-	--json)
-		JSON_OUTPUT=true
 		;;
 	--empty)
 		EMPTY_TRASH=true
@@ -62,16 +58,14 @@ main() {
 
 	local size count
 	size=$(du -sh "$trash_path" 2>/dev/null | awk '{print $1}' || echo "0")
-	count=$(ls -1 "$trash_path" 2>/dev/null | wc -l | xargs || echo "0")
+	count=$(find "$trash_path" -maxdepth 1 2>/dev/null | wc -l | xargs || echo "0")
 
 	print_table_row "Size|$size" 20 30
 	print_table_row "Items|$count files/folders" 20 30
 
 	if [[ -n "$size" && "$size" != "0" ]]; then
-		local size_num
-		size_num=$(echo "$size" | sed 's/[A-Za-z]//g')
-		local unit
-		unit=$(echo "$size" | sed 's/[0-9.]//g')
+		local size_num="${size//[A-Za-z]/}"
+		local unit="${size//[0-9.]/}"
 
 		if [[ "$unit" == *"G"* ]] && (( $(echo "$size_num > 1" | bc -l) )); then
 			print_table_row "Warning|${YELLOW}Trash contains large files${NC}" 20 30
@@ -84,9 +78,8 @@ main() {
 	echo "${GRAY}[3/3] Recent Items (Last 10)...${NC}"
 	print_table_header "Item" 40
 
-	ls -lt "$trash_path" 2>/dev/null | head -11 | tail -n +2 | while read -r line; do
-		local item_date item_name
-		item_date=$(echo "$line" | awk '{print $6, $7, $8}')
+	find "$trash_path" -maxdepth 1 -not -name ".*" -exec ls -lt {} + 2>/dev/null | head -11 | tail -n +2 | while read -r line; do
+		local item_name
 		item_name=$(echo "$line" | awk '{print $NF}')
 		[[ -n "$item_name" ]] && print_table_row "$item_name" 40
 	done || print_table_row "${GRAY}empty${NC}" 40
@@ -98,7 +91,7 @@ main() {
 		echo -n "Empty the trash? [y/N] "
 		read -r answer
 		if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
-			osascript -e 'tell application "Finder" to empty trash' 2>/dev/null || rm -rf "$trash_path"/*
+			osascript -e 'tell application "Finder" to empty trash' 2>/dev/null || rm -rf "${trash_path:?}"/*
 			echo "${GREEN}✓ Trash emptied${NC}"
 		fi
 	fi
