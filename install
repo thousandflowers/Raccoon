@@ -33,7 +33,7 @@ if [[ ! -d "${INSTALL_DIR}" ]]; then
 	git clone --depth 1 "$REPO_URL" "${INSTALL_DIR}"
 else
 	echo "Updating existing installation..."
-	cd "${INSTALL_DIR}" && git pull -q
+	cd "${INSTALL_DIR}" && git fetch --depth 1 origin main && git reset --hard origin/main
 fi
 
 VERSION=$(get_version)
