@@ -13,7 +13,7 @@ jobs:
   shellcheck:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install shellcheck
         run: brew install shellcheck
       - name: Run shellcheck
@@ -30,7 +30,7 @@ jobs:
   go-build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v5
         with:
           go-version: "${{ env.GO_VERSION }}"
@@ -41,7 +41,7 @@ jobs:
     needs: shellcheck
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install bats
         run: brew install bats-core bats-assert bats-support
       - name: Run bats tests
