@@ -183,7 +183,6 @@ print_category() {
 	local -a items=("$@")
 	
 	if [[ "$AUDIT_SILENT_MODE" == "true" ]]; then
-		CURRENT_CATEGORY="$name"
 		ACCUMULATED_CATEGORIES+=("$name")
 		for item in "${items[@]}"; do
 			# shellcheck disable=SC2155
@@ -195,6 +194,9 @@ print_category() {
 
 	echo ""
 	echo "+---------------------------------------+"
+	# Pad the title to the 38-column inner width ("| " + name + pad + "|").
+	local pad_str
+	pad_str=$(printf '%*s' $(( ${#name} < 38 ? 38 - ${#name} : 0 )) '')
 	echo "| ${CYAN}${name}${NC}${pad_str}|"
 	echo "+---------------------------------------+"
 
