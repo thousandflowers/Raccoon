@@ -45,6 +45,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install bats
-        run: brew install bats-core bats-assert bats-support
+        # test_helper.bash ships its own assert_* helpers; only bats-core is
+        # needed (bats-assert/bats-support are not homebrew-core formulae).
+        run: brew install bats-core
       - name: Run bats tests
         run: bats tests/
