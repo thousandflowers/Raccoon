@@ -18,7 +18,9 @@ jobs:
         run: brew install shellcheck
       - name: Run shellcheck
         run: |
-          shellcheck -x \
+          # -S warning: SC1091 "not following" notes on $SCRIPT_DIR-based
+          # sources are info-level and not actionable in CI.
+          shellcheck -S warning -x \
             rcc \
             install.sh \
             install \
