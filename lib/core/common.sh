@@ -48,6 +48,59 @@ print_section_header() {
     echo ""
 }
 
+# Standardized message helpers
+print_success() {
+    echo "${GREEN}${ICON_SUCCESS}${NC} $*"
+}
+
+print_error() {
+    echo "${RED}${ICON_ERROR}${NC} $*" >&2
+}
+
+print_warning() {
+    echo "${YELLOW}⚠${NC} $*"
+}
+
+print_info() {
+    echo "${GRAY}○${NC} $*"
+}
+
+print_step() {
+    local n="$1" total="$2" label="$3"
+    echo "${GRAY}[${n}/${total}]${NC} ${label}..."
+}
+
+# Confirm action with y/N prompt (auto-no with 10s timeout)
+confirm_action() {
+    local prompt="${1:-Proceed?}"
+    local timeout="${2:-10}"
+    local answer
+    echo -n "${YELLOW}${prompt} [y/N]${NC} "
+    read -r -n 1 -t "$timeout" answer || true
+    echo ""
+    [[ "$answer" == "y" || "$answer" == "Y" ]]
+}
+
+# Pause until user presses a key
+pause_for_user() {
+    local msg="${1:-Press any key to continue...}"
+    echo ""
+    echo -n "${GRAY}${msg}${NC}"
+    read -r -s -n 1
+    echo ""
+}
+
+# Print a small help header consistent across all commands
+print_help_header() {
+    local cmd="$1" desc="$2" extra="${3:-}"
+    echo "Usage: rcc ${cmd}${extra:+ ${extra}}"
+    echo ""
+    echo "${desc}"
+    echo ""
+    echo "Options:"
+    echo "  --help, -h      Show this help"
+}
+
 # Cursor control
 clear_screen() { printf '\033[2J\033[H'; }
 hide_cursor() { [[ -t 1 ]] && printf '\033[?25l' >&2 || true; }
@@ -274,4 +327,226 @@ print_table_row() {
         printf " %s%*s %s" "$text" "$pad" "" "$sep"
     done
     echo ""
+}
+
+# =====================================================================
+# Global Progress Bar (single bar for multi-step operations)
+# =====================================================================
+
+RCC_PROGRESS_TOTAL=0
+RCC_PROGRESS_CURRENT=0
+RCC_PROGRESS_INFO=""
+RCC_PROGRESS_BUFFER=()
+RCC_PROGRESS_MAX_BUFFER=100
+RCC_PROGRESS_LAST_REDRAW=0
+RCC_PROGRESS_REDRAW_INTERVAL_MS=200
+RCC_PROGRESS_ACTIVE=false
+
+_rcc_get_ms() {
+    perl -MTime::HiRes=time -e 'printf "%.0f\n", time*1000'
+}
+
+init_global_progress() {
+    local total="$1"
+    RCC_PROGRESS_TOTAL="$total"
+    RCC_PROGRESS_CURRENT=0
+    RCC_PROGRESS_INFO="Initializing..."
+    RCC_PROGRESS_BUFFER=()
+    RCC_PROGRESS_LAST_REDRAW=$(_rcc_get_ms)
+    RCC_PROGRESS_ACTIVE=true
+
+    if [[ -t 1 ]]; then
+        printf '\033[2J\033[H'
+        printf '\033[?25l'
+        _rcc_redraw_global_progress
+    else
+        echo "__RCC_PROGRESS__:0:${total}:Initializing..."
+    fi
+}
+
+update_global_progress_info() {
+    local info="$1"
+    RCC_PROGRESS_INFO="$info"
+    _rcc_maybe_redraw_global_progress
+    if [[ "$RCC_PROGRESS_ACTIVE" == "true" && ! -t 1 ]]; then
+        echo "__RCC_PROGRESS__:${RCC_PROGRESS_CURRENT}:${RCC_PROGRESS_TOTAL}:${info}"
+    fi
+}
+
+increment_global_progress() {
+    RCC_PROGRESS_CURRENT=$((RCC_PROGRESS_CURRENT + 1))
+    _rcc_maybe_redraw_global_progress
+    if [[ "$RCC_PROGRESS_ACTIVE" == "true" && ! -t 1 ]]; then
+        echo "__RCC_PROGRESS__:${RCC_PROGRESS_CURRENT}:${RCC_PROGRESS_TOTAL}:${RCC_PROGRESS_INFO}"
+    fi
+}
+
+append_progress_output() {
+    local line="$1"
+    RCC_PROGRESS_BUFFER+=("$line")
+    if [[ ${#RCC_PROGRESS_BUFFER[@]} -gt $RCC_PROGRESS_MAX_BUFFER ]]; then
+        RCC_PROGRESS_BUFFER=("${RCC_PROGRESS_BUFFER[@]:1}")
+    fi
+    _rcc_maybe_redraw_global_progress
+    if [[ ! -t 1 ]]; then
+        echo "$line"
+    fi
+}
+
+_rcc_maybe_redraw_global_progress() {
+    if [[ "$RCC_PROGRESS_ACTIVE" != "true" ]]; then return; fi
+    if ! [[ -t 1 ]]; then return; fi
+
+    local now
+    now=$(_rcc_get_ms)
+    local elapsed=$((now - RCC_PROGRESS_LAST_REDRAW))
+    if [[ $elapsed -ge $RCC_PROGRESS_REDRAW_INTERVAL_MS ]]; then
+        _rcc_redraw_global_progress
+        RCC_PROGRESS_LAST_REDRAW="$now"
+    fi
+}
+
+_rcc_redraw_global_progress() {
+    if ! [[ -t 1 ]]; then return; fi
+
+    local total=$RCC_PROGRESS_TOTAL
+    local current=$RCC_PROGRESS_CURRENT
+    local cols
+    cols=$(tput cols 2>/dev/null || echo 80)
+    local bar_width=20
+    local filled=$((current * bar_width / total))
+    local empty=$((bar_width - filled))
+    local bar=""
+    local i
+
+    for ((i=0; i<filled; i++)); do bar+="█"; done
+    for ((i=0; i<empty; i++)); do bar+="░"; done
+
+    # Move to top-left
+    printf '\033[H'
+
+    # Line 1: progress bar
+    printf "\r[%s%s] %d/%d managers\n" "$bar" "" "$current" "$total"
+
+    # Line 2: current info
+    local info_display="$RCC_PROGRESS_INFO"
+    local info_clean
+    info_clean=$(echo "$info_display" | sed -E 's/\x1b\[[0-9;]*m//g')
+    if [[ ${#info_clean} -gt $cols ]]; then
+        info_display="${info_display:0:cols}"
+    fi
+    printf "%s\n" "$info_display"
+
+    # Separator line
+    printf "%s\n" "$(printf '%*s' "$cols" '' | tr ' ' '-')"
+
+    # Buffer lines
+    if [[ ${#RCC_PROGRESS_BUFFER[@]} -gt 0 ]]; then
+        for line in "${RCC_PROGRESS_BUFFER[@]}"; do
+            local clean_line
+            clean_line=$(echo "$line" | sed -E 's/\x1b\[[0-9;]*m//g')
+            if [[ ${#clean_line} -gt $cols ]]; then
+                printf "%s\n" "${line:0:cols}"
+            else
+                printf "%s\n" "$line"
+            fi
+        done
+    fi
+
+    # Clear from cursor to end of screen
+    printf '\033[J'
+}
+
+finish_global_progress() {
+    if [[ "$RCC_PROGRESS_ACTIVE" != "true" ]]; then return; fi
+
+    RCC_PROGRESS_CURRENT=$RCC_PROGRESS_TOTAL
+    RCC_PROGRESS_INFO="Completed"
+    _rcc_redraw_global_progress
+
+    printf '\n'
+    if [[ -t 1 ]]; then
+        printf '\033[?25h'
+    fi
+
+    RCC_PROGRESS_ACTIVE=false
+}
+
+# =====================================================================
+# Pipe helper: in TTY mode -> buffer for progress overlay
+#              in non-TTY mode -> pass through to stdout (for Go TUI)
+# Usage: command 2>&1 | progress_pipe
+# =====================================================================
+
+progress_pipe() {
+    local parser_fn="${1:-}"
+    if [[ ! -t 1 ]]; then
+        cat
+    else
+        while IFS= read -r line; do
+            append_progress_output "$line"
+            if [[ -n "$parser_fn" ]]; then
+                "$parser_fn" "$line"
+            fi
+        done
+    fi
+}
+
+# =====================================================================
+# Helper: run a command with global progress bar
+# Usage: run_step "label" "info_prefix" "command"
+# =====================================================================
+
+run_step() {
+    local label="$1"
+    local info_prefix="$2"
+    local cmd="$3"
+
+    update_global_progress_info "$info_prefix: starting..."
+
+    set +e
+    set +o pipefail
+    eval "$cmd" 2>&1 | progress_pipe
+    set -e
+    set -o pipefail
+
+    increment_global_progress
+}
+
+# =====================================================================
+# Helper: run a check function with global progress bar
+# Usage: run_check "label" "check_function_name"
+# The check function should echo lines that will be captured.
+# =====================================================================
+
+run_check() {
+    local label="$1"
+    local check_fn="$2"
+
+    update_global_progress_info "audit: $label..."
+
+    set +e
+    set +o pipefail
+    $check_fn 2>&1 | progress_pipe
+    set -e
+    set -o pipefail
+
+    increment_global_progress
+}
+
+# =====================================================================
+# Helper: flush progress buffer to terminal and restore normal output
+# Usage: flush_progress_to_terminal
+# Call this after finish_global_progress() to print all buffered output.
+# =====================================================================
+
+flush_progress_to_terminal() {
+    # Already restored by finish_global_progress, just print buffer
+    if [[ ${#RCC_PROGRESS_BUFFER[@]} -gt 0 ]]; then
+        for line in "${RCC_PROGRESS_BUFFER[@]}"; do
+            echo "$line"
+        done
+    fi
+    # Clear the buffer so it doesn't get printed again
+    RCC_PROGRESS_BUFFER=()
 }
