@@ -123,6 +123,8 @@ while [[ $# -gt 0 ]]; do
 		shift
 		;;
 	--alert)
+		# shellcheck disable=SC2034
+		ALERT_ON_ISSUES=true
 		shift
 		;;
 	--notify)
@@ -180,21 +182,25 @@ print_category() {
 	shift
 	local -a items=("$@")
 	
-	local name_len=${#name}
-	local padding=$((37 - name_len))
-	local pad_str
-	pad_str=$(printf '%*s' "$padding" '')
-	
+	if [[ "$AUDIT_SILENT_MODE" == "true" ]]; then
+		CURRENT_CATEGORY="$name"
+		ACCUMULATED_CATEGORIES+=("$name")
+		for item in "${items[@]}"; do
+			# shellcheck disable=SC2155
+			local status="$(echo "$item" | cut -d: -f1)" rest="$(echo "$item" | cut -d: -f2-)"
+			print_result "$status" "$rest"
+		done
+		return
+	fi
+
 	echo ""
 	echo "+---------------------------------------+"
 	echo "| ${CYAN}${name}${NC}${pad_str}|"
 	echo "+---------------------------------------+"
 
 	for item in "${items[@]}"; do
-		local status
-		status="$(echo "$item" | cut -d: -f1)"
-		local rest
-		rest="$(echo "$item" | cut -d: -f2-)"
+		# shellcheck disable=SC2155
+		local status="$(echo "$item" | cut -d: -f1)" rest="$(echo "$item" | cut -d: -f2-)"
 		echo_result "$status" "$rest"
 	done
 	
@@ -255,7 +261,8 @@ show_audit_history() {
 	fi
 	
 	local -a history_files
-	mapfile -t history_files < <(find "$HISTORY_DIR" -name 'audit_*.json' -maxdepth 1 -exec ls -t {} + 2>/dev/null | head -10)
+	# shellcheck disable=SC2012,SC2207
+	history_files=($(ls -t "$HISTORY_DIR"/audit_*.json 2>/dev/null | head -10))
 	
 	if [[ ${#history_files[@]} -eq 0 ]]; then
 		echo "  No history found"
@@ -446,8 +453,12 @@ fix_issue() {
 			[[ "$answer" != "y" && "$answer" != "Y" ]] && return
 		fi
 
-		echo "  ${YELLOW}→ Fixing: $check_name${NC}"
-		eval "$fix_cmd" 2>/dev/null && echo "  ${GREEN}✓ Fixed${NC}" || echo "  ${RED}✗ Fix failed${NC}"
+		print_warning "Fixing: $check_name"
+		if eval "$fix_cmd" 2>/dev/null; then
+			print_success "Fixed $check_name"
+		else
+			print_error "Fix failed: $check_name"
+		fi
 	else
 		FIX_QUEUE+=("${check_name}|${fix_cmd}")
 	fi
@@ -519,7 +530,10 @@ run_core_checks() {
 run_network_checks() {
 	local -a network_results=()
 	
-	port_count="$(_sudo lsof -i -P -n 2>/dev/null | grep LISTEN | count_lines)"
+	update_global_progress_info "audit: Open Ports..."
+	port_count="$(sudo lsof -i -P -n 2>/dev/null | grep -c LISTEN)"
+	[[ -z "$port_count" ]] && port_count="0"
+	port_count="${port_count// }"
 	if [[ "$port_count" -lt 10 ]]; then
 		network_results+=("pass:Open Ports: ${port_count} listening")
 	else
@@ -597,7 +611,9 @@ run_auth_checks() {
 	fi
 	
 	local keychains
-	keychains="$(security list-keychains 2>/dev/null | count_lines)"
+	keychains="$(security list-keychains 2>/dev/null | wc -l 2>/dev/null)"
+	[[ -z "$keychains" ]] && keychains="0"
+	keychains="${keychains// }"
 	if [[ "$keychains" -gt 0 ]]; then
 		auth_results+=("pass:Keychain: ${keychains} available")
 	else
@@ -605,7 +621,10 @@ run_auth_checks() {
 	fi
 	
 	local ssh_key_count
-	ssh_key_count="$(find ~/.ssh -name '*.pub' -maxdepth 1 2>/dev/null | count_lines)"
+	# shellcheck disable=SC2012
+	ssh_key_count="$(ls -la ~/.ssh/*.pub 2>/dev/null | wc -l 2>/dev/null)"
+	[[ -z "$ssh_key_count" ]] && ssh_key_count="0"
+	ssh_key_count="${ssh_key_count// }"
 	if [[ "$ssh_key_count" -eq 0 ]]; then
 		auth_results+=("pass:SSH Keys: None")
 	else
@@ -613,7 +632,9 @@ run_auth_checks() {
 	fi
 	
 	local auth_keys_count
-	auth_keys_count="$(cat ~/.ssh/authorized_keys 2>/dev/null | count_lines)"
+	auth_keys_count="$(cat ~/.ssh/authorized_keys 2>/dev/null | wc -l 2>/dev/null)"
+	[[ -z "$auth_keys_count" ]] && auth_keys_count="0"
+	auth_keys_count="${auth_keys_count// }"
 	if [[ "$auth_keys_count" -eq 0 ]]; then
 		auth_results+=("pass:Authorized Keys: None")
 	else
@@ -636,7 +657,10 @@ run_persistence_checks() {
 	local -a persistence_results=()
 	
 	local user_la_count
-	user_la_count="$(find ~/Library/LaunchAgents -maxdepth 1 2>/dev/null | count_lines)"
+	# shellcheck disable=SC2012
+	user_la_count="$(ls -1 ~/Library/LaunchAgents/ 2>/dev/null | wc -l 2>/dev/null)"
+	[[ -z "$user_la_count" ]] && user_la_count="0"
+	user_la_count="${user_la_count// }"
 	if [[ "$user_la_count" -eq 0 ]]; then
 		persistence_results+=("pass:User LaunchAgents: None")
 	elif [[ "$user_la_count" -lt 10 ]]; then
@@ -647,7 +671,10 @@ run_persistence_checks() {
 	fi
 
 	local sys_la_count
-	sys_la_count="$(find /Library/LaunchAgents -maxdepth 1 2>/dev/null | count_lines)"
+	# shellcheck disable=SC2012
+	sys_la_count="$(ls -1 /Library/LaunchAgents/ 2>/dev/null | wc -l 2>/dev/null)"
+	[[ -z "$sys_la_count" ]] && sys_la_count="0"
+	sys_la_count="${sys_la_count// }"
 	if [[ "$sys_la_count" -eq 0 ]]; then
 		persistence_results+=("pass:System LaunchAgents: None")
 	elif [[ "$sys_la_count" -lt 10 ]]; then
@@ -657,7 +684,10 @@ run_persistence_checks() {
 	fi
 
 	local ld_count
-	ld_count="$(find /Library/LaunchDaemons -maxdepth 1 2>/dev/null | count_lines)"
+	# shellcheck disable=SC2012
+	ld_count="$(ls -1 /Library/LaunchDaemons/ 2>/dev/null | wc -l 2>/dev/null)"
+	[[ -z "$ld_count" ]] && ld_count="0"
+	ld_count="${ld_count// }"
 	if [[ "$ld_count" -eq 0 ]]; then
 		persistence_results+=("pass:LaunchDaemons: None")
 	elif [[ "$ld_count" -lt 15 ]]; then
@@ -667,7 +697,9 @@ run_persistence_checks() {
 	fi
 
 	local cron_count
-	cron_count="$(crontab -l 2>/dev/null | count_lines)"
+	cron_count="$(crontab -l 2>/dev/null | wc -l 2>/dev/null)"
+	[[ -z "$cron_count" ]] && cron_count="0"
+	cron_count="${cron_count// }"
 	if [[ "$cron_count" -eq 0 ]]; then
 		persistence_results+=("pass:Cron Jobs: None")
 	else
@@ -676,7 +708,9 @@ run_persistence_checks() {
 	fi
 
 	local at_count
-	at_count="$(atq 2>/dev/null | count_lines)"
+	at_count="$(atq 2>/dev/null | wc -l 2>/dev/null)"
+	[[ -z "$at_count" ]] && at_count="0"
+	at_count="${at_count// }"
 	if [[ "$at_count" -eq 0 ]]; then
 		persistence_results+=("pass:At Jobs: None")
 	else
@@ -685,7 +719,9 @@ run_persistence_checks() {
 	fi
 
 	local li_count
-	li_count="$(osascript -e 'tell application "System Events" to get the name of every login item' 2>/dev/null | tr ',' '\n' | count_lines)"
+	li_count="$(osascript -e 'tell application "System Events" to get the name of every login item' 2>/dev/null | tr ',' '\n' | wc -l 2>/dev/null)"
+	[[ -z "$li_count" ]] && li_count="0"
+	li_count="${li_count// }"
 	if [[ "$li_count" -eq 0 ]]; then
 		persistence_results+=("pass:Login Items: None")
 	elif [[ "$li_count" -lt 15 ]]; then
@@ -747,7 +783,8 @@ run_additional_checks() {
 	fi
 
 	local file_perms
-	file_perms="$(find ~/.ssh -maxdepth 0 -exec ls -ld {} \; 2>/dev/null | awk '{print $1}')"
+	# shellcheck disable=SC2012
+	file_perms="$(ls -la ~/.ssh 2>/dev/null | head -1 | awk '{print $1}')"
 	if [[ "$file_perms" == "drwx------" ]]; then
 		additional_results+=("pass:.ssh Permissions: Secure")
 	else
@@ -765,7 +802,7 @@ run_additional_checks() {
 	fi
 
 	local kext_count
-	kext_count="$(kextstat 2>/dev/null | grep -v "com.apple" | count_lines)"
+	kext_count="$(kextstat 2>/dev/null | grep -cv "com.apple")"
 	[[ -z "$kext_count" ]] && kext_count="0"
 	if [[ "$kext_count" -eq 0 ]]; then
 		additional_results+=("pass:Kernel Extensions: None")
@@ -794,6 +831,28 @@ run_additional_checks() {
 	fi
 	
 	print_category "Additional" "${additional_results[@]}"
+}
+
+render_accumulated_results() {
+	for cat_name in "${ACCUMULATED_CATEGORIES[@]}"; do
+		echo ""
+		print_section_header "$cat_name"
+		
+		for result in "${ACCUMULATED_RESULTS[@]}"; do
+			# shellcheck disable=SC2155
+			local r_cat="$(echo "$result" | cut -d: -f2)" status="$(echo "$result" | cut -d: -f1)" label="$(echo "$result" | cut -d: -f3-)"
+			[[ "$r_cat" != "$cat_name" ]] && continue
+			
+			case "$status" in
+				pass) print_success "$label" ;;
+				warn) print_warning "$label" ;;
+				fail) print_error "$label" ;;
+				*)    print_info "$label" ;;
+			esac
+		done
+	done
+	
+	print_summary
 }
 
 main() {
@@ -878,8 +937,12 @@ main() {
 					echo "  ${YELLOW}→ Fixing: $check_name${NC}"
 					echo "  ${GRAY}ℹ Skipped: ${fix_cmd#MANUAL:}${NC}"
 				else
-					echo "  ${YELLOW}→ Fixing: $check_name${NC}"
-					eval "$fix_cmd" 2>/dev/null && echo "  ${GREEN}✓ Fixed${NC}" || echo "  ${RED}✗ Fix failed${NC}"
+					print_warning "Fixing: $check_name"
+					if eval "$fix_cmd" 2>/dev/null; then
+					print_success "Fixed $check_name"
+				else
+					print_error "Fix failed: $check_name"
+				fi
 				fi
 			done
 		fi

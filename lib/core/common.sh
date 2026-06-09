@@ -14,6 +14,7 @@ ICON_SUCCESS="${GREEN}✓${NC}"
 ICON_ERROR="${RED}✗${NC}"
 ICON_ARROW="${PURPLE_BOLD}➤${NC}"
 
+
 # Spinner
 SPINNER_PID=""
 

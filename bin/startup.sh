@@ -18,11 +18,16 @@ show_startup_help() {
 	echo "  --help, -h      Show this help"
 }
 
+# shellcheck disable=SC2034
+JSON_OUTPUT=false
+
 for arg in "$@"; do
 	case "$arg" in
 	--help | -h)
 		show_startup_help
 		exit 0
+		;;
+	--json)
 		;;
 	*)
 		;;

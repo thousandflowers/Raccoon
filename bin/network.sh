@@ -18,6 +18,8 @@ show_network_help() {
 	echo "  --help, -h      Show this help"
 }
 
+# shellcheck disable=SC2034
+	JSON_OUTPUT=false
 confidence_score=0
 
 for arg in "$@"; do
@@ -25,6 +27,8 @@ for arg in "$@"; do
 	--help | -h)
 		show_network_help
 		exit 0
+		;;
+	--json)
 		;;
 	*)
 		;;
@@ -155,7 +159,7 @@ main() {
 	echo "  ${GRAY}Detected:${NC}"
 	local proc_found=0
 	local procs
-	# shellcheck disable=SC2009 # intentional: need process names not just PIDs
+	# shellcheck disable=SC2009
 	procs=$(ps aux 2>/dev/null | grep -iE "proxy|vpn|tunnel|wireguard|tailscale|shadowsock|vless|vmess|hysteria|clash|surge|outline|v2ray|xray|rapportd" | grep -v grep | awk '{print $11}' | sort -u || true)
 	while IFS= read -r cmd; do
 		[[ -z "$cmd" ]] && continue
@@ -190,6 +194,8 @@ main() {
 
 	print_section_header "[5/10] NO_PROXY Config..."
 	echo "  ${GRAY}Exclusions:${NC}"
+	# shellcheck disable=SC2034
+	local noproxy_found=0
 	local noproxy
 	noproxy=$(env 2>/dev/null | grep -i "NO_PROXY\|no_proxy" | cut -d= -f2- || true)
 	if [[ -n "$noproxy" ]]; then

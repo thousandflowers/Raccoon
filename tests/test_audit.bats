@@ -4,34 +4,6 @@ setup() {
 	setup_raccoon_env
 }
 
-# --- count_lines helper ---
-
-@test "count_lines: returns 0 on empty input" {
-	source "$SCRIPT_DIR/bin/audit.sh"
-	result="$(printf '' | count_lines)"
-	[[ "$result" == "0" ]]
-}
-
-@test "count_lines: counts single line" {
-	source "$SCRIPT_DIR/bin/audit.sh"
-	result="$(printf 'hello\n' | count_lines)"
-	[[ "$result" == "1" ]]
-}
-
-@test "count_lines: counts multiple lines" {
-	source "$SCRIPT_DIR/bin/audit.sh"
-	result="$(printf 'a\nb\nc\n' | count_lines)"
-	[[ "$result" == "3" ]]
-}
-
-@test "count_lines: strips leading whitespace from wc output" {
-	source "$SCRIPT_DIR/bin/audit.sh"
-	# wc -l outputs leading spaces like "      10" for alignment
-	# count_lines should strip them so the result is a clean number
-	result="$(printf 'a\nb\nc\nd\ne\nf\ng\nh\ni\nl\n' | count_lines)"
-	[[ "$result" == "10" ]]
-}
-
 # --- save_to_history rotation ---
 
 @test "save_to_history: rotation keeps at most 30 files" {

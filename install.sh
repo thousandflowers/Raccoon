@@ -33,13 +33,7 @@ if [[ ! -d "${INSTALL_DIR}" ]]; then
 	git clone --depth 1 "$REPO_URL" "${INSTALL_DIR}"
 else
 	echo "Updating existing installation..."
-	if [[ -d "${INSTALL_DIR}/.git" ]]; then
-		cd "${INSTALL_DIR}" && git pull -q
-	else
-		echo "  WARNING: ${INSTALL_DIR} exists but is not a git repo. Re-cloning..."
-		rm -rf "${INSTALL_DIR}"
-		git clone --depth 1 "$REPO_URL" "${INSTALL_DIR}"
-	fi
+	cd "${INSTALL_DIR}" && git fetch --depth 1 origin main 2>/dev/null && git reset --hard origin/main
 fi
 
 VERSION=$(get_version)

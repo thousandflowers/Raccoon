@@ -24,7 +24,7 @@ for arg in "$@"; do
 		show_docker_help
 		exit 0
 		;;
-	*)
+	--json)
 		;;
 	esac
 done

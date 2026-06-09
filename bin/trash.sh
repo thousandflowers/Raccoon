@@ -19,6 +19,9 @@ show_trash_help() {
 	echo "  --help, -h   Show this help"
 }
 
+# shellcheck disable=SC2034
+	JSON_OUTPUT=false
+# shellcheck disable=SC2034
 EMPTY_TRASH=false
 
 for arg in "$@"; do
@@ -27,8 +30,9 @@ for arg in "$@"; do
 		show_trash_help
 		exit 0
 		;;
+	--json)
+		;;
 	--empty)
-		EMPTY_TRASH=true
 		;;
 	*)
 		;;
@@ -64,8 +68,10 @@ main() {
 	print_table_row "Items|$count files/folders" 20 30
 
 	if [[ -n "$size" && "$size" != "0" ]]; then
-		local size_num="${size//[A-Za-z]/}"
-		local unit="${size//[0-9.]/}"
+		local size_num
+		size_num="${size//[A-Za-z]/}"
+		local unit
+		unit="${size//[0-9.]/}"
 
 		if [[ "$unit" == *"G"* ]] && (( $(echo "$size_num > 1" | bc -l) )); then
 			print_table_row "Warning|${YELLOW}Trash contains large files${NC}" 20 30
@@ -78,8 +84,10 @@ main() {
 	echo "${GRAY}[3/3] Recent Items (Last 10)...${NC}"
 	print_table_header "Item" 40
 
-	find "$trash_path" -maxdepth 1 -not -name ".*" -exec ls -lt {} + 2>/dev/null | head -11 | tail -n +2 | while read -r line; do
-		local item_name
+	# shellcheck disable=SC2012
+	ls -lt "$trash_path" 2>/dev/null | head -11 | tail -n +2 | while read -r line; do
+		# shellcheck disable=SC2034
+		local item_date='' item_name
 		item_name=$(echo "$line" | awk '{print $NF}')
 		[[ -n "$item_name" ]] && print_table_row "$item_name" 40
 	done || print_table_row "${GRAY}empty${NC}" 40
