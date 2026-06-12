@@ -187,7 +187,7 @@ show_progress_bar() {
 
 	local tmpfile
 	tmpfile=$(mktemp)
-	trap 'rm -f "$tmpfile"' RETURN
+	trap "rm -f '$tmpfile'" RETURN
 
 	local bar_width=10
 

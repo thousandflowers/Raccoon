@@ -1,0 +1,81 @@
+#!/bin/bash
+
+set -euo pipefail
+export LC_ALL=C
+export LANG=C
+
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+source "$SCRIPT_DIR/../lib/core/common.sh"
+
+show_backup_help() {
+	print_help_header "backup" "Check Time Machine backup status" ""
+	echo ""
+}
+
+for arg in "$@"; do
+	case "$arg" in
+	--help | -h)
+		show_backup_help
+		exit 0
+		;;
+	*)
+		;;
+	esac
+done
+
+check_tm_destination() {
+	local dest
+	dest=$(tmutil destinationinfo 2>/dev/null | grep "Name:" | head -1 |
+		cut -d: -f2- | xargs 2>/dev/null || echo "")
+
+	print_section_header "Time Machine"
+
+	print_table_header "Setting|Value" 20 30
+
+	if [[ -z "$dest" ]]; then
+		print_table_row "Destination|${RED}Not configured${NC}" 20 30
+		return 0
+	fi
+
+	print_table_row "Destination|${GREEN}${dest}${NC}" 20 30
+}
+
+check_last_backup() {
+	local last_backup
+	last_backup=$(tmutil latestbackup 2>/dev/null || echo "")
+
+	print_table_header "Last Backup|When" 20 30
+
+	if [[ -z "$last_backup" ]]; then
+		print_table_row "Backup|${YELLOW}No backup found${NC}" 20 30
+		return 0
+	fi
+
+	local backup_date
+	backup_date=$(basename "$last_backup" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)
+
+	local now
+	now=$(date +%s)
+	local backup_ts
+	backup_ts=$(date -j -f "%Y-%m-%d" "$backup_date" +%s 2>/dev/null || echo "0")
+	local diff=$(((now - backup_ts) / 3600))
+
+	if [[ $diff -lt 24 ]]; then
+		print_table_row "Backup|${GREEN}${backup_date} (${diff}h ago)${NC}" 20 30
+	elif [[ $diff -lt 168 ]]; then
+		print_table_row "Backup|${YELLOW}${backup_date} (${diff}h ago)${NC}" 20 30
+	else
+		print_table_row "Backup|${RED}${backup_date} (${diff}h overdue!)${NC}" 20 30
+	fi
+}
+
+main() {
+	check_tm_destination
+	check_last_backup
+
+	echo ""
+	print_success "Completed"
+}
+
+main "$@"

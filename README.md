@@ -40,6 +40,8 @@ rcc audit
 
 Clones to `~/.raccoon`, symlinks `rcc` to `/usr/local/bin`. Run `rcc` for the interactive menu or `rcc <command>` for direct access.
 
+<img src="docs/gifs/rcc-help.gif" alt="rcc help output" width="600">
+
 ---
 
 ## Usage & Examples
@@ -49,6 +51,8 @@ rcc [command] [options]
 ```
 
 Run `rcc` with no arguments → interactive menu. Pass a command for direct access.
+
+<img src="docs/gifs/rcc-menu.gif" alt="rcc interactive menu" width="600">
 
 **Quick checks:**
 
@@ -69,25 +73,8 @@ rcc audit --deep     # flag style — same result
 
 All audit flags work both ways: `--json` / `json`, `--fix` / `fix`, `--history` / `history`.
 
-```
-$ rcc audit
-═══ Raccoon Security Audit ═══
-
- ✓ Gatekeeper enabled
- ✓ SIP enabled
- ✓ FileVault enabled
- ✓ Firewall enabled
- ✓ Automatic updates enabled
- ✓ Guest account disabled
- ✗ Remote login enabled
- ✓ Login keychain locked
- ✓ Find My Mac enabled
- ...
-
- Result: 24 pass · 5 warn · 2 fail · 31 total
-
- Detailed report saved to ~/.raccoon/audit-history/
-```
+<img src="docs/gifs/rcc-audit.gif" alt="rcc audit" width="600">
+<img src="docs/gifs/rcc-battery.gif" alt="rcc battery" width="600">
 
 ---
 
