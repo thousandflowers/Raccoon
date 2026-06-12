@@ -162,20 +162,12 @@ upgrade_homebrew() {
 	increment_global_progress
 
 	update_global_progress_info "brew: updating..."
-	set +e
-	set +o pipefail
-	brew update 2>&1 </dev/null | progress_pipe _parse_brew_update
-	set -e
-	set -o pipefail
+	brew update 2>&1 </dev/null | progress_pipe _parse_brew_update || true
 
 	increment_global_progress
 
 	update_global_progress_info "brew: upgrading..."
-	set +e
-	set +o pipefail
-	GIT_TERMINAL_PROMPT=0 brew upgrade 2>&1 </dev/null | progress_pipe _parse_brew_upgrade
-	set -e
-	set -o pipefail
+	GIT_TERMINAL_PROMPT=0 brew upgrade 2>&1 </dev/null | progress_pipe _parse_brew_upgrade || true
 
 	increment_global_progress
 }
@@ -232,11 +224,7 @@ upgrade_pip() {
 	while IFS= read -r pkg; do
 		[[ -z "$pkg" ]] && continue
 		update_global_progress_info "pip: upgrade $pkg"
-		set +e
-		set +o pipefail
-		$pip_cmd install --upgrade "$pkg" 2>&1 | progress_pipe _parse_pip
-		set -e
-		set -o pipefail
+		$pip_cmd install --upgrade "$pkg" 2>&1 | progress_pipe _parse_pip || true
 	done <<< "$pkgs"
 
 	increment_global_progress
@@ -258,22 +246,14 @@ upgrade_npm() {
 
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "npm: dry run"
-		set +e
-		set +o pipefail
-		npm outdated -g 2>&1 | progress_pipe
-		set -e
-		set -o pipefail
+		npm outdated -g 2>&1 | progress_pipe || true
 		increment_global_progress
 		increment_global_progress
 		return 0
 	fi
 
 	update_global_progress_info "npm: updating..."
-	set +e
-	set +o pipefail
-	npm update -g 2>&1 | progress_pipe _parse_npm
-	set -e
-	set -o pipefail
+	npm update -g 2>&1 | progress_pipe _parse_npm || true
 
 	increment_global_progress
 	increment_global_progress
@@ -313,11 +293,7 @@ upgrade_nvm() {
 	increment_global_progress
 
 	update_global_progress_info "nvm: updating..."
-	set +e
-	set +o pipefail
-	nvm install --lts 2>&1 | progress_pipe _parse_nvm
-	set -e
-	set -o pipefail
+	nvm install --lts 2>&1 | progress_pipe _parse_nvm || true
 
 	increment_global_progress
 	increment_global_progress
@@ -357,11 +333,7 @@ upgrade_rustup() {
 	increment_global_progress
 
 	update_global_progress_info "rustup: updating..."
-	set +e
-	set +o pipefail
-	rustup update 2>&1 | progress_pipe _parse_rustup
-	set -e
-	set -o pipefail
+	rustup update 2>&1 | progress_pipe _parse_rustup || true
 
 	increment_global_progress
 }
@@ -400,11 +372,7 @@ upgrade_gem() {
 	increment_global_progress
 
 	update_global_progress_info "gem: updating..."
-	set +e
-	set +o pipefail
-	gem update 2>&1 | progress_pipe _parse_gem
-	set -e
-	set -o pipefail
+	gem update 2>&1 | progress_pipe _parse_gem || true
 
 	increment_global_progress
 }

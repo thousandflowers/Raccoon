@@ -7,6 +7,20 @@ source "$SCRIPT_DIR/../lib/core/common.sh"
 
 BIN_PATH="$SCRIPT_DIR"
 
+show_menu_help() {
+	print_help_header "menu" "Interactive TUI menu" ""
+	echo ""
+}
+
+for arg in "$@"; do
+	case "$arg" in
+	--help | -h)
+		show_menu_help
+		exit 0
+		;;
+	esac
+done
+
 items=(
 	"upgrade:upgrade.sh:Upgrade system & apps"
 	"audit:audit.sh:Security audit"

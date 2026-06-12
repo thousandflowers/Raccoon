@@ -48,6 +48,9 @@ main() {
 	if [[ "$JSON_OUTPUT" == "true" ]]; then
 		local tmpf
 		tmpf=$(mktemp)
+		# Expand $tmpf now to capture path (intentional SC2064)
+	# shellcheck disable=SC2064
+	trap "rm -f '$tmpf'" EXIT
 		ps aux -m | awk -v top="$TOP_N" 'NR>1 && NR<=top+1 {printf "{\"pid\": %s, \"rss\": %s, \"command\": \"%s\"}\n", $2, $6, $11}' > "$tmpf"
 		awk 'BEGIN{print "["} {if(NR>1) printf ",\n"; printf "  %s", $0} END{print "\n]"}' "$tmpf"
 		rm "$tmpf"

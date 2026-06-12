@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="0.7.1"
+VERSION="0.8.0"
 TAGLINE="macOS companion toolkit"
 
 reset_terminal() {

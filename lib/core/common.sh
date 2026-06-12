@@ -187,6 +187,8 @@ show_progress_bar() {
 
 	local tmpfile
 	tmpfile=$(mktemp)
+	# Expand $tmpfile now to capture path (intentional SC2064)
+	# shellcheck disable=SC2064
 	trap "rm -f '$tmpfile'" RETURN
 
 	local bar_width=10
