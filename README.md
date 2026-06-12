@@ -35,7 +35,7 @@ Raccoon (`rcc`) is a system diagnostics and maintenance toolkit for macOS. It su
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
-rcc audit
+rcc
 ```
 
 Clones to `~/.raccoon`, symlinks `rcc` to `/usr/local/bin`. Run `rcc` for the interactive menu or `rcc <command>` for direct access.
