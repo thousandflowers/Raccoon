@@ -1,5 +1,7 @@
 # Build artifacts
+bin/rcc-ui
 ui/rcc-ui
+ui/ui
 
 # Audit output is large and regenerated on every run
 audit_*.json

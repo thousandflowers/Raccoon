@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -uo pipefail
+set -euo pipefail
 export LC_ALL=C
 export LANG=C
 
@@ -182,16 +182,7 @@ print_category() {
 	shift
 	local -a items=("$@")
 	
-	if [[ "$AUDIT_SILENT_MODE" == "true" ]]; then
-		ACCUMULATED_CATEGORIES+=("$name")
-		for item in "${items[@]}"; do
-			# shellcheck disable=SC2155
-			local status="$(echo "$item" | cut -d: -f1)" rest="$(echo "$item" | cut -d: -f2-)"
-			print_result "$status" "$rest"
-		done
-		return
-	fi
-
+	
 	echo ""
 	echo "+---------------------------------------+"
 	# Pad the title to the 38-column inner width ("| " + name + pad + "|").
@@ -835,27 +826,6 @@ run_additional_checks() {
 	print_category "Additional" "${additional_results[@]}"
 }
 
-render_accumulated_results() {
-	for cat_name in "${ACCUMULATED_CATEGORIES[@]}"; do
-		echo ""
-		print_section_header "$cat_name"
-		
-		for result in "${ACCUMULATED_RESULTS[@]}"; do
-			# shellcheck disable=SC2155
-			local r_cat="$(echo "$result" | cut -d: -f2)" status="$(echo "$result" | cut -d: -f1)" label="$(echo "$result" | cut -d: -f3-)"
-			[[ "$r_cat" != "$cat_name" ]] && continue
-			
-			case "$status" in
-				pass) print_success "$label" ;;
-				warn) print_warning "$label" ;;
-				fail) print_error "$label" ;;
-				*)    print_info "$label" ;;
-			esac
-		done
-	done
-	
-	print_summary
-}
 
 main() {
 	local -a core_results=()
