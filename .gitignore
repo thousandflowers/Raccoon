@@ -3,6 +3,8 @@ bin/rcc-ui
 ui/rcc-ui
 ui/ui
 
-# Audit output is large and regenerated on every run
+# Audit output and history
 audit_*.json
+audit-history/
+audit-history-imported/
 *.log
