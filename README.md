@@ -1,5 +1,9 @@
 # 🦝 Raccoon
 
+<p align="center">
+  <img src="docs/images/rcc.png" alt="Raccoon Hero" width="800">
+</p>
+
 > macOS companion toolkit for power users
 
 [![CI](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml)
