@@ -8,6 +8,14 @@
 
 Raccoon (`rcc`) is a system diagnostics and maintenance toolkit for macOS. It surfaces security audits, hardware health, network state, package hygiene, and developer workflows through a single CLI — with an optional [Bubble Tea](https://github.com/charmbracelet/bubbletea) TUI.
 
+## Why Raccoon?
+
+I built Raccoon because I wanted a single, lightweight tool that could:
+1. **Audit my Mac's security** without needing a 500MB proprietary app.
+2. **Keep my dev environment clean** by tracking updates across `brew`, `npm`, `pip`, and `gem` in one command.
+3. **Be portable**: It's almost entirely Bash, requiring zero dependencies beyond what comes with macOS.
+4. **Be fast**: No splash screens, no background daemons, just results.
+
 - **Zero dependencies** beyond stock macOS + git (all scripts are Bash)
 - **1500+ lines** of audited shell with shellcheck-clean CI
 - **32 security checks** covering Core Security, Network, Auth, Persistence, Privacy, and Additional
@@ -16,6 +24,7 @@ Raccoon (`rcc`) is a system diagnostics and maintenance toolkit for macOS. It su
 
 ## Table of Contents
 
+- [Why Raccoon?](#why-raccoon)
 - [Quick Start](#quick-start)
 - [Usage & Examples](#usage--examples)
 - [Commands](#commands)
