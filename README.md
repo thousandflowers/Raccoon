@@ -1,9 +1,5 @@
 # 🦝 Raccoon
 
-<p align="center">
-  <img src="docs/images/rcc.png" alt="Raccoon Hero" width="800">
-</p>
-
 > macOS companion toolkit for power users
 
 [![CI](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml)
@@ -49,7 +45,7 @@ I built Raccoon because I wanted a single, lightweight tool that could:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
-rcc
+rcc audit
 ```
 
 Clones to `~/.raccoon`, symlinks `rcc` to `/usr/local/bin`. Run `rcc` for the interactive menu or `rcc <command>` for direct access.
@@ -106,6 +102,10 @@ rcc audit --deep     # flag style — same result
 ```
 
 All audit flags work both ways: `--json` / `json`, `--fix` / `fix`, `--history` / `history`.
+
+<img src="docs/gifs/rcc-audit.gif" alt="rcc audit" width="600">
+<img src="docs/gifs/rcc-battery.gif" alt="rcc battery" width="600">
+
 ---
 
 ## Commands
@@ -161,7 +161,7 @@ When compiled, Raccoon launches a [Bubble Tea](https://github.com/charmbracelet/
 │ trash      fonts      history    certs       │
 │ docker     xcode                             │
 │                                              │
-│ ←→ Navigate · ↑↓ Rows · Enter Run · Q Quit   │
+│ ←→ Navigate · ↑↓ Rows · Enter Run · Q Quit  │
 └──────────────────────────────────────────────┘
 ```
 

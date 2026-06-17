@@ -1,18 +1,57 @@
 #!/bin/bash
 
-# Colors
-GREEN=$'\033[0;32m'
-RED=$'\033[0;31m'
-YELLOW=$'\033[0;33m'
-GRAY=$'\033[0;90m'
-PURPLE_BOLD=$'\033[1;35m'
-CYAN=$'\033[0;36m'
-NC=$'\033[0m'
+# Colors — respect NO_COLOR environment variable
+if [[ -n "${NO_COLOR:-}" ]]; then
+    GREEN=""; RED=""; YELLOW=""; GRAY=""; PURPLE_BOLD=""; CYAN=""; NC=""
+    ICON_SUCCESS="OK"; ICON_ERROR="XX"; ICON_ARROW="->"
+else
+    GREEN=$'\033[0;32m'; RED=$'\033[0;31m'; YELLOW=$'\033[0;33m'
+    GRAY=$'\033[0;90m'; PURPLE_BOLD=$'\033[1;35m'; CYAN=$'\033[0;36m'
+    NC=$'\033[0m'
+    ICON_SUCCESS="${GREEN}✓${NC}"; ICON_ERROR="${RED}✗${NC}"
+    ICON_ARROW="${PURPLE_BOLD}➤${NC}"
+fi
 
-# Icons
-ICON_SUCCESS="${GREEN}✓${NC}"
-ICON_ERROR="${RED}✗${NC}"
-ICON_ARROW="${PURPLE_BOLD}➤${NC}"
+# Disable ANSI colors at runtime (e.g. for non-TTY output)
+_rcc_disable_color() {
+    GREEN=""; RED=""; YELLOW=""; GRAY=""; PURPLE_BOLD=""; CYAN=""; NC=""
+    ICON_SUCCESS="OK"; ICON_ERROR="XX"; ICON_ARROW="->"
+}
+
+# Strip ANSI escape sequences — use for width calculations
+_rcc_strip_ansi() {
+    printf '%s\n' "$1" | sed -E 's/\x1b\[[0-9;]*m//g'
+}
+
+# Return visible character count (ANSI-stripped length)
+# All Raccoon labels are ASCII, so ${#var} is correct even in C locale
+_rcc_visible_width() {
+    local str="$1"
+    [[ -z "$str" ]] && { echo 0; return; }
+    local clean
+    clean=$(_rcc_strip_ansi "$str")
+    echo ${#clean}
+}
+
+# Right-pad a string (with ANSI codes) to a target visible width
+_rcc_pad_to() {
+    local str="$1"
+    local width="$2"
+    local vlen
+    vlen=$(_rcc_visible_width "$str")
+    local pad=$((width - vlen))
+    [[ $pad -lt 0 ]] && pad=0
+    printf '%s%*s' "$str" "$pad" ''
+}
+
+_rcc_hr() {
+    local width="${1:-39}"
+    printf '+'
+    local i
+    for ((i=0; i<width; i++)); do printf '-'; done
+    printf '+'
+    echo ''
+}
 
 
 # Spinner
@@ -321,9 +360,8 @@ print_table_row() {
     for i in "${!val_arr[@]}"; do
         local w=${widths[$i]:-20}
         local text="${val_arr[$i]}"
-        local clean
-        clean=$(echo "$text" | sed -E 's/\x1b\[[0-9;]*m//g')
-        local vlen=${#clean}
+        local vlen
+        vlen=$(_rcc_visible_width "$text")
         local pad=$((w - vlen))
         [[ $pad -lt 0 ]] && pad=0
         printf " %s%*s %s" "$text" "$pad" "" "$sep"

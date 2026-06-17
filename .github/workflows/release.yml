@@ -5,7 +5,6 @@ on:
     tags: ["v*"]
 
 env:
-  GO_VERSION: "1.23"
   TAP_REPO: thousandflowers/homebrew-raccoon
   FORMULA_PATH: Formula/rcc.rb
 
@@ -34,6 +33,21 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ui/go.mod
+
+      - name: Build universal Go TUI binary
+        run: |
+          cd ui
+          GOARCH=arm64 go build -o rcc-ui-arm64 main.go
+          GOARCH=amd64 go build -o rcc-ui-amd64 main.go
+          lipo -create -output rcc-ui rcc-ui-arm64 rcc-ui-amd64
+          cd ..
+          cp ui/rcc-ui bin/rcc-ui
 
       - name: Get version from tag
         id: version
@@ -42,14 +56,25 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=${TAG#v}" >> $GITHUB_OUTPUT
 
-      - name: Create GitHub Release
+      - name: Generate release notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          echo "## What's Changed" > /tmp/release-notes.md
+          echo "" >> /tmp/release-notes.md
+          if [[ -n "$PREV_TAG" ]]; then
+            git log "$PREV_TAG..HEAD" --oneline --no-decorate >> /tmp/release-notes.md
+          else
+            git log --oneline --no-decorate >> /tmp/release-notes.md
+          fi
+
+      - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.version.outputs.tag }}" \
             --title "${{ steps.version.outputs.tag }}" \
-            --generate-notes \
-            --verify-tag
+            --notes-file /tmp/release-notes.md \
+            bin/rcc-ui
 
       - name: Compute tarball SHA256
         id: sha
