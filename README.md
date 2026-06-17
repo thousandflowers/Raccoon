@@ -26,6 +26,7 @@ I built Raccoon because I wanted a single, lightweight tool that could:
 
 - [Why Raccoon?](#why-raccoon)
 - [Quick Start](#quick-start)
+- [Install with Homebrew](#install-with-homebrew)
 - [Usage & Examples](#usage--examples)
 - [Commands](#commands)
 - [Go TUI](#go-tui)
@@ -50,6 +51,26 @@ rcc audit
 Clones to `~/.raccoon`, symlinks `rcc` to `/usr/local/bin`. Run `rcc` for the interactive menu or `rcc <command>` for direct access.
 
 <img src="docs/gifs/rcc-help.gif" alt="rcc help output" width="600">
+
+---
+
+## Install with Homebrew
+
+```bash
+brew install thousandflowers/raccoon/rcc
+```
+
+This adds the [homebrew-raccoon](https://github.com/thousandflowers/homebrew-raccoon) tap automatically. After that:
+
+```bash
+rcc audit                # run a quick security audit
+brew upgrade rcc         # update to the latest version
+brew uninstall rcc       # remove completely
+```
+
+The Homebrew formula handles versioning, upgrades, and uninstallation automatically — no symlinks to manage.
+
+> **Note:** The `curl | bash` installer remains the primary install method for single-user setups. Homebrew is recommended if you already use it to manage CLI tools.
 
 ---
 
@@ -248,13 +269,19 @@ shellcheck rcc install.sh bin/*.sh lib/core/*.sh
 
 ## Updating
 
-Re-run the installer:
+**Homebrew:**
+
+```bash
+brew upgrade rcc
+```
+
+**curl | bash:**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
 ```
 
-Or manually:
+**Manual:**
 
 ```bash
 cd ~/.raccoon && git pull
@@ -263,6 +290,15 @@ cd ~/.raccoon && git pull
 ---
 
 ## Uninstall
+
+**Homebrew:**
+
+```bash
+brew uninstall rcc
+brew untap thousandflowers/raccoon   # optional — removes the tap
+```
+
+**curl | bash:**
 
 ```bash
 rm -rf ~/.raccoon
