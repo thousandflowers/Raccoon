@@ -1,154 +1,145 @@
 # 🦝 Raccoon
 
-> macOS companion toolkit for power users
+<p align="center">
+  <img src="docs/images/rcc.png" alt="Raccoon Hero" width="800">
+</p>
+
+> macOS companion toolkit — system info, security audits, dev tools, all from one terminal.
 
 [![CI](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go_TUI-Bubble_Tea-00ADD8?logo=go)](ui/)
 
-Raccoon (`rcc`) is a system diagnostics and maintenance toolkit for macOS. It surfaces security audits, hardware health, network state, package hygiene, and developer workflows through a single CLI — with an optional [Bubble Tea](https://github.com/charmbracelet/bubbletea) TUI.
-
-## Why Raccoon?
-
-I built Raccoon because I wanted a single, lightweight tool that could:
-1. **Audit my Mac's security** without needing a 500MB proprietary app.
-2. **Keep my dev environment clean** by tracking updates across `brew`, `npm`, `pip`, and `gem` in one command.
-3. **Be portable**: It's almost entirely Bash, requiring zero dependencies beyond what comes with macOS.
-4. **Be fast**: No splash screens, no background daemons, just results.
-
-- **Zero dependencies** beyond stock macOS + git (all scripts are Bash)
-- **1500+ lines** of audited shell with shellcheck-clean CI
-- **32 security checks** covering Core Security, Network, Auth, Persistence, Privacy, and Additional
+Zero dependencies beyond macOS + git. 1500+ lines of shellcheck-clean Bash.
 
 ---
 
-## Table of Contents
-
-- [Why Raccoon?](#why-raccoon)
-- [Quick Start](#quick-start)
-- [Install with Homebrew](#install-with-homebrew)
-- [Usage & Examples](#usage--examples)
-- [Commands](#commands)
-- [Go TUI](#go-tui)
-- [Security Audit](#security-audit)
-- [Shell Completion](#shell-completion)
-- [Man Page](#man-page)
-- [Contributing](#contributing)
-- [Updating](#updating)
-- [Uninstall](#uninstall)
-- [Project Structure](#project-structure)
-- [License](#license)
-
----
-
-## Quick Start
+## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
-rcc audit
 ```
 
-Clones to `~/.raccoon`, symlinks `rcc` to `/usr/local/bin`. Run `rcc` for the interactive menu or `rcc <command>` for direct access.
-
-<img src="docs/gifs/rcc-help.gif" alt="rcc help output" width="600">
-
----
-
-## Install with Homebrew
+Or via Homebrew:
 
 ```bash
 brew install thousandflowers/raccoon/rcc
 ```
 
-This adds the [homebrew-raccoon](https://github.com/thousandflowers/homebrew-raccoon) tap automatically. After that:
+Run `rcc` to launch the interactive menu, or `rcc <command>` for direct access.
+
+<details>
+<summary>Update & uninstall</summary>
+
+**Update:**
 
 ```bash
-rcc audit                # run a quick security audit
-brew upgrade rcc         # update to the latest version
-brew uninstall rcc       # remove completely
+# Homebrew
+brew upgrade rcc
+
+# curl install — re-run the installer
+curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
 ```
 
-The Homebrew formula handles versioning, upgrades, and uninstallation automatically — no symlinks to manage.
+**Uninstall:**
 
-> **Note:** The `curl | bash` installer remains the primary install method for single-user setups. Homebrew is recommended if you already use it to manage CLI tools.
+```bash
+# Homebrew
+brew uninstall rcc
+
+# curl install
+rm -rf ~/.raccoon && rm "$(which rcc)"
+```
+</details>
 
 ---
 
-## Usage & Examples
+## What you can do
 
-```
-rcc [command] [options]
-```
+### 🔒 Security audit
 
-Run `rcc` with no arguments → interactive menu. Pass a command for direct access.
-
-<img src="docs/gifs/rcc-menu.gif" alt="rcc interactive menu" width="600">
-
-**Quick checks:**
+30+ checks across Core Security, Network, Auth, Persistence, Privacy, and more.
 
 ```bash
-rcc audit            # 32-point security scan
-rcc disk             # APFS volumes, SMART status, free space
-rcc network          # Interfaces, Wi-Fi, DNS, routing table
-rcc battery          # Health %, cycle count, temperature
-rcc upgrade          # Brew + pip + npm + gem — tracked metrics
+rcc audit                 # quick scan
+rcc audit deep            # full scan (requires sudo)
+rcc audit --fix           # auto-fix common issues
+rcc audit --json          # machine-readable output
+rcc audit --csv           # spreadsheet-ready
+rcc audit --html          # save as HTML report
+rcc audit --report out    # save report to file
+rcc audit history         # view past audits
+rcc audit --diff          # changes since last audit
+rcc audit watch           # schedule weekly scan via LaunchAgent
 ```
-
-**Flag style — two forms accepted:**
-
-```bash
-rcc audit deep       # classic
-rcc audit --deep     # flag style — same result
-```
-
-All audit flags work both ways: `--json` / `json`, `--fix` / `fix`, `--history` / `history`.
 
 <img src="docs/gifs/rcc-audit.gif" alt="rcc audit" width="600">
-<img src="docs/gifs/rcc-battery.gif" alt="rcc battery" width="600">
+
+### 🖥️ System information
+
+```bash
+rcc disk                  # volumes, SMART, free space
+rcc network               # interfaces, Wi‑Fi, DNS, routing
+rcc memory                # processes sorted by RAM
+rcc ports                 # open ports & listening services
+rcc battery               # health %, cycles, temperature
+rcc backup                # Time Machine status
+```
+
+### 🛠️ Developer tools
+
+```bash
+rcc upgrade               # update brew, pip, npm, gem at once
+rcc upgrade --dry-run     # preview upgrades without running them
+rcc ssh                   # SSH key management
+rcc git                   # status, branches, stash, cleanup
+rcc docker                # images, containers, volumes
+rcc xcode                 # simulators, derived data, SPM caches
+```
+
+### 🧹 Maintenance
+
+```bash
+rcc env                   # shell environment & PATH breakdown
+rcc startup               # launch agents & login items
+rcc trash                 # trash size & empty
+rcc fonts                 # find duplicates & corrupted fonts
+rcc history               # shell history analysis
+rcc certs                 # SSL certificate expiry report
+```
 
 ---
 
-## Commands
+## All commands
 
 | Command | Description |
 |---------|-------------|
-| **Core Tools** | |
-| `upgrade` | Update Homebrew, pip, npm, gem |
-| `upgrade --dry-run` | Show what would be upgraded without updating |
 | `audit` | Security audit (30+ checks) |
-| `audit deep` | Full audit (requires sudo) |
-| `audit fix` | Auto-fix common security issues |
-| `audit json` | Audit output in JSON format |
-| `audit history` | Audit history with diff |
-| `audit watch` | Schedule weekly audit via LaunchAgent |
-| **System** | |
-| `network` | Interfaces, Wi-Fi, DNS, routing |
-| `disk` | Disk space, APFS container, SMART |
-| `memory` | Processes sorted by RAM |
-| `ports` | Open ports and listening services |
-| `battery` | Battery health, cycles, temperature |
+| `audit deep` | Full audit with sudo |
+| `audit fix` | Auto-fix security issues |
+| `battery` | Health, cycles, temperature |
 | `backup` | Time Machine status |
-| **Developer** | |
-| `ssh` | SSH key generation and management |
-| `git` | Git status, branches, stash, cleanup |
+| `certs` | SSL certificate expiry |
+| `disk` | Volumes, SMART, free space |
 | `docker` | Images, containers, volumes |
-| `xcode` | Simulators, derived data, SPM |
-| **Maintenance** | |
-| `env` | Shell environment and PATH summary |
-| `startup` | Launch agents and login items |
-| `trash` | Trash contents and size |
-| `fonts` | Font duplicates and corruption |
+| `env` | Shell environment & PATH |
+| `fonts` | Font duplicates & issues |
+| `git` | Status, branches, stash |
 | `history` | Shell history analysis |
-| `certs` | SSL certificates and expiration |
-| **Meta** | |
-| `--version`, `-V` | Print version |
-| `help`, `--help`, `-h` | Show help |
+| `memory` | RAM usage by process |
+| `network` | Interfaces, Wi‑Fi, DNS |
+| `ports` | Open ports & listeners |
+| `ssh` | SSH key management |
+| `startup` | Launch agents & login items |
+| `trash` | Trash contents & size |
+| `upgrade` | Multi‑package update |
+| `xcode` | Simulators, caches, SPM |
 
 ---
 
 ## Go TUI
 
-When compiled, Raccoon launches a [Bubble Tea](https://github.com/charmbracelet/bubbletea) TUI instead of the Bash fallback menu:
+Raccoon ships an optional terminal UI built with [Bubble Tea](https://github.com/charmbracelet/bubbletea):
 
 ```
 ┌──────────────────────────────────────────────┐
@@ -161,203 +152,67 @@ When compiled, Raccoon launches a [Bubble Tea](https://github.com/charmbracelet/
 │ trash      fonts      history    certs       │
 │ docker     xcode                             │
 │                                              │
-│ ←→ Navigate · ↑↓ Rows · Enter Run · Q Quit  │
+│ ←→ Navigate · ↑↓ Rows · Enter Run · Q Quit   │
 └──────────────────────────────────────────────┘
 ```
 
-Build it:
-
-```bash
-cd ui && ./build.sh
-```
-
-The binary is compiled to `bin/rcc-ui` and auto-detected by the `rcc` entrypoint.
+Compile with `cd ui && ./build.sh`. The binary lands in `bin/rcc-ui` and is auto-detected by `rcc`.
 
 ---
 
-## Security Audit
+## Shell completion
 
-| Flag | Description |
-|------|-------------|
-| `--deep` | All 32 checks (requires sudo) |
-| `--quiet` | Output just "pass warn fail" counts |
-| `--json` | JSON format |
-| `--csv` | CSV format |
-| `--html` | HTML report |
-| `--report FILE` | Save report to file |
-| `--fix` | Auto-fix issues where possible |
-| `--fix --dry-run` | Show what would be fixed |
-| `--fix --force` | Skip confirmation |
-| `--history` | Show audit history |
-| `--diff` | Changes since last audit |
-| `--watch` | Weekly scheduled audit |
-| `--notify` | Send notification on completion |
+```bash
+rcc completion bash    # print bash completions
+rcc completion zsh     # print zsh completions
+```
 
-History is saved to `~/.raccoon/audit-history/`; last 30 runs are kept automatically.
+Pipe into your shell rc file to make it permanent:
+
+```bash
+rcc completion bash >> ~/.bashrc
+rcc completion zsh  >> ~/.zshrc
+```
 
 ---
 
-## Shell Completion
-
-Install completion for the current shell:
-
-```bash
-# Bash
-source <(rcc completion bash)
-
-# Zsh
-source <(rcc completion zsh)
-```
-
-To make it permanent:
-
-```bash
-# Bash — add to ~/.bashrc
-source <(rcc completion bash)
-
-# Zsh — add to ~/.zshrc
-source <(rcc completion zsh)
-```
-
-Completions cover all commands, flags, and audit subcommands (`deep`, `fix`, `json`, `history`, etc.).
-
----
-
-## Man Page
+## Man page
 
 ```bash
 man rcc
 ```
 
-Covers all commands, flags, and examples. Installer symlinks it into `/usr/local/share/man/man1/rcc.1`. To read without installing:
+Covers every command, flag, and example.
 
-```bash
-nroff -man man/man1/rcc.1 | less
-man -l man/man1/rcc.1
+---
+
+## Project structure
+
+```
+Raccoon/
+├── rcc                  # Entry point + dispatcher
+├── install.sh           # curl | bash installer
+├── lib/core/            # Shared shell library
+│   ├── common.sh
+│   └── commands.sh
+├── bin/                 # Command scripts (audit, disk, …)
+├── ui/                  # Go Bubble Tea TUI
+├── completions/         # bash + zsh autocompletions
+├── man/man1/rcc.1      # Man page
+├── tests/               # Bats test suite
+└── docs/                # Images, GIFs, guides
 ```
 
 ---
 
 ## Contributing
 
-Bug reports and PRs welcome. Please use the issue/PR templates:
-
-- [Bug report](.github/ISSUE_TEMPLATE/bug_report.md)
-- [Feature request](.github/ISSUE_TEMPLATE/feature_request.md)
-- [Pull request template](.github/PULL_REQUEST_TEMPLATE.md)
-
-**Running tests:**
+Bug reports and PRs welcome — use the templates.
 
 ```bash
-# Install bats-core if needed
-brew install bats-core
-
-# Full suite
-bats tests/
-
-# Single file
-bats tests/test_audit.bats
-```
-
-**Style:** All shell scripts pass `shellcheck`. Run before pushing:
-
-```bash
-shellcheck rcc install.sh bin/*.sh lib/core/*.sh
-```
-
----
-
-## Updating
-
-**Homebrew:**
-
-```bash
-brew upgrade rcc
-```
-
-**curl | bash:**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
-```
-
-**Manual:**
-
-```bash
-cd ~/.raccoon && git pull
-```
-
----
-
-## Uninstall
-
-**Homebrew:**
-
-```bash
-brew uninstall rcc
-brew untap thousandflowers/raccoon   # optional — removes the tap
-```
-
-**curl | bash:**
-
-```bash
-rm -rf ~/.raccoon
-rm "$(which rcc)"
-```
-
----
-
-## Project Structure
-
-```
-Raccoon/
-├── rcc                 # Entry point + dispatcher
-├── install.sh          # One-line installer
-├── LICENSE
-├── .editorconfig
-├── .github/
-│   ├── workflows/      # CI: shellcheck + Go build + bats
-│   ├── dependabot.yml
-│   ├── ISSUE_TEMPLATE/
-│   └── PULL_REQUEST_TEMPLATE.md
-├── man/man1/
-│   └── rcc.1           # Man page
-├── ui/                 # Go Bubble Tea TUI
-│   ├── main.go
-│   ├── go.mod
-│   └── build.sh
-├── bin/                # Diagnostic scripts
-│   ├── audit.sh        # 896-line security audit engine
-│   ├── network.sh
-│   ├── disk.sh
-│   ├── memory.sh
-│   ├── ports.sh
-│   ├── battery.sh
-│   ├── backup.sh
-│   ├── ssh.sh
-│   ├── git.sh
-│   ├── docker.sh
-│   ├── xcode.sh
-│   ├── env.sh
-│   ├── startup.sh
-│   ├── trash.sh
-│   ├── fonts.sh
-│   ├── history.sh
-│   ├── certs.sh
-│   └── upgrade.sh      # Multi-package upgrade tracker
-├── lib/core/           # Shared library
-│   ├── common.sh
-│   └── commands.sh
-├── completions/        # Shell autocompletion
-│   ├── bash/
-│   │   └── rcc.bash
-│   └── zsh/
-│       └── _rcc
-└── tests/              # Bats test suite
-    ├── test_helper.bash
-    ├── test_install.bats
-    ├── test_commands.bats
-    └── test_audit.bats  # 18 tests for audit engine
+brew install bats-core shellcheck
+bats tests/              # run tests
+shellcheck rcc bin/*.sh lib/core/*.sh   # lint
 ```
 
 ---
