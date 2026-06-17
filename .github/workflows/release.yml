@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ui/go.mod
+
+      - name: Build universal Go TUI binary
+        run: |
+          cd ui
+          GOARCH=arm64 go build -o rcc-ui-arm64 main.go
+          GOARCH=amd64 go build -o rcc-ui-amd64 main.go
+          lipo -create -output rcc-ui rcc-ui-arm64 rcc-ui-amd64
+          cd ..
+          cp ui/rcc-ui bin/rcc-ui
+
+      - name: Generate release notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [[ -n "$PREV_TAG" ]]; then
+            echo "## Changes since $PREV_TAG" > /tmp/release-notes.md
+            git log "$PREV_TAG..HEAD" --oneline --no-decorate >> /tmp/release-notes.md
+          else
+            echo "## Initial release" > /tmp/release-notes.md
+            git log --oneline --no-decorate >> /tmp/release-notes.md
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: /tmp/release-notes.md
+          draft: false
+          prerelease: false
+          files: |
+            bin/rcc-ui
