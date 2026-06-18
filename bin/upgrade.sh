@@ -9,12 +9,15 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_upgrade_help() {
-	print_help_header "upgrade" "Update package managers: Homebrew, pip, npm, nvm, rustup, gem" "[--dry-run]"
+	print_help_header "upgrade" "Update package managers and tools" "[--dry-run]"
 	echo "  --dry-run, -n    Show what would be upgraded without updating"
+	echo ""
+	echo "  Tracked: brew pip npm pnpm bun uv go nvm rustup gem docker claude"
 	echo ""
 }
 
 RCC_DRY_RUN=false
+RCC_DEFERRED_TAPS=()
 
 for arg in "$@"; do
 	case "$arg" in
@@ -245,28 +248,25 @@ upgrade_npm() {
 
 	increment_global_progress
 
-	# ponytail: check npm prefix writability; can't fix permissions, only warn
-	local npm_prefix
+	# ponytail: check npm prefix writability; fallback to sudo instead of skip
+	local npm_prefix npm_sudo
 	npm_prefix=$(npm config get prefix 2>/dev/null || echo "/usr/local")
+	npm_sudo=""
 	if [[ ! -w "$npm_prefix" ]] && [[ ! -w "${npm_prefix}/lib/node_modules" ]]; then
-		append_progress_output "npm: ⚠ prefix $npm_prefix not writable — use nvm or set npm prefix to ~/.npm-global"
-		update_global_progress_info "npm: permission error, skipping"
-		increment_global_progress
-		increment_global_progress
-		increment_global_progress
-		return 0
+		append_progress_output "npm: prefix $npm_prefix not writable, trying sudo"
+		npm_sudo="sudo"
 	fi
 
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "npm: dry run"
-		npm outdated -g 2>&1 | progress_pipe || true
+		$npm_sudo npm outdated -g 2>&1 | progress_pipe || true
 		increment_global_progress
 		increment_global_progress
 		return 0
 	fi
 
 	update_global_progress_info "npm: updating..."
-	npm update -g 2>&1 | progress_pipe _parse_npm || true
+	$npm_sudo npm update -g 2>&1 | progress_pipe _parse_npm || true
 
 	increment_global_progress
 	increment_global_progress
@@ -502,27 +502,312 @@ _fallback_upgrade_gem() {
 	fi
 }
 
+_fallback_upgrade_pnpm() {
+	echo ""
+	print_section_header "pnpm"
+	if ! command -v pnpm >/dev/null 2>&1; then
+		print_info "not installed"
+		return 0
+	fi
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		echo "pnpm $(pnpm --version)"
+	else
+		pnpm up -g 2>&1 || true
+	fi
+}
+
+_fallback_upgrade_bun() {
+	echo ""
+	print_section_header "bun"
+	if ! command -v bun >/dev/null 2>&1; then
+		print_info "not installed"
+		return 0
+	fi
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		echo "bun $(bun --version)"
+	else
+		bun upgrade 2>&1 || true
+	fi
+}
+
+_fallback_upgrade_uv() {
+	echo ""
+	print_section_header "uv"
+	if ! command -v uv >/dev/null 2>&1; then
+		print_info "not installed"
+		return 0
+	fi
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		uv --version 2>&1 || true
+	else
+		uv self update 2>&1 || true
+		uv tool upgrade --all 2>&1 || true
+	fi
+}
+
+_fallback_upgrade_go() {
+	echo ""
+	print_section_header "go"
+	if ! command -v go >/dev/null 2>&1; then
+		print_info "not installed"
+		return 0
+	fi
+	go version 2>&1 || true
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		return 0
+	fi
+	go install golang.org/x/tools/gopls@latest 2>&1 || true
+	go install golang.org/x/tools/cmd/goimports@latest 2>&1 || true
+}
+
+_fallback_upgrade_docker() {
+	echo ""
+	print_section_header "docker"
+	if ! command -v docker >/dev/null 2>&1; then
+		print_info "not installed"
+		return 0
+	fi
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		echo "docker $(docker --version 2>/dev/null | head -1)"
+	else
+		docker image prune -af --filter until=24h 2>&1 || true
+	fi
+}
+
+_fallback_upgrade_claude() {
+	echo ""
+	print_section_header "claude"
+	if ! command -v claude >/dev/null 2>&1; then
+		print_info "not installed"
+		return 0
+	fi
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		echo "claude $(claude --version 2>/dev/null | head -1)"
+	else
+		claude update 2>&1 || true
+	fi
+}
+
+upgrade_pnpm() {
+	update_global_progress_info "pnpm: checking..."
+	if ! command -v pnpm >/dev/null 2>&1; then
+		append_progress_output "pnpm: not installed"
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		update_global_progress_info "pnpm: dry run"
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+	update_global_progress_info "pnpm: updating..."
+	pnpm up -g 2>&1 | progress_pipe || true
+	increment_global_progress
+	increment_global_progress
+}
+
+upgrade_bun() {
+	update_global_progress_info "bun: checking..."
+	if ! command -v bun >/dev/null 2>&1; then
+		append_progress_output "bun: not installed"
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		update_global_progress_info "bun: dry run"
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+	update_global_progress_info "bun: updating..."
+	bun upgrade 2>&1 | progress_pipe || true
+	increment_global_progress
+	increment_global_progress
+}
+
+upgrade_uv() {
+	update_global_progress_info "uv: checking..."
+	if ! command -v uv >/dev/null 2>&1; then
+		append_progress_output "uv: not installed"
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		update_global_progress_info "uv: dry run"
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+	update_global_progress_info "uv: updating..."
+	uv self update 2>&1 | progress_pipe || true
+	increment_global_progress
+	# ponytail: tool upgrade is best-effort, ignore failures
+	uv tool upgrade --all 2>&1 | progress_pipe || true
+	increment_global_progress
+}
+
+upgrade_go() {
+	update_global_progress_info "go: checking..."
+	if ! command -v go >/dev/null 2>&1; then
+		append_progress_output "go: not installed"
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+	update_global_progress_info "go: $(go version 2>/dev/null | awk '{print $3}')"
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+	# ponytail: only update gopls and goimports — well-known Go tools
+	increment_global_progress
+	update_global_progress_info "go: updating gopls..."
+	go install golang.org/x/tools/gopls@latest 2>&1 | progress_pipe || true
+	increment_global_progress
+	update_global_progress_info "go: updating goimports..."
+	go install golang.org/x/tools/cmd/goimports@latest 2>&1 | progress_pipe || true
+	increment_global_progress
+}
+
+upgrade_docker() {
+	update_global_progress_info "docker: checking..."
+	if ! command -v docker >/dev/null 2>&1; then
+		append_progress_output "docker: not installed"
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		update_global_progress_info "docker: dry run"
+		append_progress_output "docker: would prune images"
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+	# ponytail: prune images older than 24h — safe for daily runs
+	update_global_progress_info "docker: pruning images >24h..."
+	docker image prune -af --filter until=24h 2>&1 | progress_pipe || true
+	increment_global_progress
+	increment_global_progress
+}
+
+upgrade_claude() {
+	update_global_progress_info "claude: checking..."
+	if ! command -v claude >/dev/null 2>&1; then
+		append_progress_output "claude: not installed"
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		update_global_progress_info "claude: dry run"
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+	update_global_progress_info "claude: updating..."
+	claude update 2>&1 | progress_pipe || true
+	increment_global_progress
+	increment_global_progress
+}
+
 # ============================================================
 # Main
 # ============================================================
 
-main() {
-	init_global_progress 18
+_check_taps_preflight() {
+	# ponytail: skip preflight in non-TTY (tests, pipes)
+	if ! [[ -t 1 ]]; then
+		return 0
+	fi
+	if ! command -v brew >/dev/null 2>&1; then
+		return 0
+	fi
+	# ponytail: brew tap-info --json fetches remote data; use local CSV
+	while IFS= read -r tap; do
+		[[ -z "$tap" ]] && continue
+		[[ "$tap" == homebrew/* ]] && continue
+		# brew tap-info line: "<tap>: Installed" then "Untrusted" underneath
+		if ! brew tap-info "$tap" 2>/dev/null | grep -qx "Untrusted"; then
+			continue
+		fi
+		if [[ -t 0 ]]; then
+			echo -n "Trust tap ${tap}? (Y/n) [auto-defer 10s]: "
+			read -t 10 -r response || true
+			case "${response:-y}" in
+				[Yy]*|"") brew tap --trust "$tap" 2>/dev/null || RCC_DEFERRED_TAPS+=("$tap") ;;
+				*) RCC_DEFERRED_TAPS+=("$tap") ;;
+			esac
+		else
+			RCC_DEFERRED_TAPS+=("$tap")
+		fi
+	done < <(brew tap 2>/dev/null || true)
 
+	if [[ ${#RCC_DEFERRED_TAPS[@]} -gt 0 ]]; then
+		echo ""
+		echo "Deferred tap trust requests (will process after all upgrades):"
+		for tap in "${RCC_DEFERRED_TAPS[@]}"; do
+			echo "  ${tap}"
+		done
+		echo ""
+	fi
+}
+
+_show_deferred_taps() {
+	if [[ ${#RCC_DEFERRED_TAPS[@]} -eq 0 ]]; then
+		return 0
+	fi
+	echo ""
+	echo "=== Deferred Tap Trust ==="
+	for tap in "${RCC_DEFERRED_TAPS[@]}"; do
+		if [[ -t 0 ]]; then
+			echo -n "Trust ${tap}? (Y/n): "
+			read -r response || true
+			case "${response:-y}" in
+				[Yy]*|"")
+					brew tap --trust "$tap" 2>/dev/null || echo "  ✗ Failed to trust $tap"
+					;;
+				*) echo "  Skipped ${tap}" ;;
+			esac
+		fi
+	done
+}
+
+main() {
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		echo "${YELLOW}DRY RUN MODE - no changes made${NC}"
 		echo ""
 	fi
 
+	# Pre-flight: handle tap trust before progress bar
+	_check_taps_preflight
+
+	# ponytail: one progress slot per upgrade function
+	init_global_progress 30
+
 	upgrade_homebrew
 	upgrade_pip
 	upgrade_npm
+	upgrade_pnpm
+	upgrade_bun
+	upgrade_uv
+	upgrade_go
 	upgrade_nvm
 	upgrade_rustup
 	upgrade_gem
+	upgrade_docker
+	upgrade_claude
 
 	finish_global_progress
 	echo ""
+
+	_show_deferred_taps
+
 	print_success "Completed"
 }
 

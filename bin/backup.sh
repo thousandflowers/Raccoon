@@ -25,9 +25,10 @@ for arg in "$@"; do
 done
 
 check_tm_destination() {
-	local dest
+	local dest kind
 	dest=$(tmutil destinationinfo 2>/dev/null | grep "Name:" | head -1 |
 		cut -d: -f2- | xargs 2>/dev/null || echo "")
+	kind=$(tmutil destinationinfo 2>/dev/null | grep "Kind:" | head -1 | cut -d: -f2- | xargs || echo "")
 
 	# ponytail: plain-text parse fails during backups (field absent).
 	# fallback: XML parse via Perl one-liner.
@@ -37,8 +38,6 @@ check_tm_destination() {
 		[[ -n "$xml_dest" ]] && dest="$xml_dest"
 	fi
 
-	print_section_header "Time Machine"
-
 	print_table_header "Setting|Value" 20 30
 
 	if [[ -z "$dest" ]]; then
@@ -47,6 +46,18 @@ check_tm_destination() {
 	fi
 
 	print_table_row "Destination|${GREEN}${dest}${NC}" 20 30
+	[[ -n "$kind" ]] && print_table_row "Kind|$kind" 20 30
+}
+
+check_tm_phase() {
+	local phase
+	phase=$(tmutil currentphase 2>/dev/null || echo "unknown")
+	case "$phase" in
+		BackupNotRunning) phase="${GREEN}Idle${NC}" ;;
+		BackupRunning) phase="${YELLOW}Backing up...${NC}" ;;
+		*) phase="${GRAY}$phase${NC}" ;;
+	esac
+	print_table_row "Status|$phase" 20 30
 }
 
 check_last_backup() {
@@ -78,9 +89,28 @@ check_last_backup() {
 	fi
 }
 
+check_tm_exclusions() {
+	local excl_count=0
+	if mdfind "kMDItemFSLabel = 6" 2>/dev/null | head -1 | grep -q .; then
+		echo ""
+		echo "${GRAY}Exclusions (Spotlight-tagged)...${NC}"
+		while IFS= read -r excl_path; do
+			[[ -z "$excl_path" ]] && continue
+			echo "  ${GRAY}$excl_path${NC}"
+			((excl_count++)) || true
+		done < <(mdfind "kMDItemFSLabel = 6" 2>/dev/null | head -10)
+	else
+		# ponytail: mdfind returns nothing when no exclusions; no news is good news
+		:
+	fi
+}
+
 main() {
+	print_section_header "Time Machine"
 	check_tm_destination
+	check_tm_phase
 	check_last_backup
+	check_tm_exclusions
 
 	echo ""
 	print_success "Completed"
