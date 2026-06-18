@@ -11,9 +11,15 @@ source "$SCRIPT_DIR/../lib/core/common.sh"
 SSH_DIR="$HOME/.ssh"
 
 show_ssh_help() {
-	print_help_header "ssh" "Inspect and manage SSH keys" "[--export KEY] [--export-gpg [KEY]]"
-	echo "  --export KEY       Copy SSH public key to clipboard (default: id_ed25519)"
-	echo "  --export-gpg KEY   List or copy GPG public key to clipboard"
+	print_help_header "ssh" "Inspect and manage SSH keys (orphan, unprotected, permissions)" "[--export KEY] [--export-gpg [KEY]]"
+	echo ""
+	echo "  Inspection (default):"
+	echo "    Scans ~/.ssh for unprotected keys (no passphrase), orphan keys (missing .pub),"
+	echo "    and incorrect permissions — shows all findings in a table."
+	echo ""
+	echo "  Export:"
+	echo "    --export KEY       Copy SSH public key to clipboard (default: id_ed25519)"
+	echo "    --export-gpg [KEY] List GPG keys, or copy specific GPG/PGP public key to clipboard"
 	echo ""
 }
 
