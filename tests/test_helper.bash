@@ -16,7 +16,9 @@ setup_raccoon_env() {
 }
 
 teardown_raccoon_env() {
-	rm -rf "${HOME}"
+	# ponytail: chmod before rm handles read-only files from go install etc
+	chmod -R +w "${HOME}" 2>/dev/null || true
+	rm -rf "${HOME}" 2>/dev/null || true
 }
 
 # Run a command with assert status
