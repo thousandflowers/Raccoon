@@ -78,9 +78,9 @@ rcc audit watch           # schedule weekly scan via LaunchAgent
 ### 🖥️ System information
 
 ```bash
-rcc disk                  # volumes, SMART, free space
+rcc disk                  # internal, external & network drives, SMART
 rcc network               # interfaces, Wi‑Fi, DNS, routing
-rcc memory                # processes sorted by RAM
+rcc memory                # system stats + processes sorted by RAM
 rcc ports                 # open ports & listening services
 rcc battery               # health %, cycles, temperature
 rcc backup                # Time Machine status
@@ -91,7 +91,7 @@ rcc backup                # Time Machine status
 ```bash
 rcc upgrade               # update brew, pip, npm, gem at once
 rcc upgrade --dry-run     # preview upgrades without running them
-rcc ssh                   # SSH key management
+rcc ssh                   # inspect keys, --export, --export-gpg
 rcc git                   # status, branches, stash, cleanup
 rcc docker                # images, containers, volumes
 rcc xcode                 # simulators, derived data, SPM caches
@@ -120,16 +120,16 @@ rcc certs                 # SSL certificate expiry report
 | `battery` | Health, cycles, temperature |
 | `backup` | Time Machine status |
 | `certs` | SSL certificate expiry |
-| `disk` | Volumes, SMART, free space |
+| `disk` | Internal, external & network drives, SMART |
 | `docker` | Images, containers, volumes |
 | `env` | Shell environment & PATH |
 | `fonts` | Font duplicates & issues |
 | `git` | Status, branches, stash |
 | `history` | Shell history analysis |
-| `memory` | RAM usage by process |
+| `memory` | System memory + process RSS |
 | `network` | Interfaces, Wi‑Fi, DNS |
 | `ports` | Open ports & listeners |
-| `ssh` | SSH key management |
+| `ssh` | Key inspection, `--export`, `--export-gpg` |
 | `startup` | Launch agents & login items |
 | `trash` | Trash contents & size |
 | `upgrade` | Multi‑package update |

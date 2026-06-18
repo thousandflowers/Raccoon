@@ -130,6 +130,7 @@ upgrade_homebrew() {
 	update_global_progress_info "brew: checking..."
 
 	export HOMEBREW_NO_AUTO_UPDATE=1
+	export HOMEBREW_NO_INSTALL_CLEANUP=1
 	export GIT_TERMINAL_PROMPT=0
 
 	if ! command -v brew >/dev/null 2>&1; then
@@ -244,6 +245,18 @@ upgrade_npm() {
 
 	increment_global_progress
 
+	# ponytail: check npm prefix writability; can't fix permissions, only warn
+	local npm_prefix
+	npm_prefix=$(npm config get prefix 2>/dev/null || echo "/usr/local")
+	if [[ ! -w "$npm_prefix" ]] && [[ ! -w "${npm_prefix}/lib/node_modules" ]]; then
+		append_progress_output "npm: ⚠ prefix $npm_prefix not writable — use nvm or set npm prefix to ~/.npm-global"
+		update_global_progress_info "npm: permission error, skipping"
+		increment_global_progress
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "npm: dry run"
 		npm outdated -g 2>&1 | progress_pipe || true
@@ -352,6 +365,18 @@ upgrade_gem() {
 
 	increment_global_progress
 
+	# ponytail: check gem dir writability; can't fix permissions, only warn + suggest --user-install
+	local gem_dir
+	gem_dir=$(gem environment gemdir 2>/dev/null || echo "/Library/Ruby/Gems")
+	if [[ ! -w "$gem_dir" ]]; then
+		append_progress_output "gem: ⚠ $gem_dir not writable — use rbenv or gem install --user-install"
+		update_global_progress_info "gem: permission error, skipping"
+		increment_global_progress
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "gem: dry run"
 		local output
@@ -368,8 +393,6 @@ upgrade_gem() {
 		increment_global_progress
 		return 0
 	fi
-
-	increment_global_progress
 
 	update_global_progress_info "gem: updating..."
 	gem update 2>&1 | progress_pipe _parse_gem || true
