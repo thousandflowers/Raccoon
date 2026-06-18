@@ -56,9 +56,9 @@ rm -rf ~/.raccoon && rm "$(which rcc)"
 
 ## Why I built this
 
-I had two separate scripts. One I'd run on my own Mac to keep packages up to date — brew, pip, npm, gem, all at once — because I kept forgetting to update one or the other. The other I'd run on my sisters' Macs whenever they asked me to check something: disk space, open ports, what was running at startup.
+It started as a PR to [Mole](https://github.com/tw93/Mole) — a `mo update` command that updated brew, pip, npm, and gem in one shot because i always forgot to update something. The maintainer liked the code but declined it as out of scope for Mole.
 
-At some point I merged them, kept adding commands, and Raccoon became the tool I reach for whenever I need to know what's going on with a Mac.
+So I took it further. I had a second script I'd run on my sisters' Macs whenever they asked me to check something: disk space, open ports, what was running at startup. I merged the two, kept adding commands, and Raccoon became the tool I reach for whenever I need to know what's going on with a Mac.
 
 ---
 
