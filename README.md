@@ -129,7 +129,7 @@ Run `rcc` with no arguments → interactive menu. Pass a command for direct acce
 
 ```bash
 rcc audit            # 32-point security scan
-rcc disk             # APFS volumes, SMART status, free space
+rcc disk             # internal, external & network drives, SMART
 rcc network          # Interfaces, Wi-Fi, DNS, routing table
 rcc battery          # Health %, cycle count, temperature
 rcc upgrade          # Brew + pip + npm + gem — tracked metrics
@@ -166,13 +166,13 @@ All audit flags work both ways: `--json` / `json`, `--fix` / `fix`, `--history` 
 | `audit watch` | Schedule weekly audit via LaunchAgent |
 | **System** | |
 | `network` | Interfaces, Wi-Fi, DNS, routing |
-| `disk` | Disk space, APFS container, SMART |
-| `memory` | Processes sorted by RAM |
+| `disk` | Internal, external & network drives, SMART |
+| `memory` | System stats (cached, swap) + processes by RSS |
 | `ports` | Open ports and listening services |
 | `battery` | Battery health, cycles, temperature |
 | `backup` | Time Machine status |
 | **Developer** | |
-| `ssh` | SSH key generation and management |
+| `ssh` | Key inspection, `--export`, `--export-gpg` |
 | `git` | Git status, branches, stash, cleanup |
 | `docker` | Images, containers, volumes |
 | `xcode` | Simulators, derived data, SPM |

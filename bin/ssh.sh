@@ -11,7 +11,9 @@ source "$SCRIPT_DIR/../lib/core/common.sh"
 SSH_DIR="$HOME/.ssh"
 
 show_ssh_help() {
-	print_help_header "ssh" "Check SSH keys and configuration" ""
+	print_help_header "ssh" "Inspect and manage SSH keys" "[--export KEY] [--export-gpg [KEY]]"
+	echo "  --export KEY       Copy SSH public key to clipboard (default: id_ed25519)"
+	echo "  --export-gpg KEY   List or copy GPG public key to clipboard"
 	echo ""
 }
 
@@ -116,5 +118,34 @@ main() {
 	echo ""
 	print_success "Completed"
 }
+
+# ponytail: --export copies pubkey to clipboard, no need to handle every key type
+if [[ "${1:-}" == "--export" ]]; then
+	keyname="${2:-id_ed25519}"
+	if [[ -f "$HOME/.ssh/${keyname}.pub" ]]; then
+		pbcopy < "$HOME/.ssh/${keyname}.pub"
+		echo "✓ Public key ${keyname}.pub copied to clipboard"
+	else
+		echo "✗ Key not found: ~/.ssh/${keyname}.pub" >&2
+		return 1
+	fi
+	exit 0
+fi
+
+# ponytail: --export-gpg lists or copies GPG public key; no key management, just clipboard
+if [[ "${1:-}" == "--export-gpg" ]]; then
+	gpg_key="${2:-}"
+	if [[ -z "$gpg_key" ]]; then
+		gpg --list-keys --keyid-format LONG 2>/dev/null || echo "No GPG keys found"
+	else
+		if gpg --export --armor "$gpg_key" 2>/dev/null | pbcopy; then
+			echo "✓ GPG public key $gpg_key copied to clipboard"
+		else
+			echo "✗ GPG key not found: $gpg_key" >&2
+			return 1
+		fi
+	fi
+	exit 0
+fi
 
 main "$@"

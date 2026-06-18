@@ -886,6 +886,7 @@ func startScript(binPath, script string) tea.Cmd {
 		}
 	}
 	cmd.Stderr = cmd.Stdout
+	cmd.Stdin = nil // ponytail: prevent child from receiving TTY in raw mode and corrupting TUI
 
 	if err := cmd.Start(); err != nil {
 		return func() tea.Msg {

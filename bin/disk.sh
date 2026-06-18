@@ -11,7 +11,7 @@ source "$SCRIPT_DIR/../lib/core/common.sh"
 show_disk_help() {
 	echo "Usage: rcc disk [options]"
 	echo ""
-	echo "Show disk status, volumes, and space usage"
+	echo "Show disk status — internal, external, and network volumes"
 	echo ""
 	echo "Options:"
 	echo "  --json          Output in JSON format"
@@ -38,23 +38,27 @@ main() {
 	print_section_header "Disk Status"
 
 	echo "${GRAY}[1/5] Physical Disks...${NC}"
-	print_table_header "Disk|Size|SMART" 10 12 10
+	print_table_header "Disk|Int/Ext|Size|SMART" 10 8 12 10
 
-	local disk_info
-	disk_info=$(diskutil info disk0 2>/dev/null)
-	local disk_size
-	disk_size=$(echo "$disk_info" | grep "Disk Size" | head -1 | awk '{print $3, $4}')
-	local smart
-	smart=$(echo "$disk_info" | grep "SMART Status" | head -1 | awk '{print $3}')
-	local smart_colored
-	if [[ "$smart" == "Verified" ]]; then
-		smart_colored="${GREEN}Verified${NC}"
-	elif [[ "$smart" == "Failing" ]]; then
-		smart_colored="${RED}Failing${NC}"
-	else
-		smart_colored="${GRAY}N/A${NC}"
+	# ponytail: only physical disks from diskutil list (internal + external)
+	local disk_lines disk_line disk_id disk_type disk_info disk_size smart smart_colored
+	disk_lines=$(diskutil list 2>/dev/null | grep '(physical)')
+	if [[ -n "$disk_lines" ]]; then
+		while IFS= read -r disk_line; do
+			[[ -z "$disk_line" ]] && continue
+			disk_id=$(echo "$disk_line" | sed 's|/dev/||' | awk '{print $1}')
+			disk_type=$(echo "$disk_line" | grep -oE '(internal|external)')
+			disk_info=$(diskutil info "$disk_id" 2>/dev/null)
+			disk_size=$(echo "$disk_info" | grep "Disk Size" | head -1 | awk '{print $3, $4}')
+			smart=$(echo "$disk_info" | grep "SMART Status" | head -1 | awk '{print $3}')
+			case "$smart" in
+				Verified) smart_colored="${GREEN}Verified${NC}" ;;
+				Failing) smart_colored="${RED}Failing${NC}" ;;
+				*) smart_colored="${GRAY}N/A${NC}" ;;
+			esac
+			print_table_row "$disk_id|$disk_type|${disk_size:-?}|$smart_colored" 10 8 12 10
+		done <<< "$disk_lines"
 	fi
-	print_table_row "disk0|$disk_size|$smart_colored" 10 12 10
 	echo "${GREEN}✓${NC}"
 
 	echo ""
@@ -102,13 +106,18 @@ main() {
 	echo "${GREEN}✓${NC}"
 
 	echo ""
-	echo "${GRAY}[5/5] SMART Status...${NC}"
-	if [[ "$smart" == "Verified" ]]; then
-		echo "  disk0: ${GREEN}Verified${NC}"
-	elif [[ "$smart" == "Failing" ]]; then
-		echo "  disk0: ${RED}Failing${NC}"
+	echo "${GRAY}[5/5] Network Mounts...${NC}"
+	# ponytail: df -t with network filesystem types; no output = no network mounts
+	local net_output
+	net_output=$(df -h -t smbfs,nfs,afpfs 2>/dev/null | tail -n +2)
+	if [[ -z "$net_output" ]]; then
+		echo "  ${GRAY}No network mounts${NC}"
 	else
-		echo "  disk0: ${GRAY}N/A${NC}"
+		print_table_header "Mount|Size|Used|Free" 25 10 10 10
+		while IFS= read -r line; do
+			[[ -z "$line" ]] && continue
+			print_table_row "$(echo "$line" | awk '{print $NF}')|$(echo "$line" | awk '{print $2}')|$(echo "$line" | awk '{print $3}')|$(echo "$line" | awk '{print $4}')" 25 10 10 10
+		done <<< "$net_output"
 	fi
 	echo "${GREEN}✓${NC}"
 

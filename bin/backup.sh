@@ -29,6 +29,14 @@ check_tm_destination() {
 	dest=$(tmutil destinationinfo 2>/dev/null | grep "Name:" | head -1 |
 		cut -d: -f2- | xargs 2>/dev/null || echo "")
 
+	# ponytail: plain-text parse fails during backups (field absent).
+	# fallback: XML parse via Perl one-liner.
+	if [[ -z "$dest" ]]; then
+		local xml_dest
+		xml_dest=$(tmutil destinationinfo -X 2>/dev/null | perl -wne 'print $1 if /<key>Name<\/key>\s*<string>(.*?)<\/string>/s' 2>/dev/null || echo "")
+		[[ -n "$xml_dest" ]] && dest="$xml_dest"
+	fi
+
 	print_section_header "Time Machine"
 
 	print_table_header "Setting|Value" 20 30

@@ -45,6 +45,47 @@ done
 main() {
 	print_section_header "Memory Usage"
 
+	# ponytail: system memory from vm_stat + sysctl, not parsing every vm_stat field
+	local page_size total_mem vm_stat_out
+	page_size=$(sysctl -n hw.pagesize 2>/dev/null || echo 16384)
+	total_mem=$(sysctl -n hw.memsize 2>/dev/null || echo 0)
+	vm_stat_out=$(vm_stat 2>/dev/null || true)
+
+	if [[ -n "$vm_stat_out" ]]; then
+		local pages_wired pages_active pages_compressed pages_inactive
+		pages_wired=$(echo "$vm_stat_out" | grep "Pages wired" | awk '{print $3}' | tr -d '.')
+		pages_active=$(echo "$vm_stat_out" | grep "Pages active" | awk '{print $3}' | tr -d '.')
+		pages_compressed=$(echo "$vm_stat_out" | grep "Pages occupied" | awk '{print $5}' | tr -d '.')
+		pages_inactive=$(echo "$vm_stat_out" | grep "Pages inactive" | awk '{print $3}' | tr -d '.')
+
+		local total_gb wired_mb active_mb compressed_mb cached_mb
+		total_gb=$((total_mem / 1024 / 1024 / 1024))
+		[[ -n "$pages_wired" ]] && wired_mb=$((pages_wired * page_size / 1024 / 1024)) || wired_mb=0
+		[[ -n "$pages_active" ]] && active_mb=$((pages_active * page_size / 1024 / 1024)) || active_mb=0
+		[[ -n "$pages_compressed" ]] && compressed_mb=$((pages_compressed * page_size / 1024 / 1024)) || compressed_mb=0
+		[[ -n "$pages_inactive" ]] && cached_mb=$((pages_inactive * page_size / 1024 / 1024)) || cached_mb=0
+
+		print_table_header "Metric|Value" 25 15
+		print_table_row "Total RAM|${total_gb} GB" 25 15
+		print_table_row "Wired|${wired_mb} MB" 25 15
+		print_table_row "Active|${active_mb} MB" 25 15
+		print_table_row "Cached|${cached_mb} MB" 25 15
+		print_table_row "Compressed|${compressed_mb} MB" 25 15
+
+		# ponytail: swap from sysctl vm.swapusage, not parsing swap file details
+		local swap_out swap_total swap_used swap_avail
+		swap_out=$(sysctl vm.swapusage 2>/dev/null || true)
+		if [[ -n "$swap_out" ]]; then
+			swap_total=$(echo "$swap_out" | awk '{print $3}' | tr -d 'M')
+			swap_used=$(echo "$swap_out" | awk '{print $6}' | tr -d 'M')
+			swap_avail=$(echo "$swap_out" | awk '{print $9}' | tr -d 'M')
+			print_table_row "Swap Total|${swap_total} MB" 25 15
+			print_table_row "Swap Used|${swap_used} MB" 25 15
+			print_table_row "Swap Free|${swap_avail} MB" 25 15
+		fi
+		echo ""
+	fi
+
 	if [[ "$JSON_OUTPUT" == "true" ]]; then
 		local tmpf
 		tmpf=$(mktemp)
