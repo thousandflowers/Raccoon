@@ -95,6 +95,37 @@ var scriptFrames = map[string]raccoonAnimation{
   > ^ <`,
 	},
 
+	// apps — shopper raccoon, app boxes install
+	"apps.sh": {
+		`    _
+  / \_/\_
+ ( o.o )[A]
+  > ^ <`,
+		`  __\_/\_
+ ( -.- )[A]
+  > ^ <`,
+		` /=\_/\_
+ ( *.* )[▒]
+  > ^ <`,
+		`  __\_/\_
+ ( >.< )[█]
+  > ^ <`,
+		`    _
+  / \_/\_
+ ( ^.^ ) ✓
+  > ^ <`,
+		`  __\_/\_
+ ( o.o )[A]
+  > ^ <`,
+		` /=\_/\_
+ ( *.* )[▒]
+  > ^ <`,
+		`    _
+  / \_/\_
+ ( ^.^ ) ✓
+  > ^ <`,
+	},
+
 	// audit — detective raccoon, magnifying glass scans
 	"audit.sh": {
 		`    _
@@ -791,6 +822,7 @@ func resolveBinPath() string {
 func items() []item {
 	return []item{
 		{title: "upgrade", script: "upgrade.sh", description: "Update packages (brew, pip, npm, gem)"},
+		{title: "apps", script: "apps.sh", description: "Update GUI apps (App Store + casks)"},
 		{title: "audit", script: "audit.sh", description: "Security audit + fix"},
 		{title: "network", script: "network.sh", description: "Interfaces, Wi-Fi, DNS, routing"},
 		{title: "disk", script: "disk.sh", description: "Disk space, APFS, SMART status"},
@@ -1111,7 +1143,7 @@ func (m model) runningView() string {
 		if strings.TrimSpace(clean) == "" {
 			continue
 		}
-		b.WriteString(styleMuted.Render("  │ " + clean) + "\n")
+		b.WriteString(styleMuted.Render("  │ "+clean) + "\n")
 	}
 
 	b.WriteString("\n")
@@ -1162,7 +1194,7 @@ func (m model) outputView() string {
 		if len(clean) > m.width-4 {
 			clean = clean[:m.width-4]
 		}
-		b.WriteString(styleOutput.Render("  " + clean) + "\n")
+		b.WriteString(styleOutput.Render("  "+clean) + "\n")
 	}
 
 	// Scroll indicator
