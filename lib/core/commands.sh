@@ -1,7 +1,14 @@
 #!/bin/bash
 
-VERSION="$(git -C "${BASH_SOURCE[0]%/*}/../.." describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')"
+# Only derive the version from git in a real checkout. Without the .git
+# guard, `git describe` walks UP the directory tree and, for a Homebrew
+# install under /opt/homebrew, picks up Homebrew's own tag (e.g. 6.0.2).
+__rcc_root="${BASH_SOURCE[0]%/*}/../.."
+if [ -e "${__rcc_root}/.git" ]; then
+	VERSION="$(git -C "${__rcc_root}" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')"
+fi
 VERSION="${VERSION:-0.10.2}"
+unset __rcc_root
 
 TAGLINE="macOS companion toolkit"
 
