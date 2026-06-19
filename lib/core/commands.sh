@@ -1,13 +1,20 @@
 #!/bin/bash
 
-# Only derive the version from git in a real checkout. Without the .git
-# guard, `git describe` walks UP the directory tree and, for a Homebrew
-# install under /opt/homebrew, picks up Homebrew's own tag (e.g. 6.0.2).
+# Version resolution, most-authoritative first:
+#   1. a VERSION file stamped by the Homebrew formula (always the installed tag)
+#   2. git describe in a real checkout (dev)
+#   3. a generic dev fallback
+# The .git guard stops git describe from walking UP into an enclosing repo
+# (e.g. Homebrew's own /opt/homebrew/.git -> reported "6.0.2"). The `|| true`
+# stops `set -euo pipefail` from aborting when git describe fails, e.g. a CI
+# shallow checkout that has no tags.
 __rcc_root="${BASH_SOURCE[0]%/*}/../.."
-if [ -e "${__rcc_root}/.git" ]; then
-	VERSION="$(git -C "${__rcc_root}" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')"
+if [ -f "${__rcc_root}/VERSION" ]; then
+	VERSION="$(cat "${__rcc_root}/VERSION" 2>/dev/null || true)"
+elif [ -e "${__rcc_root}/.git" ]; then
+	VERSION="$(git -C "${__rcc_root}" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || true)"
 fi
-VERSION="${VERSION:-0.10.2}"
+VERSION="${VERSION:-dev}"
 unset __rcc_root
 
 TAGLINE="macOS companion toolkit"
