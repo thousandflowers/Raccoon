@@ -54,13 +54,20 @@ run_core_checks() {
 		fix_issue "Stealth Mode" "_sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on"
 	fi
 	
-	local updates
-	updates="$(softwareupdate -l 2>/dev/null | grep -c "Recommended Update" 2>/dev/null)" || true
-	[[ -z "$updates" ]] && updates="0"
-	if [[ "$updates" -eq 0 ]]; then
+	# softwareupdate -l output varies across macOS versions; the stable
+	# sentinel is "No new software available", and each pending update is a
+	# line beginning with "* ". The old grep for "Recommended Update" never
+	# matched modern output, so it always reported "Up to date".
+	local sw_output
+	sw_output="$(softwareupdate -l 2>&1)" || true
+	if echo "$sw_output" | grep -qi "No new software available"; then
 		core_results+=("pass:Software Updates: Up to date")
-	else
+	elif echo "$sw_output" | grep -qE '^[[:space:]]*\* '; then
+		local updates
+		updates="$(echo "$sw_output" | grep -cE '^[[:space:]]*\* ')"
 		core_results+=("warn:Software Updates: ${updates} pending")
+	else
+		core_results+=("warn:Software Updates: Unable to determine")
 	fi
 	
 	print_category "Core Security" "${core_results[@]}"
