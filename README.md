@@ -81,8 +81,6 @@ rcc audit --diff          # changes since last audit
 rcc audit watch           # schedule weekly scan via LaunchAgent
 ```
 
-<img src="docs/gifs/rcc-audit.gif" alt="rcc audit" width="600">
-
 ### 🖥️ System information
 
 ```bash
