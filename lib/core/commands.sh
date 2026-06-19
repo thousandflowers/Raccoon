@@ -9,6 +9,7 @@ reset_terminal() {
 
 MENU_ITEMS=(
     "upgrade:Update packages"
+    "apps:Update GUI apps (App Store + casks)"
     "audit:Security audit (quick)"
     "audit deep:Security audit (full)"
     "network:Network info"

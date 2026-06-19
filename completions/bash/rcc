@@ -19,7 +19,7 @@ _rcc() {
 			# shellcheck disable=SC2207,SC2016
 			COMPREPLY=($(compgen -W '$_rcc_audit_opts' -- "$cur"))
 			;;
-		upgrade)
+		upgrade|apps)
 			# shellcheck disable=SC2207
 			COMPREPLY=($(compgen -W '--dry-run -n --help -h' -- "$cur"))
 			;;
