@@ -1,7 +1,7 @@
 #!/bin/bash
 
 VERSION="$(git -C "${BASH_SOURCE[0]%/*}/../.." describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')"
-VERSION="${VERSION:-0.10.1}"
+VERSION="${VERSION:-0.10.2}"
 
 TAGLINE="macOS companion toolkit"
 
