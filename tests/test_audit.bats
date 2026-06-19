@@ -63,3 +63,17 @@ setup() {
 	[[ "$result" == *'"warning": 1'* ]]
 	[[ "$result" == *'"fail": 0'* ]]
 }
+
+# --- report rendering (regression: ragged boxes) ---
+
+@test "audit.sh: report box rows all align to one width" {
+	run bash -c "bash '$SCRIPT_DIR/bin/audit.sh' 2>/dev/null | python3 '$SCRIPT_DIR/tests/check_box_width.py'"
+	assert_output_contains "OK"
+}
+
+@test "audit.sh: _box_row pads to the border width" {
+	source "$SCRIPT_DIR/bin/audit.sh"
+	border="$(_box_border)"
+	row="$(_box_row "x hi" "x hi")"
+	[[ "${#border}" -eq "${#row}" ]]
+}

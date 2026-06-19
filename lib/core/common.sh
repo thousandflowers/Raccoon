@@ -129,6 +129,25 @@ pause_for_user() {
     echo ""
 }
 
+# Cache sudo credentials, preferring Touch ID. Returns 0 if sudo is usable.
+# Safe to call before a progress UI / from inside the TUI: when pam_tid is
+# configured, `sudo -v` triggers a GUI Touch ID dialog that needs no tty and
+# does not fight terminal rendering. Falls back to a tty password prompt only
+# when a real terminal is attached. Never hangs headless without pam_tid.
+ensure_sudo() {
+    [[ -n "${RACCOON_TEST:-}" ]] && return 1  # never prompt during tests
+    command -v sudo >/dev/null 2>&1 || return 1
+    sudo -n true 2>/dev/null && return 0  # already cached
+    if grep -qs pam_tid.so /etc/pam.d/sudo_local /etc/pam.d/sudo 2>/dev/null; then
+        # ponytail: Touch ID GUI; if the user dismisses it sudo falls back to a
+        # tty password read — degraded under a raw-mode TUI but not infinite.
+        sudo -v 2>/dev/null && return 0
+    elif [[ -t 0 ]]; then
+        sudo -v 2>/dev/null && return 0
+    fi
+    return 1
+}
+
 # Print a small help header consistent across all commands
 print_help_header() {
     local cmd="$1" desc="$2" extra="${3:-}"

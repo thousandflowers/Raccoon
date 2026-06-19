@@ -42,6 +42,7 @@ _rcc() {
       # shellcheck disable=SC2034
       local -a commands=(
         'upgrade:update package managers'
+        'apps:update GUI apps (App Store + casks)'
         'audit:security audit'
         'network:network interfaces and info'
         'disk:disk space and health'
@@ -67,7 +68,7 @@ _rcc() {
       # shellcheck disable=SC1087,SC2195
       case "$line[1]" in
         audit)  _rcc_audit_opts ;;
-        upgrade) _arguments '--dry-run[show what would be upgraded]' '-n[show what would be upgraded]' ;;
+        upgrade|apps) _arguments '--dry-run[show what would be upgraded]' '-n[show what would be upgraded]' ;;
       esac
       ;;
   esac

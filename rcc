@@ -21,6 +21,7 @@ case "${1:-""}" in
 		"ssh")     exec "${SCRIPT_DIR}/bin/ssh.sh" "${@:2}" ;;
 		"git")     exec "${SCRIPT_DIR}/bin/git.sh" "${@:2}" ;;
 		"upgrade") exec "${SCRIPT_DIR}/bin/upgrade.sh" "${@:2}" ;;
+		"apps")    exec "${SCRIPT_DIR}/bin/apps.sh" "${@:2}" ;;
 		"ports")   exec "${SCRIPT_DIR}/bin/ports.sh" "${@:2}" ;;
 		"battery") exec "${SCRIPT_DIR}/bin/battery.sh" "${@:2}" ;;
 		"backup")  exec "${SCRIPT_DIR}/bin/backup.sh" "${@:2}" ;;

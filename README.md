@@ -99,6 +99,8 @@ rcc backup                # Time Machine status
 ```bash
 rcc upgrade               # update brew, pip, npm, gem at once
 rcc upgrade --dry-run     # preview upgrades without running them
+rcc apps                  # update GUI apps (App Store + Homebrew casks)
+rcc apps --dry-run        # preview app updates without running them
 rcc ssh                   # inspect keys, --export, --export-gpg
 rcc git                   # status, branches, stash, cleanup
 rcc docker                # images, containers, volumes
@@ -122,6 +124,7 @@ rcc certs                 # SSL certificate expiry report
 
 | Command | Description |
 |---------|-------------|
+| `apps` | Update GUI apps (App Store + casks) |
 | `audit` | Security audit (30+ checks) |
 | `audit deep` | Full audit with sudo |
 | `audit fix` | Auto-fix security issues |

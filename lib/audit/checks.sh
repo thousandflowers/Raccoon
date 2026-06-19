@@ -332,7 +332,9 @@ run_additional_checks() {
 	fi
 
 	local quarantined
-	quarantined="$(xattr -lr ~/Downloads 2>/dev/null | grep -c "com.apple.quarantine" || echo "0")"
+	# grep -c already prints 0 on no match (and exits 1); `|| echo 0` would
+	# append a SECOND 0, producing "0\n0" and breaking the report row.
+	quarantined="$(xattr -lr ~/Downloads 2>/dev/null | grep -c "com.apple.quarantine" || true)"
 	if [[ "$quarantined" -eq 0 ]]; then
 		additional_results+=("pass:Quarantined Files: None")
 	else
