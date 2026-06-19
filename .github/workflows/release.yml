@@ -71,10 +71,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --title "${{ steps.version.outputs.tag }}" \
+          TAG="${{ steps.version.outputs.tag }}"
+          gh release create "$TAG" \
+            --title "$TAG" \
             --notes-file /tmp/release-notes.md \
-            bin/rcc-ui
+            bin/rcc-ui \
+          || gh release upload "$TAG" bin/rcc-ui --clobber
 
       - name: Compute tarball SHA256
         id: sha
@@ -86,8 +88,13 @@ jobs:
 
       - name: Update Homebrew formula
         env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.RACCOONTAPPUSH }}
         run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "ERROR: tap token is empty (secret RACCOONTAPPUSH not set?)"
+            exit 1
+          fi
+
           TAG="${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
           SHA256="${{ steps.sha.outputs.sha256 }}"
