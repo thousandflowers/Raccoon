@@ -281,7 +281,7 @@ main() {
 	local l1
 	l1=$(get_latency "1.1.1.1")
 	local connections
-	connections=$(netstat -an 2>/dev/null | grep -c "ESTABLISHED" || echo "0")
+	connections=$(netstat -an 2>/dev/null | grep -c "ESTABLISHED" || true)
 	printf "%-12s %-8s %s\n" "Server" "Latency" "Status"
 	echo "${GRAY}────────────────────────────────────────${NC}"
 	printf "%-12s %-8s %s\n" "8.8.8.8" "$l8" "${GREEN}✓${NC}"

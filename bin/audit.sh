@@ -21,6 +21,29 @@ count_lines() {
 	echo "${val// }"
 }
 
+# ── Box drawing ────────────────────────────────────────────
+# Every report row goes through _box_row so columns line up with the borders.
+# Single source of truth for width avoids the hand-counted padding drift that
+# made the old report ragged. Labels are ASCII so ${#plain} (bytes) == columns.
+BOX_INNER=39  # columns between the two '|' borders, including 1 leading space
+
+_box_border() {
+	printf '+%s+\n' "$(printf '%*s' "$BOX_INNER" '' | tr ' ' '-')"
+}
+
+# _box_row PLAIN RENDERED — pad RENDERED so the row width matches the border.
+# PLAIN is the same text without color codes / multibyte, used only for width.
+_box_row() {
+	local plain="$1" rendered="$2"
+	# Defense-in-depth: a stray newline from a check would split the row across
+	# lines and break the border. Collapse newlines so a row is always one line.
+	plain="${plain//$'\n'/ }"
+	rendered="${rendered//$'\n'/ }"
+	local pad=$((BOX_INNER - 1 - ${#plain}))
+	((pad < 0)) && pad=0
+	printf '| %s%*s|\n' "$rendered" "$pad" ''
+}
+
 SUDO_AVAILABLE=true
 _sudo() {
 	if [[ "${SUDO_AVAILABLE:-true}" != "true" ]] && [[ "$1" != "-v" ]]; then
@@ -146,7 +169,7 @@ print_result() {
 	local label="$2"
 	local icon=""
 	local colored_label=""
-	
+
 	if [[ "$status" == "pass" ]]; then
 		icon="${GREEN}✓${NC}"
 		colored_label="${GREEN}$label${NC}"
@@ -163,63 +186,56 @@ print_result() {
 		icon="${GRAY}○${NC}"
 		colored_label="${GRAY}$label${NC}"
 	fi
-	
-	local raw_len=${#label}
-	local pad_len=$((34 - raw_len))
-	local padding
-	padding=$(printf '%*s' "$pad_len" '')
-	
-	printf "│ %s %s%s │\n" "$icon" "$colored_label" "$padding"
-}
 
-echo_result() {
-	local status="$1"
-	local result="$2"
-	print_result "$status" "$result"
+	# icon is 1 display column; "x " is its ASCII width stand-in for measuring.
+	_box_row "x ${label}" "${icon} ${colored_label}"
 }
 
 print_category() {
 	local name="$1"
 	shift
 	local -a items=("$@")
-	
-	
+
 	echo ""
-	echo "+---------------------------------------+"
-	# Pad the title to the 38-column inner width ("| " + name + pad + "|").
-	local pad_str
-	pad_str=$(printf '%*s' $(( ${#name} < 38 ? 38 - ${#name} : 0 )) '')
-	echo "| ${CYAN}${name}${NC}${pad_str}|"
-	echo "+---------------------------------------+"
+	_box_border
+	_box_row "$name" "${CYAN}${name}${NC}"
+	_box_border
 
 	for item in "${items[@]}"; do
-		# shellcheck disable=SC2155
-		local status="$(echo "$item" | cut -d: -f1)" rest="$(echo "$item" | cut -d: -f2-)"
-		echo_result "$status" "$rest"
+		local status="${item%%:*}" rest="${item#*:}"
+		print_result "$status" "$rest"
 	done
-	
-	echo "+---------------------------------------+"
+
+	_box_border
+}
+
+# Summary count row: label padded to 8 cols so the numbers line up.
+_summary_row() {
+	local color="$1" label="$2" count="$3"
+	local body
+	body="$(printf '%-8s %s' "$label" "$count")"
+	_box_row "$body" "${color}$(printf '%-8s' "$label")${NC} $count"
 }
 
 print_summary() {
 	echo ""
-	echo "+---------------------------------------+"
-	echo "| ${PURPLE_BOLD}Summary${NC}                           |"
-	echo "+---------------------------------------+"
-	printf "| ${GREEN}Pass${NC}    | %5s                     |\n" "$PASS_count"
-	printf "| ${YELLOW}Warning${NC} | %5s                     |\n" "$WARN_count"
-	printf "| ${RED}Fail${NC}   | %5s                     |\n" "$FAIL_count"
-	echo "+---------------------------------------+"
+	_box_border
+	_box_row "Summary" "${PURPLE_BOLD}Summary${NC}"
+	_box_border
+	_summary_row "$GREEN" "Pass" "$PASS_count"
+	_summary_row "$YELLOW" "Warning" "$WARN_count"
+	_summary_row "$RED" "Fail" "$FAIL_count"
+	_box_border
 
 	if [[ $FAIL_count -eq 0 && $WARN_count -eq 0 ]]; then
-		echo "| ${GREEN}✓ All checks passed${NC}              |"
+		_box_row "x All checks passed" "${GREEN}✓ All checks passed${NC}"
 	elif [[ $FAIL_count -eq 0 ]]; then
-		echo "| ${YELLOW}⚠ No critical issues${NC}           |"
+		_box_row "x No critical issues" "${YELLOW}⚠ No critical issues${NC}"
 	else
-		echo "| ${RED}✗ Action required${NC}                |"
+		_box_row "x Action required" "${RED}✗ Action required${NC}"
 	fi
 
-	echo "+---------------------------------------+"
+	_box_border
 }
 
 save_to_history() {
@@ -462,12 +478,15 @@ fix_issue() {
 
 
 main() {
-	if ! _sudo -n true 2>/dev/null; then
-		if [[ -t 0 ]]; then
-			_sudo -v 2>/dev/null || true
-		else
-			echo "${YELLOW}⚠ Non-interactive: skip sudo-requiring checks${NC}" >&2
-			SUDO_AVAILABLE=false
+	# Touch ID (pam_tid) works even when launched headless from the TUI, so try
+	# it unconditionally rather than gating on a tty. Only mark sudo unavailable
+	# when auth genuinely can't happen.
+	if ensure_sudo; then
+		SUDO_AVAILABLE=true
+	else
+		SUDO_AVAILABLE=false
+		if [[ "$DEEP_SCAN" == "true" || "$QUIET_MODE" == "true" ]]; then
+			echo "${YELLOW}⚠ sudo unavailable (Touch ID declined or no terminal) — sudo checks skipped${NC}" >&2
 		fi
 	fi
 	

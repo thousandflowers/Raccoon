@@ -400,194 +400,6 @@ upgrade_gem() {
 	increment_global_progress
 }
 
-# ============================================================
-# Fallback output (non-TTY)
-# ============================================================
-
-_fallback_upgrade_homebrew() {
-	echo ""
-	print_section_header "Homebrew"
-	if ! command -v brew >/dev/null 2>&1; then
-		print_info "not installed"
-		return 0
-	fi
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		brew outdated 2>&1 || true
-	else
-		brew update 2>&1 || true
-		brew upgrade 2>&1 || true
-	fi
-}
-
-_fallback_upgrade_pip() {
-	echo ""
-	print_section_header "pip"
-	local pip_cmd=""
-	if command -v pip3 >/dev/null 2>&1; then
-		pip_cmd="pip3"
-	elif command -v pip >/dev/null 2>&1; then
-		pip_cmd="pip"
-	else
-		print_info "not installed"
-		return 0
-	fi
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		$pip_cmd list --outdated 2>&1 || true
-	else
-		$pip_cmd list --outdated --format=freeze 2>/dev/null |
-			grep -v '^\-e' | cut -d = -f 1 |
-			xargs -n1 $pip_cmd install --upgrade 2>&1 || true
-	fi
-}
-
-_fallback_upgrade_npm() {
-	echo ""
-	print_section_header "npm"
-	if ! command -v npm >/dev/null 2>&1; then
-		print_info "not installed"
-		return 0
-	fi
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		npm outdated -g 2>&1 || true
-	else
-		npm update -g 2>&1 || true
-	fi
-}
-
-_fallback_upgrade_nvm() {
-	echo ""
-	print_section_header "nvm"
-	local nvm_dir="${NVM_DIR:-$HOME/.nvm}"
-	local nvm_sh="$nvm_dir/nvm.sh"
-	if [[ ! -s "$nvm_sh" ]]; then
-		print_info "not installed"
-		return 0
-	fi
-	export NVM_DIR="$nvm_dir"
-	# shellcheck disable=SC1090
-	source "$nvm_sh" >/dev/null 2>&1
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		nvm version current 2>/dev/null || echo "system"
-		nvm version-remote --lts 2>/dev/null || echo "unknown"
-	else
-		nvm install --lts 2>&1 || true
-	fi
-}
-
-_fallback_upgrade_rustup() {
-	echo ""
-	print_section_header "rustup"
-	if ! command -v rustup >/dev/null 2>&1; then
-		print_info "not installed"
-		return 0
-	fi
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		rustup check 2>&1 || true
-	else
-		rustup update 2>&1 || true
-	fi
-}
-
-_fallback_upgrade_gem() {
-	echo ""
-	print_section_header "gem"
-	if ! command -v gem >/dev/null 2>&1; then
-		print_info "not installed"
-		return 0
-	fi
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		gem outdated 2>&1 || true
-	else
-		gem update 2>&1 || true
-	fi
-}
-
-_fallback_upgrade_pnpm() {
-	echo ""
-	print_section_header "pnpm"
-	if ! command -v pnpm >/dev/null 2>&1; then
-		print_info "not installed"
-		return 0
-	fi
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		echo "pnpm $(pnpm --version)"
-	else
-		pnpm up -g 2>&1 || true
-	fi
-}
-
-_fallback_upgrade_bun() {
-	echo ""
-	print_section_header "bun"
-	if ! command -v bun >/dev/null 2>&1; then
-		print_info "not installed"
-		return 0
-	fi
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		echo "bun $(bun --version)"
-	else
-		bun upgrade 2>&1 || true
-	fi
-}
-
-_fallback_upgrade_uv() {
-	echo ""
-	print_section_header "uv"
-	if ! command -v uv >/dev/null 2>&1; then
-		print_info "not installed"
-		return 0
-	fi
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		uv --version 2>&1 || true
-	else
-		uv self update 2>&1 || true
-		uv tool upgrade --all 2>&1 || true
-	fi
-}
-
-_fallback_upgrade_go() {
-	echo ""
-	print_section_header "go"
-	if ! command -v go >/dev/null 2>&1; then
-		print_info "not installed"
-		return 0
-	fi
-	go version 2>&1 || true
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		return 0
-	fi
-	go install golang.org/x/tools/gopls@latest 2>&1 || true
-	go install golang.org/x/tools/cmd/goimports@latest 2>&1 || true
-}
-
-_fallback_upgrade_docker() {
-	echo ""
-	print_section_header "docker"
-	if ! command -v docker >/dev/null 2>&1; then
-		print_info "not installed"
-		return 0
-	fi
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		echo "docker $(docker --version 2>/dev/null | head -1)"
-	else
-		docker image prune -af --filter until=24h 2>&1 || true
-	fi
-}
-
-_fallback_upgrade_claude() {
-	echo ""
-	print_section_header "claude"
-	if ! command -v claude >/dev/null 2>&1; then
-		print_info "not installed"
-		return 0
-	fi
-	if [[ "$RCC_DRY_RUN" == "true" ]]; then
-		echo "claude $(claude --version 2>/dev/null | head -1)"
-	else
-		claude update 2>&1 || true
-	fi
-}
-
 upgrade_pnpm() {
 	update_global_progress_info "pnpm: checking..."
 	if ! command -v pnpm >/dev/null 2>&1; then
@@ -786,6 +598,13 @@ main() {
 
 	# Pre-flight: handle tap trust before progress bar
 	_check_taps_preflight
+
+	# Cache sudo up front (Touch ID when available) so cask upgrades that need
+	# root actually complete. Mid-progress the 200ms redraw overwrites any sudo
+	# prompt, so the upgrade would silently stall and the package not update.
+	if [[ "$RCC_DRY_RUN" != "true" ]] && command -v brew >/dev/null 2>&1; then
+		ensure_sudo || echo "${YELLOW}⚠ sudo unavailable — casks needing root may be skipped${NC}"
+	fi
 
 	# ponytail: one progress slot per upgrade function
 	init_global_progress 30
