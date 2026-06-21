@@ -934,6 +934,12 @@ func startScript(binPath, script string) tea.Cmd {
 			return scriptOutput{line: scanner.Text(), scanner: scanner, cmd: cmd}
 		}
 		err := cmd.Wait()
+		// Scan() returning false can mean a read error (e.g. a line exceeding
+		// the 512KB buffer), not just EOF — surface it so a truncated stream
+		// isn't reported as success when the process happened to exit 0.
+		if se := scanner.Err(); se != nil && err == nil {
+			err = se
+		}
 		return scriptDone{err: err}
 	}
 }
@@ -946,6 +952,12 @@ func readLine(scanner *bufio.Scanner, cmd *exec.Cmd) tea.Cmd {
 			return scriptOutput{line: scanner.Text(), scanner: scanner, cmd: cmd}
 		}
 		err := cmd.Wait()
+		// Scan() returning false can mean a read error (e.g. a line exceeding
+		// the 512KB buffer), not just EOF — surface it so a truncated stream
+		// isn't reported as success when the process happened to exit 0.
+		if se := scanner.Err(); se != nil && err == nil {
+			err = se
+		}
 		return scriptDone{err: err}
 	}
 }
@@ -990,6 +1002,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, readLine(msg.scanner, msg.cmd)
 
 	case scriptDone:
+		// Ignore a scriptDone that arrives after the user already killed the
+		// script (state is back to stateMenu): the in-flight reader goroutine
+		// still fires one final scriptDone, which would otherwise yank the user
+		// into the output view of the script they just dismissed.
+		if m.state != stateRunning {
+			return m, nil
+		}
 		m.state = stateOutput
 		m.outputLines = append(m.outputLines, "") // spacer
 		if msg.err != nil {
@@ -1106,7 +1125,7 @@ func (m model) runningView() string {
 		if m.progressLabel != "" {
 			clean := stripANSI(m.progressLabel)
 			if len(clean) > sepLen-20 {
-				clean = clean[:sepLen-20]
+				clean = clean[:max(0, sepLen-20)]
 			}
 			b.WriteString("  " + styleProgressLabel.Render(clean))
 		}
@@ -1138,7 +1157,7 @@ func (m model) runningView() string {
 	for _, l := range lines[start:] {
 		clean := stripANSI(l)
 		if len(clean) > m.width-4 {
-			clean = clean[:m.width-4]
+			clean = clean[:max(0, m.width-4)]
 		}
 		if strings.TrimSpace(clean) == "" {
 			continue
@@ -1192,7 +1211,7 @@ func (m model) outputView() string {
 	for _, l := range m.outputLines[m.outputScroll:end] {
 		clean := stripANSI(l)
 		if len(clean) > m.width-4 {
-			clean = clean[:m.width-4]
+			clean = clean[:max(0, m.width-4)]
 		}
 		b.WriteString(styleOutput.Render("  "+clean) + "\n")
 	}
@@ -1334,7 +1353,14 @@ func main() {
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
+	finalModel, err := p.Run()
+	// Don't orphan a running child: on SIGTERM (or any exit while a script is
+	// mid-run, e.g. upgrade.sh) the program returns here with the child still
+	// alive — kill it before we exit.
+	if fm, ok := finalModel.(model); ok && fm.cmd != nil && fm.cmd.Process != nil {
+		_ = fm.cmd.Process.Kill()
+	}
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
