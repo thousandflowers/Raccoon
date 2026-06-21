@@ -195,7 +195,11 @@ _filter_menu_items() {
         n=$((n+1))
     done
     
-    echo "${filtered[@]}"
+    # One item per line: items contain spaces, so a space-joined echo would be
+    # re-split word-by-word by the caller and corrupt every multi-word entry.
+    if [[ ${#filtered[@]} -gt 0 ]]; then
+        printf '%s\n' "${filtered[@]}"
+    fi
 }
 
 _show_filtered_menu() {
@@ -231,7 +235,11 @@ _search_and_run() {
     
     local result
     result=$(_filter_menu_items "$query")
-    read -ra filtered <<< "$result"
+    # Read newline-delimited items; read -ra would split on spaces inside items.
+    local -a filtered=()
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && filtered+=("$line")
+    done <<< "$result"
     
     if [[ ${#filtered[@]} -eq 0 ]]; then
         echo ""
@@ -250,7 +258,7 @@ _search_and_run() {
     
     local sel=1
     while true; do
-        clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf $'\033[2J\033[H]'
+        clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf $'\033[2J\033[H'
         show_brand_banner
         _show_filtered_menu "$sel" "${filtered[@]}"
         
@@ -306,11 +314,11 @@ interactive_main_menu() {
     
     trap 'exit 0' INT
     
-    clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf $'\033[2J\033[H]'
+    clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf $'\033[2J\033[H'
     show_brand_banner
     
     while true; do
-        clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf $'\033[2J\033[H]'
+        clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf $'\033[2J\033[H'
         show_brand_banner
         show_menu "$cur"
         
@@ -322,8 +330,9 @@ interactive_main_menu() {
                 read -r -s -n 1 t
                 [[ "$t" == "A" ]] && ((cur > 1)) && cur=$((cur-1))
                 [[ "$t" == "B" ]] && ((cur < TOTAL_OPTIONS)) && cur=$((cur+1))
-                [[ $cur -eq 7 || $cur -eq 12 ]] && [[ "$t" == "A" ]] && cur=$((cur-1))
-                [[ $cur -eq 7 || $cur -eq 12 ]] && [[ "$t" == "B" ]] && cur=$((cur+1))
+                # Separators ("---") sit at 1-based positions 8 and 14; skip over them.
+                [[ $cur -eq 8 || $cur -eq 14 ]] && [[ "$t" == "A" ]] && cur=$((cur-1))
+                [[ $cur -eq 8 || $cur -eq 14 ]] && [[ "$t" == "B" ]] && cur=$((cur+1))
                 ;;
             "") run_cmd "$cur" ;;
             /)

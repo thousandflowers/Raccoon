@@ -112,7 +112,7 @@ main() {
 	print_table_row "Total running services|$running" 35 10
 	launchctl list 2>/dev/null | tail -n +2 | head -5 | awk '{print $3 "|" $1}' | while IFS='|' read -r svc pid; do
 		[[ -n "$svc" ]] && print_table_row "$svc|$pid" 35 10
-	done
+	done || true
 	echo "${GREEN}✓${NC}"
 
 	echo ""

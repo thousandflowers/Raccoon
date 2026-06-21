@@ -348,9 +348,13 @@ show_progress_bar() {
 		else
 			failed+=("$label")
 			if [[ "$is_tty" == "true" ]]; then
+				# Build the bar by loop, like render_bar: `printf '█%.0s' $current`
+				# passes $current as ONE arg, so it always printed exactly one block.
+				local _fbar="" _ebar="" _i
+				for ((_i=0; _i<current; _i++)); do _fbar+="█"; done
+				for ((_i=0; _i<total-current; _i++)); do _ebar+="░"; done
 				printf "\r[%s%s] %d/%d %s %s\n" \
-					"${GREEN}$(printf '█%.0s' $current 2>/dev/null)${NC}" \
-					"$(printf '░%.0s' $((total - current)) 2>/dev/null)" \
+					"${GREEN}${_fbar}${NC}" "${GRAY}${_ebar}${NC}" \
 					"$current" "$total" "$label" "${RED}✗ failed${NC}"
 			else
 				echo "${RED}✗ failed${NC}"
