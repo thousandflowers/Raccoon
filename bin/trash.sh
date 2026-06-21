@@ -62,7 +62,7 @@ main() {
 
 	local size count
 	size=$(du -sh "$trash_path" 2>/dev/null | awk '{print $1}' || echo "0")
-	count=$(find "$trash_path" -maxdepth 1 2>/dev/null | wc -l | xargs || echo "0")
+	count=$(find "$trash_path" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | xargs || echo "0")
 
 	print_table_row "Size|$size" 20 30
 	print_table_row "Items|$count files/folders" 20 30
@@ -88,7 +88,7 @@ main() {
 	ls -lt "$trash_path" 2>/dev/null | head -11 | tail -n +2 | while read -r line; do
 		# shellcheck disable=SC2034
 		local item_date='' item_name
-		item_name=$(echo "$line" | awk '{print $NF}')
+		item_name=$(echo "$line" | awk '{for(i=9;i<=NF;i++) printf "%s%s",$i,(i<NF?" ":"")}')
 		[[ -n "$item_name" ]] && print_table_row "$item_name" 40
 	done || print_table_row "${GRAY}empty${NC}" 40
 

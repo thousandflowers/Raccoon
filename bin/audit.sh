@@ -314,9 +314,9 @@ show_diff() {
 	local curr_fail="$FAIL_count"
 	
 	local prev_pass=0; local prev_warn=0; local prev_fail=0
-	prev_pass="$(grep -o '"pass": [0-9]*' "$prev_file" | grep -o '[0-9]*' | head -1)"
-	prev_warn="$(grep -o '"warning": [0-9]*' "$prev_file" | grep -o '[0-9]*' | head -1)"
-	prev_fail="$(grep -o '"fail": [0-9]*' "$prev_file" | grep -o '[0-9]*' | head -1)"
+	prev_pass="$(grep -o '"pass": [0-9]*' "$prev_file" | grep -o '[0-9]*' | head -1 || echo "0")"
+	prev_warn="$(grep -o '"warning": [0-9]*' "$prev_file" | grep -o '[0-9]*' | head -1 || echo "0")"
+	prev_fail="$(grep -o '"fail": [0-9]*' "$prev_file" | grep -o '[0-9]*' | head -1 || echo "0")"
 	
 	echo "  Previous: ${GREEN}Pass: $prev_pass${NC} ${YELLOW}Warn: $prev_warn${NC} ${RED}Fail: $prev_fail${NC}"
 	echo "  Current:  ${GREEN}Pass: $curr_pass${NC} ${YELLOW}Warn: $curr_warn${NC} ${RED}Fail: $curr_fail${NC}"

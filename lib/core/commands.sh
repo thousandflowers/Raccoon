@@ -124,32 +124,35 @@ run_cmd() {
     printf '\033[?25h'
     stty sane
     
+    # Cases are 1-based MENU_ITEMS positions. Keep in lockstep with MENU_ITEMS:
+    # positions 8 and 14 are "---" separators and have no command.
     local c="$1"
     case "$c" in
         1) exec "${SCRIPT_DIR}/bin/upgrade.sh" ;;
-        2) exec "${SCRIPT_DIR}/bin/audit.sh" ;;
-        3) exec "${SCRIPT_DIR}/bin/audit.sh" --deep ;;
-        4) exec "${SCRIPT_DIR}/bin/network.sh" ;;
-        5) exec "${SCRIPT_DIR}/bin/disk.sh" ;;
-        6) exec "${SCRIPT_DIR}/bin/memory.sh" ;;
-        7) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --quiet ;;
-        8) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --fix ;;
-        9) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --json ;;
-        10) exec "${SCRIPT_DIR}/bin/audit.sh" --history ;;
-        11) exec "${SCRIPT_DIR}/bin/audit.sh" --watch ;;
-        13) exec "${SCRIPT_DIR}/bin/ssh.sh" ;;
-        14) exec "${SCRIPT_DIR}/bin/git.sh" ;;
-        15) exec "${SCRIPT_DIR}/bin/ports.sh" ;;
-        16) exec "${SCRIPT_DIR}/bin/battery.sh" ;;
-        17) exec "${SCRIPT_DIR}/bin/backup.sh" ;;
-        18) exec "${SCRIPT_DIR}/bin/env.sh" ;;
-        19) exec "${SCRIPT_DIR}/bin/startup.sh" ;;
-        20) exec "${SCRIPT_DIR}/bin/trash.sh" ;;
-        21) exec "${SCRIPT_DIR}/bin/fonts.sh" ;;
-        22) exec "${SCRIPT_DIR}/bin/history.sh" ;;
-        23) exec "${SCRIPT_DIR}/bin/certs.sh" ;;
-        24) exec "${SCRIPT_DIR}/bin/docker.sh" ;;
-        25) exec "${SCRIPT_DIR}/bin/xcode.sh" ;;
+        2) exec "${SCRIPT_DIR}/bin/apps.sh" ;;
+        3) exec "${SCRIPT_DIR}/bin/audit.sh" ;;
+        4) exec "${SCRIPT_DIR}/bin/audit.sh" --deep ;;
+        5) exec "${SCRIPT_DIR}/bin/network.sh" ;;
+        6) exec "${SCRIPT_DIR}/bin/disk.sh" ;;
+        7) exec "${SCRIPT_DIR}/bin/memory.sh" ;;
+        9) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --quiet ;;
+        10) exec "${SCRIPT_DIR}/bin/audit.sh" --fix ;;
+        11) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --json ;;
+        12) exec "${SCRIPT_DIR}/bin/audit.sh" --history ;;
+        13) exec "${SCRIPT_DIR}/bin/audit.sh" --watch ;;
+        15) exec "${SCRIPT_DIR}/bin/ssh.sh" ;;
+        16) exec "${SCRIPT_DIR}/bin/git.sh" ;;
+        17) exec "${SCRIPT_DIR}/bin/ports.sh" ;;
+        18) exec "${SCRIPT_DIR}/bin/battery.sh" ;;
+        19) exec "${SCRIPT_DIR}/bin/backup.sh" ;;
+        20) exec "${SCRIPT_DIR}/bin/env.sh" ;;
+        21) exec "${SCRIPT_DIR}/bin/startup.sh" ;;
+        22) exec "${SCRIPT_DIR}/bin/trash.sh" ;;
+        23) exec "${SCRIPT_DIR}/bin/fonts.sh" ;;
+        24) exec "${SCRIPT_DIR}/bin/history.sh" ;;
+        25) exec "${SCRIPT_DIR}/bin/certs.sh" ;;
+        26) exec "${SCRIPT_DIR}/bin/docker.sh" ;;
+        27) exec "${SCRIPT_DIR}/bin/xcode.sh" ;;
     esac
 }
 

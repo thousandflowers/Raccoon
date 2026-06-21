@@ -79,9 +79,11 @@ main() {
 		local swap_out swap_total swap_used swap_avail
 		swap_out=$(sysctl vm.swapusage 2>/dev/null || true)
 		if [[ -n "$swap_out" ]]; then
-			swap_total=$(echo "$swap_out" | awk '{print $3}' | tr -d 'M')
-			swap_used=$(echo "$swap_out" | awk '{print $6}' | tr -d 'M')
-			swap_avail=$(echo "$swap_out" | awk '{print $9}' | tr -d 'M')
+			# sysctl: "vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M"
+			# the numbers are $4/$7/$10; $3/$6/$9 are the "=" signs.
+			swap_total=$(echo "$swap_out" | awk '{print $4}' | tr -d 'M')
+			swap_used=$(echo "$swap_out" | awk '{print $7}' | tr -d 'M')
+			swap_avail=$(echo "$swap_out" | awk '{print $10}' | tr -d 'M')
 			print_table_row "Swap Total|${swap_total} MB" 25 15
 			print_table_row "Swap Used|${swap_used} MB" 25 15
 			print_table_row "Swap Free|${swap_avail} MB" 25 15

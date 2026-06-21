@@ -481,7 +481,7 @@ upgrade_go() {
 		return 0
 	fi
 	# ponytail: only update gopls and goimports — well-known Go tools
-	increment_global_progress
+	# 2 slots total (one per tool), matching the not-installed and dry-run paths.
 	update_global_progress_info "go: updating gopls..."
 	go install golang.org/x/tools/gopls@latest 2>&1 | progress_pipe || true
 	increment_global_progress

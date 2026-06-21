@@ -50,7 +50,7 @@ main() {
 			local repo tag size
 			repo=$(echo "$line" | awk '{print $1}')
 			tag=$(echo "$line" | awk '{print $2}')
-			size=$(echo "$line" | awk '{print $7, $8}')
+			size=$(echo "$line" | awk '{print $NF}')
 			[[ -n "$repo" ]] && print_table_row "$repo|$tag|$size" 25 15 10
 		done
 	else
@@ -70,7 +70,7 @@ main() {
 			local cid image status
 			cid=$(echo "$line" | awk '{print $1}' | cut -c1-14)
 			image=$(echo "$line" | awk '{print $2}')
-			status=$(echo "$line" | awk '{print $NF}')
+			status=$(echo "$line" | awk '{print $5}')
 			[[ -n "$cid" ]] && print_table_row "$cid|$image|$status" 14 20 15
 		done
 	else
@@ -92,7 +92,7 @@ main() {
 			[[ -z "$line" ]] && continue
 			local vol_name driver
 			vol_name=$(echo "$line" | awk '{print $2}')
-			driver=$(echo "$line" | awk '{print $3}')
+			driver=$(echo "$line" | awk '{print $1}')
 			[[ -n "$vol_name" && "$vol_name" != "NAME" ]] && print_table_row "$vol_name|$driver" 30 15
 		done
 	else

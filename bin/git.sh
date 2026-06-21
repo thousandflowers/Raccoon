@@ -93,7 +93,9 @@ check_repo() {
 	fi
 
 	local no_upstream
-	no_upstream=$(git branch -vv 2>/dev/null | grep -v '\[' | grep -cE '^\s+\S' || true)
+	# Count branches with no upstream. The current branch is prefixed with "* "
+	# (not whitespace), so the old '^\s+\S' missed it; count every remaining line.
+	no_upstream=$(git branch -vv 2>/dev/null | grep -v '\[' | grep -c '.' || true)
 	if [[ "$no_upstream" -gt 0 ]]; then
 		has_issue=1
 		issues+="${YELLOW}$no_upstream no upstream${NC}"
@@ -136,7 +138,7 @@ main() {
 
 	for repo in "${repos[@]}"; do
 		local result
-		result=$(check_repo "$repo")
+		result=$(check_repo "$repo") || true
 		if [[ -n "$result" ]]; then
 			((repos_with_issues++)) || true
 			repo_issues+=("$result")

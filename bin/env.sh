@@ -88,6 +88,7 @@ check_duplicate_path() {
 	for dir in "${path_parts[@]}"; do
 		if echo "$seen" | grep -qxF "$dir"; then
 			print_table_row "$dir|${YELLOW}duplicate${NC}" 45 10
+			duplicates+="$dir"
 		else
 			seen+=$'\n'"$dir"
 		fi
