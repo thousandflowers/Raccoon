@@ -53,10 +53,13 @@ main() {
 
 	if [[ -n "$vm_stat_out" ]]; then
 		local pages_wired pages_active pages_compressed pages_inactive
-		pages_wired=$(echo "$vm_stat_out" | grep "Pages wired" | awk '{print $3}' | tr -d '.')
-		pages_active=$(echo "$vm_stat_out" | grep "Pages active" | awk '{print $3}' | tr -d '.')
-		pages_compressed=$(echo "$vm_stat_out" | grep "Pages occupied" | awk '{print $5}' | tr -d '.')
-		pages_inactive=$(echo "$vm_stat_out" | grep "Pages inactive" | awk '{print $3}' | tr -d '.')
+		# vm_stat right-aligns the page count as the LAST field on each line,
+		# e.g. "Pages wired down:   178539." — taking a fixed $3/$5 picks up
+		# label words ("down:") and breaks the later arithmetic under set -u.
+		pages_wired=$(echo "$vm_stat_out" | grep "Pages wired" | awk '{print $NF}' | tr -d '.' || true)
+		pages_active=$(echo "$vm_stat_out" | grep "Pages active" | awk '{print $NF}' | tr -d '.' || true)
+		pages_compressed=$(echo "$vm_stat_out" | grep "Pages occupied" | awk '{print $NF}' | tr -d '.' || true)
+		pages_inactive=$(echo "$vm_stat_out" | grep "Pages inactive" | awk '{print $NF}' | tr -d '.' || true)
 
 		local total_gb wired_mb active_mb compressed_mb cached_mb
 		total_gb=$((total_mem / 1024 / 1024 / 1024))

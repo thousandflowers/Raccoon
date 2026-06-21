@@ -42,20 +42,20 @@ main() {
 
 	# ponytail: only physical disks from diskutil list (internal + external)
 	local disk_lines disk_line disk_id disk_type disk_info disk_size smart smart_colored
-	disk_lines=$(diskutil list 2>/dev/null | grep '(physical)')
+	disk_lines=$(diskutil list 2>/dev/null | grep '(physical)' || true)
 	if [[ -n "$disk_lines" ]]; then
 		while IFS= read -r disk_line; do
 			[[ -z "$disk_line" ]] && continue
 			disk_id=$(echo "$disk_line" | sed 's|/dev/||' | awk '{print $1}')
-			disk_type=$(echo "$disk_line" | grep -oE '(internal|external)')
-			disk_info=$(diskutil info "$disk_id" 2>/dev/null)
-			disk_size=$(echo "$disk_info" | grep "Disk Size" | head -1 | awk '{print $3, $4}')
-			smart=$(echo "$disk_info" | grep "SMART Status" | head -1 | awk '{print $3}')
+			disk_type=$(echo "$disk_line" | grep -oE '(internal|external)' || true)
+			disk_info=$(diskutil info "$disk_id" 2>/dev/null || true)
+			disk_size=$(echo "$disk_info" | grep "Disk Size" | head -1 | awk '{print $3, $4}' || true)
+			smart=$(echo "$disk_info" | grep "SMART Status" | head -1 | awk '{print $3}' || true)
 			# ponytail: mount point from the first volume on this disk
 			# We extract from df lines that start with /dev/[disk_id]s
 			local mount_found mount_line
 			mount_found=""
-			mount_line=$(df -h 2>/dev/null | grep "^/dev/${disk_id}s" | head -1 | awk '{print $NF}')
+			mount_line=$(df -h 2>/dev/null | grep "^/dev/${disk_id}s" | head -1 | awk '{print $NF}' || true)
 			[[ -n "$mount_line" ]] && mount_found="$mount_line"
 			case "$smart" in
 				Verified) smart_colored="${GREEN}Verified${NC}" ;;
@@ -101,10 +101,10 @@ main() {
 	print_table_header "Container|Size|Free" 18 12 12
 
 	local container_info container_ref container_size container_line container_free
-	container_info=$(diskutil apfs list 2>/dev/null)
-	container_ref=$(echo "$container_info" | grep "Container Reference:" | head -1 | awk '{print $NF}')
-	container_size=$(echo "$container_info" | grep "Size (Capacity Ceiling):" | head -1 | sed 's/.*(\([0-9.]*\) GB.*/\1 GB/')
-	container_line=$(echo "$container_info" | grep "Capacity Not Allocated:" | head -1)
+	container_info=$(diskutil apfs list 2>/dev/null || true)
+	container_ref=$(echo "$container_info" | grep "Container Reference:" | head -1 | awk '{print $NF}' || true)
+	container_size=$(echo "$container_info" | grep "Size (Capacity Ceiling):" | head -1 | sed 's/.*(\([0-9.]*\) GB.*/\1 GB/' || true)
+	container_line=$(echo "$container_info" | grep "Capacity Not Allocated:" | head -1 || true)
 	# shellcheck disable=SC2001
 	container_free=$(echo "$container_line" | sed 's/.*(\([0-9.]*\) GB.*/\1 GB/')
 	print_table_row "$container_ref|$container_size|$container_free" 18 12 12

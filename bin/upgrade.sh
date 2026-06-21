@@ -603,7 +603,14 @@ main() {
 	# root actually complete. Mid-progress the 200ms redraw overwrites any sudo
 	# prompt, so the upgrade would silently stall and the package not update.
 	if [[ "$RCC_DRY_RUN" != "true" ]] && command -v brew >/dev/null 2>&1; then
-		ensure_sudo || echo "${YELLOW}⚠ sudo unavailable — casks needing root may be skipped${NC}"
+		if ensure_sudo; then
+			# Refresh the timestamp across the whole (possibly >5min) run so a
+			# cask/npm sudo never re-prompts mid-progress and gets garbled.
+			trap stop_sudo_keepalive EXIT
+			start_sudo_keepalive
+		else
+			echo "${YELLOW}⚠ sudo unavailable — casks needing root may be skipped${NC}"
+		fi
 	fi
 
 	# ponytail: one progress slot per upgrade function
