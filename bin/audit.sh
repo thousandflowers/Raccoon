@@ -14,6 +14,13 @@ WARN_count=0
 FAIL_count=0
 declare -a FIX_QUEUE=()
 
+# Fixes that mutate user data snapshot the original here first, so a wrong
+# auto-fix is recoverable. Created lazily (only when a fix actually runs).
+FIX_BACKUP_DIR="$HOME/.raccoon/fix-backups/$(date +%Y%m%d-%H%M%S)"
+# Per-machine opt-out: check names listed in ~/.raccoon/audit.conf are never
+# auto-fixed. A config that looks unusual on one Mac may be legitimate on another.
+FIX_SKIP=""
+
 # Count lines from stdin, return 0 on empty (avoids wc whitespace + null boilerplate)
 count_lines() {
 	local val
@@ -73,6 +80,11 @@ show_audit_help() {
 	echo "  --alert       Alert on new issues"
 	echo "  --notify      Send notification on issues"
 	echo "  --help, -h    Show this help"
+	echo ""
+	echo "Safety:"
+	echo "  Destructive fixes snapshot originals to ~/.raccoon/fix-backups/ first."
+	echo "  Opt a machine out of specific fixes: list check names in"
+	echo "  ~/.raccoon/audit.conf (one per line, # for comments)."
 }
 
 DEEP_SCAN=false
@@ -445,9 +457,36 @@ print_output_json() {
 	echo "}"
 }
 
+# Lazily create and echo the per-run backup dir. Same path on every call within
+# a run, so multiple snapshots from one fix command land in the same folder.
+_fix_backup_dir() {
+	mkdir -p "$FIX_BACKUP_DIR" 2>/dev/null || true
+	echo "$FIX_BACKUP_DIR"
+}
+
+# Load the per-machine fix opt-out list (one check name per line, # comments).
+load_fix_skips() {
+	local conf="$HOME/.raccoon/audit.conf"
+	[[ -f "$conf" ]] || return 0
+	FIX_SKIP="$(grep -v '^[[:space:]]*#' "$conf" | grep -v '^[[:space:]]*$' || true)"
+}
+
+# True when CHECK_NAME is opted out of auto-fix by ~/.raccoon/audit.conf.
+# ponytail: exact-name skip list. Add per-value baselines (expected DNS, etc.)
+# only if someone actually needs finer control than "fix this / don't".
+_fix_skipped() {
+	[[ -n "$FIX_SKIP" ]] && grep -Fxq "$1" <<<"$FIX_SKIP"
+}
+
 fix_issue() {
 	local check_name="$1"
 	local fix_cmd="$2"
+
+	# Per-machine opt-out wins over everything: never queue, never apply.
+	if _fix_skipped "$check_name"; then
+		[[ "$QUIET_MODE" != "true" ]] && echo "  ${GRAY}ℹ Skipped (audit.conf): $check_name${NC}"
+		return
+	fi
 
 	if [[ "$AUTO_FIX" == "true" ]]; then
 		if [[ "$FIX_DRY_RUN" == "true" ]]; then
@@ -464,7 +503,8 @@ fix_issue() {
 		fi
 
 		print_warning "Fixing: $check_name"
-		if eval "$fix_cmd" 2>/dev/null; then
+		# No 2>/dev/null: a failing fix must show why, not vanish silently.
+		if eval "$fix_cmd"; then
 			print_success "Fixed $check_name"
 		else
 			print_error "Fix failed: $check_name"
@@ -478,6 +518,8 @@ fix_issue() {
 
 
 main() {
+	load_fix_skips
+
 	# Touch ID (pam_tid) works even when launched headless from the TUI, so try
 	# it unconditionally rather than gating on a tty. Only mark sudo unavailable
 	# when auth genuinely can't happen.
@@ -556,7 +598,8 @@ main() {
 					echo "  ${GRAY}ℹ Skipped: ${fix_cmd#MANUAL:}${NC}"
 				else
 					print_warning "Fixing: $check_name"
-					if eval "$fix_cmd" 2>/dev/null; then
+					# No 2>/dev/null: surface why a fix failed.
+					if eval "$fix_cmd"; then
 					print_success "Fixed $check_name"
 				else
 					print_error "Fix failed: $check_name"
