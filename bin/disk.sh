@@ -83,14 +83,19 @@ main() {
 		vol_free=$(echo "$vol_line" | awk '{print $4}')
 		local vol_name
 		vol_name=$(basename "$vol_mount")
-		# Skip synthesized system volumes, show user-relevant ones
-		# ponytail: skip if not from a physical disk, map auto_home, and devfs
 		[[ "$vol_dev" == "map"* ]] && continue
 		[[ "$vol_dev" == "devfs" ]] && continue
-		[[ "$vol_dev" == "/dev/disk3s1s1" ]] && vol_name="System" && vol_mount="/"
+		# Show only user-relevant volumes: the boot volume (/), the Data volume,
+		# and any external mounts. Hide the synthesized helpers that share the
+		# APFS container (Preboot, VM, Update, Recovery, xarts, iSCPreboot, …).
+		case "$vol_mount" in
+			/) vol_name="System" ;;
+			/System/Volumes/Data) vol_name="Data" ;;
+			/System/Volumes/*) continue ;;
+		esac
 		print_table_row "$vol_name|$vol_mount|APFS|$vol_used|$vol_free" 22 22 8 10 10
 		((vol_count++)) || true
-	done < <(df -h 2>/dev/null | grep "^/dev/disk" | grep -v "^/dev/disk3s1s1$")
+	done < <(df -h 2>/dev/null | grep "^/dev/disk")
 	if [[ $vol_count -eq 0 ]]; then
 		print_table_row "System|/|APFS|?|?" 22 22 8 10 10
 	fi
@@ -124,9 +129,14 @@ main() {
 		sp_used=$(echo "$sp_line" | awk '{print $3}')
 		sp_free=$(echo "$sp_line" | awk '{print $4}')
 		sp_pct=$(echo "$sp_line" | awk '{print $5}')
+		# Same filter as [2/5]: hide synthesized helper volumes, keep / + Data.
+		case "$sp_mount" in
+			/System/Volumes/Data) ;;
+			/System/Volumes/*) continue ;;
+		esac
 		print_table_row "$sp_mount|$sp_used|$sp_free|$sp_pct" 22 10 10 10
 		((space_count++)) || true
-	done < <(df -h 2>/dev/null | grep "^/dev/disk" | grep -v "^/dev/disk3s1s1$")
+	done < <(df -h 2>/dev/null | grep "^/dev/disk")
 	if [[ $space_count -eq 0 ]]; then
 		print_table_row "/|?|?|?" 22 10 10 10
 	fi
