@@ -129,7 +129,7 @@ main() {
 	print_table_header "Port|Service|Description" 8 15 30
 	local port_found=0
 	local ports
-	ports=$(lsof -i -P -n 2>/dev/null | grep LISTEN | grep -vE "^COMMAND" | awk '{print $2}' | sed 's/.*:://' | sed 's/(.*//' | sort -u || true)
+	ports=$(lsof -i -P -n 2>/dev/null | grep LISTEN | grep -vE "^COMMAND" | awk '{print $9}' | sed 's/.*://' | sort -u || true)
 	while IFS= read -r port; do
 		[[ -z "$port" ]] && continue
 		local type

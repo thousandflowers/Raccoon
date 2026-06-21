@@ -82,7 +82,10 @@ main() {
 	echo "  ${GRAY}Installed platforms:${NC}"
 
 	local xcode_path
-	xcode_path=$(xcode-select -p 2>/dev/null | sed 's/\/Contents\/Developer//')
+	# xcode-select -p IS the developer dir (…/Contents/Developer), where
+	# Platforms/ lives — don't strip it off, or the dir check below always fails.
+	# Exits non-zero when no dev dir is configured, so fall back to empty.
+	xcode_path=$(xcode-select -p 2>/dev/null) || xcode_path=""
 	if [[ -n "$xcode_path" && -d "$xcode_path/Platforms" ]]; then
 		find "$xcode_path/Platforms" -maxdepth 1 2>/dev/null | while read -r platform; do
 			[[ -n "$platform" ]] && print_table_row "$platform" 40

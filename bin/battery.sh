@@ -35,24 +35,24 @@ get_battery_info() {
 	battery_info=$(system_profiler SPPowerDataType 2>/dev/null)
 
 	local cycle_count
-	cycle_count=$(echo "$battery_info" | grep -i "Cycle Count" | awk '{print $NF}' | tr -d ':')
+	cycle_count=$(echo "$battery_info" | grep -i "Cycle Count" | awk '{print $NF}' | tr -d ':') || cycle_count=""
 
 	local max_capacity
-	max_capacity=$(echo "$battery_info" | grep -i "Maximum Capacity" | awk '{print $NF}' | tr -d '%')
+	max_capacity=$(echo "$battery_info" | grep -i "Maximum Capacity" | awk '{print $NF}' | tr -d '%') || max_capacity=""
 
 	local condition
-	condition=$(echo "$battery_info" | grep -i "Condition" | awk '{for(i=2;i<=NF;i++) printf "%s ", $i}' | sed 's/ *$//')
+	condition=$(echo "$battery_info" | grep -i "Condition" | awk '{for(i=2;i<=NF;i++) printf "%s ", $i}' | sed 's/ *$//') || condition=""
 
 	local is_charging
-	is_charging=$(echo "$battery_info" | grep -i "Charging:" | awk '{print $NF}')
+	is_charging=$(echo "$battery_info" | grep -i "Charging:" | awk '{print $NF}') || is_charging=""
 
 	local is_full
-	is_full=$(echo "$battery_info" | grep -i "Fully Charged:" | awk '{print $NF}')
+	is_full=$(echo "$battery_info" | grep -i "Fully Charged:" | awk '{print $NF}') || is_full=""
 
 	local charge_percent
 	charge_percent=$(echo "$battery_info" | \
 		grep -iE "State of Charge|Current Charge" | \
-		grep -oE '[0-9]+' | head -1)
+		grep -oE '[0-9]+' | head -1) || charge_percent=""
 
 	if [[ -z "$charge_percent" ]]; then
 		charge_percent=$(pmset -g batt 2>/dev/null | \

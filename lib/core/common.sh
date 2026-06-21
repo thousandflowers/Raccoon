@@ -138,14 +138,37 @@ ensure_sudo() {
     [[ -n "${RACCOON_TEST:-}" ]] && return 1  # never prompt during tests
     command -v sudo >/dev/null 2>&1 || return 1
     sudo -n true 2>/dev/null && return 0  # already cached
+    # Explain why, and DO NOT swallow the "Password:" prompt: it goes to stderr,
+    # and hiding it (the old `sudo -v 2>/dev/null`) made rcc look like it hung
+    # waiting on nothing (issue #23). Keep the prompt visible.
+    printf '%s\n' "${GRAY}rcc needs sudo for upgrades that touch system paths (casks, global npm).${NC}" >&2
     if grep -qs pam_tid.so /etc/pam.d/sudo_local /etc/pam.d/sudo 2>/dev/null; then
-        # ponytail: Touch ID GUI; if the user dismisses it sudo falls back to a
-        # tty password read — degraded under a raw-mode TUI but not infinite.
-        sudo -v 2>/dev/null && return 0
+        # Touch ID GUI; if the user dismisses it, sudo falls back to a visible
+        # tty password read.
+        sudo -v && return 0
     elif [[ -t 0 ]]; then
-        sudo -v 2>/dev/null && return 0
+        sudo -v && return 0
     fi
     return 1
+}
+
+# Keep the cached sudo timestamp fresh in the background for the duration of a
+# long command, so a later sudo (Homebrew cask, global npm) never re-prompts
+# mid-progress — where the ~200ms TUI redraw would scramble the password read
+# and sudo would reject the garbled input (issue #23). No-op unless sudo is
+# already cached. Always pair with stop_sudo_keepalive.
+_RCC_SUDO_KEEPALIVE_PID=""
+start_sudo_keepalive() {
+    [[ -n "${RACCOON_TEST:-}" ]] && return 0
+    sudo -n true 2>/dev/null || return 0   # only if already authenticated
+    # $$ inside the subshell is the script's PID: the loop dies with the script.
+    ( while true; do sudo -n true 2>/dev/null; sleep 50; kill -0 "$$" 2>/dev/null || exit; done ) &
+    _RCC_SUDO_KEEPALIVE_PID=$!
+    disown 2>/dev/null || true
+}
+stop_sudo_keepalive() {
+    [[ -n "$_RCC_SUDO_KEEPALIVE_PID" ]] && kill "$_RCC_SUDO_KEEPALIVE_PID" 2>/dev/null || true
+    _RCC_SUDO_KEEPALIVE_PID=""
 }
 
 # Print a small help header consistent across all commands
@@ -276,7 +299,10 @@ show_progress_bar() {
 		local label="${step%%:*}"
 		local cmd="${step#*:}"
 
-		((current++))
+		# NOT ((current++)): bash 5 returns the pre-increment value (0 on the
+		# first step) as exit status 1, which aborts the whole run under set -e
+		# (e.g. when the TUI runs this via Homebrew bash). $((...)) is immune.
+		current=$((current + 1))
 
 		if [[ "$is_tty" == "true" ]]; then
 			render_bar $((current - 1)) "$label..."
@@ -322,9 +348,13 @@ show_progress_bar() {
 		else
 			failed+=("$label")
 			if [[ "$is_tty" == "true" ]]; then
+				# Build the bar by loop, like render_bar: `printf '█%.0s' $current`
+				# passes $current as ONE arg, so it always printed exactly one block.
+				local _fbar="" _ebar="" _i
+				for ((_i=0; _i<current; _i++)); do _fbar+="█"; done
+				for ((_i=0; _i<total-current; _i++)); do _ebar+="░"; done
 				printf "\r[%s%s] %d/%d %s %s\n" \
-					"${GREEN}$(printf '█%.0s' $current 2>/dev/null)${NC}" \
-					"$(printf '░%.0s' $((total - current)) 2>/dev/null)" \
+					"${GREEN}${_fbar}${NC}" "${GRAY}${_ebar}${NC}" \
 					"$current" "$total" "$label" "${RED}✗ failed${NC}"
 			else
 				echo "${RED}✗ failed${NC}"

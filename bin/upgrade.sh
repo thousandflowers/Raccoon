@@ -105,12 +105,14 @@ _parse_nvm() {
 
 _parse_rustup() {
 	local line="$1"
-	if [[ -n "$line" && "$line" != *"info:"* ]]; then
-		update_global_progress_info "rustup: $line"
-	elif [[ "$line" == *"updated"* ]]; then
+	# Specific outcomes first: the generic non-"info:" catch-all below would
+	# otherwise swallow "updated"/"unchanged" lines and print them raw.
+	if [[ "$line" == *"updated"* ]]; then
 		update_global_progress_info "rustup: updated"
 	elif [[ "$line" == *"unchanged"* ]]; then
 		update_global_progress_info "rustup: unchanged"
+	elif [[ -n "$line" && "$line" != *"info:"* ]]; then
+		update_global_progress_info "rustup: $line"
 	fi
 }
 
@@ -371,7 +373,7 @@ upgrade_gem() {
 	if [[ ! -w "$gem_dir" ]]; then
 		append_progress_output "gem: ⚠ $gem_dir not writable — use rbenv or gem install --user-install"
 		update_global_progress_info "gem: permission error, skipping"
-		increment_global_progress
+		# 3 slots total with the increment at line 366 above (matches every other gem path).
 		increment_global_progress
 		increment_global_progress
 		return 0
@@ -397,6 +399,8 @@ upgrade_gem() {
 	update_global_progress_info "gem: updating..."
 	gem update 2>&1 | progress_pipe _parse_gem || true
 
+	# 3 slots total with the increment at line 366 above (matches every other gem path).
+	increment_global_progress
 	increment_global_progress
 }
 
@@ -477,7 +481,7 @@ upgrade_go() {
 		return 0
 	fi
 	# ponytail: only update gopls and goimports — well-known Go tools
-	increment_global_progress
+	# 2 slots total (one per tool), matching the not-installed and dry-run paths.
 	update_global_progress_info "go: updating gopls..."
 	go install golang.org/x/tools/gopls@latest 2>&1 | progress_pipe || true
 	increment_global_progress
@@ -603,7 +607,14 @@ main() {
 	# root actually complete. Mid-progress the 200ms redraw overwrites any sudo
 	# prompt, so the upgrade would silently stall and the package not update.
 	if [[ "$RCC_DRY_RUN" != "true" ]] && command -v brew >/dev/null 2>&1; then
-		ensure_sudo || echo "${YELLOW}⚠ sudo unavailable — casks needing root may be skipped${NC}"
+		if ensure_sudo; then
+			# Refresh the timestamp across the whole (possibly >5min) run so a
+			# cask/npm sudo never re-prompts mid-progress and gets garbled.
+			trap stop_sudo_keepalive EXIT
+			start_sudo_keepalive
+		else
+			echo "${YELLOW}⚠ sudo unavailable — casks needing root may be skipped${NC}"
+		fi
 	fi
 
 	# ponytail: one progress slot per upgrade function

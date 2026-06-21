@@ -23,10 +23,11 @@ show_certs_help() {
 JSON_OUTPUT=false
 SHOW_EXPIRED=false
 SHOW_EXPIRING=0
+EXPIRING_WINDOW=30
 SHOW_DETAIL=false
 
-for arg in "$@"; do
-	case "$arg" in
+while [[ $# -gt 0 ]]; do
+	case "$1" in
 	--help | -h)
 		show_certs_help
 		exit 0
@@ -37,7 +38,14 @@ for arg in "$@"; do
 		SHOW_EXPIRED=true
 		;;
 	--expiring)
-		SHOW_EXPIRING=30
+		# Optional numeric arg: "--expiring 7" -> within 7 days; bare --expiring -> 30.
+		if [[ "${2:-}" =~ ^[0-9]+$ ]]; then
+			SHOW_EXPIRING="$2"
+			EXPIRING_WINDOW="$2"
+			shift
+		else
+			SHOW_EXPIRING=30
+		fi
 		;;
 	--detail)
 		SHOW_DETAIL=true
@@ -45,6 +53,7 @@ for arg in "$@"; do
 	*)
 		;;
 	esac
+	shift
 done
 
 main() {
@@ -98,7 +107,7 @@ for cert in certs:
         
         if diff < 0:
             status = 'expired'
-        elif diff <= 30:
+        elif diff <= ${EXPIRING_WINDOW}:
             status = 'expiring'
         else:
             status = 'valid'
@@ -125,7 +134,9 @@ print(f'SUMMARY:{total}|{valid}|{expiring}|{expired}|{selfsigned}')
 ")
 	
 	local summary
-	summary=$(echo "$details" | grep "SUMMARY:")
+	# Strip the "SUMMARY:" prefix so cut -f1 is `total`, not "SUMMARY:total"
+	# (the prefix used to merge with field 1, shifting every column by one).
+	summary=$(echo "$details" | grep "SUMMARY:" | sed 's/^SUMMARY://')
 	local cert_lines
 	cert_lines=$(echo "$details" | grep -v "SUMMARY:")
 	
@@ -137,11 +148,11 @@ print(f'SUMMARY:{total}|{valid}|{expiring}|{expired}|{selfsigned}')
 	selfsigned=0
 	
 	if [[ -n "$summary" ]]; then
-		total=$(echo "$summary" | cut -d'|' -f2)
-		valid=$(echo "$summary" | cut -d'|' -f3)
-		expiring=$(echo "$summary" | cut -d'|' -f4)
-		expired=$(echo "$summary" | cut -d'|' -f5)
-		selfsigned=$(echo "$summary" | cut -d'|' -f6)
+		total=$(echo "$summary" | cut -d'|' -f1)
+		valid=$(echo "$summary" | cut -d'|' -f2)
+		expiring=$(echo "$summary" | cut -d'|' -f3)
+		expired=$(echo "$summary" | cut -d'|' -f4)
+		selfsigned=$(echo "$summary" | cut -d'|' -f5)
 	fi
 	
 	printf "%-12s %12s %12s %12s %12s\n" "Total" "Valid" "Expiring" "Expired" "Self-Signed"

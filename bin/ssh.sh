@@ -50,7 +50,7 @@ check_unprotected_keys() {
 			if ssh-keygen -y -P "" -f "$key" >/dev/null 2>&1; then
 				local key_type=""
 				if [[ -f "${key}.pub" ]]; then
-					key_type=$(ssh-keygen -l -f "${key}.pub" 2>/dev/null | awk '{print $4}' || echo "?")
+					key_type=$(ssh-keygen -l -f "${key}.pub" 2>/dev/null | awk '{print $NF}' || echo "?")
 				else
 					key_type="?"
 				fi
@@ -133,7 +133,7 @@ if [[ "${1:-}" == "--export" ]]; then
 		echo "✓ Public key ${keyname}.pub copied to clipboard"
 	else
 		echo "✗ Key not found: ~/.ssh/${keyname}.pub" >&2
-		return 1
+		exit 1
 	fi
 	exit 0
 fi
@@ -144,11 +144,13 @@ if [[ "${1:-}" == "--export-gpg" ]]; then
 	if [[ -z "$gpg_key" ]]; then
 		gpg --list-keys --keyid-format LONG 2>/dev/null || echo "No GPG keys found"
 	else
-		if gpg --export --armor "$gpg_key" 2>/dev/null | pbcopy; then
+		gpg_out=$(gpg --export --armor "$gpg_key" 2>/dev/null)
+		if [[ -n "$gpg_out" ]]; then
+			printf '%s' "$gpg_out" | pbcopy
 			echo "✓ GPG public key $gpg_key copied to clipboard"
 		else
 			echo "✗ GPG key not found: $gpg_key" >&2
-			return 1
+			exit 1
 		fi
 	fi
 	exit 0

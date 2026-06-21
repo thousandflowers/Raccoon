@@ -38,15 +38,10 @@ main() {
 	print_section_header "Fonts Status"
 
 	local sys_fonts user_fonts
-	sys_fonts=$(find /Library/Fonts -maxdepth 1 -type f 2>/dev/null | wc -l | xargs || echo "0")
-	user_fonts=$(find ~/Library/Fonts -maxdepth 1 -type f 2>/dev/null | wc -l | xargs || echo "0")
-
-	local sys_fonts
-	sys_fonts=$(find /Library/Fonts/ -maxdepth 1 2>/dev/null | wc -l | xargs || echo "0")
+	sys_fonts=$(find /Library/Fonts -mindepth 1 -maxdepth 1 -type f 2>/dev/null | wc -l | xargs || echo "0")
 	print_table_row "/Library/Fonts/|$sys_fonts" 25 20
 
-	local user_fonts
-	user_fonts=$(find "$HOME/Library/Fonts/" -maxdepth 1 2>/dev/null | wc -l | xargs || echo "0")
+	user_fonts=$(find "$HOME/Library/Fonts" -mindepth 1 -maxdepth 1 -type f 2>/dev/null | wc -l | xargs || echo "0")
 	print_table_row "$HOME/Library/Fonts/|$user_fonts" 25 20
 
 	print_success "Font sources scanned"

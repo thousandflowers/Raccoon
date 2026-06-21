@@ -31,8 +31,10 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
+		JSON_OUTPUT=true
 		;;
 	--empty)
+		EMPTY_TRASH=true
 		;;
 	*)
 		;;
@@ -40,9 +42,24 @@ for arg in "$@"; do
 done
 
 main() {
-	print_section_header "Trash Status"
-
 	local trash_path="$HOME/.Trash"
+
+	# JSON is a clean machine-readable fast-path: emit only the object, no tables.
+	if [[ "$JSON_OUTPUT" == "true" ]]; then
+		local size="0" count="0"
+		if [[ -d "$trash_path" ]]; then
+			# Absorb a failing find/du INSIDE the pipe (|| true) — a trailing
+			# `|| echo 0` would concatenate onto wc's "0" and break the JSON.
+			size=$( { du -sh "$trash_path" 2>/dev/null || true; } | awk '{print $1}')
+			[[ -z "$size" ]] && size="0"
+			count=$( { find "$trash_path" -mindepth 1 -maxdepth 1 2>/dev/null || true; } | wc -l | tr -dc '0-9')
+			[[ -z "$count" ]] && count="0"
+		fi
+		printf '{"path":"%s","size":"%s","count":%s}\n' "$trash_path" "$size" "$count"
+		return 0
+	fi
+
+	print_section_header "Trash Status"
 
 	echo "${GRAY}[1/3] Trash Location...${NC}"
 	print_table_header "Setting|Value" 20 30
@@ -62,7 +79,7 @@ main() {
 
 	local size count
 	size=$(du -sh "$trash_path" 2>/dev/null | awk '{print $1}' || echo "0")
-	count=$(find "$trash_path" -maxdepth 1 2>/dev/null | wc -l | xargs || echo "0")
+	count=$(find "$trash_path" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | xargs || echo "0")
 
 	print_table_row "Size|$size" 20 30
 	print_table_row "Items|$count files/folders" 20 30
@@ -88,7 +105,7 @@ main() {
 	ls -lt "$trash_path" 2>/dev/null | head -11 | tail -n +2 | while read -r line; do
 		# shellcheck disable=SC2034
 		local item_date='' item_name
-		item_name=$(echo "$line" | awk '{print $NF}')
+		item_name=$(echo "$line" | awk '{for(i=9;i<=NF;i++) printf "%s%s",$i,(i<NF?" ":"")}')
 		[[ -n "$item_name" ]] && print_table_row "$item_name" 40
 	done || print_table_row "${GRAY}empty${NC}" 40
 
@@ -96,8 +113,11 @@ main() {
 
 	if [[ "$EMPTY_TRASH" == "true" ]]; then
 		echo ""
-		echo -n "Empty the trash? [y/N] "
-		read -r answer
+		local answer="n"
+		if [[ -z "${RACCOON_TEST:-}" ]]; then
+			echo -n "Empty the trash? [y/N] "
+			read -r answer || answer="n"   # don't abort under set -e on EOF (pipe/TUI)
+		fi
 		if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
 			osascript -e 'tell application "Finder" to empty trash' 2>/dev/null || rm -rf "${trash_path:?}"/*
 			echo "${GREEN}✓ Trash emptied${NC}"

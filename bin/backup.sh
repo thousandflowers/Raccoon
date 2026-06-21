@@ -72,7 +72,7 @@ check_last_backup() {
 	fi
 
 	local backup_date
-	backup_date=$(basename "$last_backup" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)
+	backup_date=$(basename "$last_backup" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || echo "")
 
 	local now
 	now=$(date +%s)
