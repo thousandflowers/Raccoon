@@ -26,6 +26,7 @@ jobs:
             install \
             lib/core/common.sh \
             lib/core/commands.sh \
+            lib/audit/checks.sh \
             bin/*.sh \
             completions/bash/rcc
 

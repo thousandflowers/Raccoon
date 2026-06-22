@@ -92,8 +92,10 @@ run_network_checks() {
 	if [[ -n "$dns_servers" ]]; then
 		network_results+=("pass:DNS Servers: ${dns_servers}")
 	else
-		network_results+=("warn:DNS Servers: None configured")
-		fix_issue "DNS Servers" "networksetup -setdnsservers Wi-Fi 8.8.8.8"
+		# No *manually* configured resolver is the normal DHCP case, not a
+		# problem. Forcing a public DNS (e.g. Google 8.8.8.8) would override a
+		# legitimate local/VPN/Tailscale setup, so report — don't "fix".
+		network_results+=("pass:DNS Servers: DHCP-provided")
 	fi
 
 	local vpn_count
@@ -185,7 +187,7 @@ run_auth_checks() {
 		auth_results+=("pass:Authorized Keys: None")
 	else
 		auth_results+=("warn:Authorized Keys: ${auth_keys_count} key(s)")
-		fix_issue "Authorized Keys" "rm ~/.ssh/authorized_keys"
+		fix_issue "Authorized Keys" "cp ~/.ssh/authorized_keys \"\$(_fix_backup_dir)/\" && rm ~/.ssh/authorized_keys"
 	fi
 
 	local sudoers_check
@@ -213,7 +215,7 @@ run_persistence_checks() {
 		persistence_results+=("pass:User LaunchAgents: ${user_la_count} items")
 	else
 		persistence_results+=("warn:User LaunchAgents: ${user_la_count} items")
-		fix_issue "User LaunchAgents" "rm -rf ~/Library/LaunchAgents/*.plist 2>/dev/null; echo 'Removed user launch agents'"
+		fix_issue "User LaunchAgents" "cp ~/Library/LaunchAgents/*.plist \"\$(_fix_backup_dir)/\" 2>/dev/null; rm -f ~/Library/LaunchAgents/*.plist; echo 'Removed user launch agents (backup saved)'"
 	fi
 
 	local sys_la_count
@@ -250,7 +252,7 @@ run_persistence_checks() {
 		persistence_results+=("pass:Cron Jobs: None")
 	else
 		persistence_results+=("warn:Cron Jobs: ${cron_count} jobs")
-		fix_issue "Cron Jobs" "crontab -r 2>/dev/null || true"
+		fix_issue "Cron Jobs" "crontab -l > \"\$(_fix_backup_dir)/crontab.txt\" 2>/dev/null; crontab -r 2>/dev/null || true"
 	fi
 
 	local at_count
@@ -274,7 +276,7 @@ run_persistence_checks() {
 		persistence_results+=("pass:Login Items: ${li_count} items")
 	else
 		persistence_results+=("warn:Login Items: ${li_count} items")
-		fix_issue "Login Items" "osascript -e 'tell application \"System Events\" to delete every login item' 2>/dev/null || true"
+		fix_issue "Login Items" "osascript -e 'tell application \"System Events\" to get the name of every login item' > \"\$(_fix_backup_dir)/login-items.txt\" 2>/dev/null; osascript -e 'tell application \"System Events\" to delete every login item' 2>/dev/null || true"
 	fi
 	
 	print_category "Persistence" "${persistence_results[@]}"
@@ -345,8 +347,10 @@ run_additional_checks() {
 	if [[ "$quarantined" -eq 0 ]]; then
 		additional_results+=("pass:Quarantined Files: None")
 	else
-		additional_results+=("warn:Quarantined Files: ${quarantined}")
-		fix_issue "Quarantined Files" "find ~/Downloads -xattr -r -d com.apple.quarantine 2>/dev/null || true"
+		# Quarantine IS Gatekeeper working as intended. Recursively stripping it
+		# would bypass malware checks on un-reviewed downloads — the opposite of
+		# what a security audit should do. Report only.
+		additional_results+=("pass:Quarantined Files: ${quarantined} (Gatekeeper active)")
 	fi
 
 	local kext_count

@@ -20,6 +20,7 @@ jobs:
           shellcheck -S warning -x \
             rcc install.sh install \
             lib/core/common.sh lib/core/commands.sh \
+            lib/audit/checks.sh \
             bin/*.sh completions/bash/rcc
       - name: Install bats
         run: brew install bats-core

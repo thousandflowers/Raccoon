@@ -81,6 +81,23 @@ rcc audit --diff          # changes since last audit
 rcc audit watch           # schedule weekly scan via LaunchAgent
 ```
 
+**Safe by default.** `--fix` never imposes a one-size-fits-all setting — a config
+that looks odd on one Mac is often legitimate on another:
+
+- Destructive fixes (cron, SSH `authorized_keys`, LaunchAgents, login items)
+  snapshot the originals to `~/.raccoon/fix-backups/<timestamp>/` before changing
+  anything, so a wrong fix is recoverable.
+- Raccoon never sets a public DNS resolver for you or strips the Gatekeeper
+  quarantine flag — both would silently weaken a working setup.
+- Opt a machine out of any fix: list its check names in `~/.raccoon/audit.conf`,
+  one per line (`#` for comments). Those checks are reported but never auto-fixed.
+
+```bash
+# ~/.raccoon/audit.conf — never auto-fix these on this Mac
+Cron Jobs
+User LaunchAgents
+```
+
 ### 🖥️ System information
 
 ```bash
