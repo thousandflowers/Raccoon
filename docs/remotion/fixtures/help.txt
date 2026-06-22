@@ -1,0 +1,31 @@
+Raccoon version 0.11.0
+macOS companion toolkit
+
+Commands:
+  rcc upgrade:Update packages
+  rcc apps:Update GUI apps (App Store + casks)
+  rcc audit:Security audit (quick)
+  rcc audit deep:Security audit (full)
+  rcc network:Network info
+  rcc disk:Disk space
+  rcc memory:Memory usage
+  rcc audit quiet:audit --quiet
+  rcc audit fix:audit --fix
+  rcc audit json:audit --json
+  rcc audit history:audit --history
+  rcc audit watch:audit --watch
+  rcc ssh:SSH keys
+  rcc git:Git repos
+  rcc ports:Open ports
+  rcc battery:Battery health
+  rcc backup:Time Machine
+  rcc env:Environment
+  rcc startup:Launch agents
+  rcc trash:Trash
+  rcc fonts:Fonts
+  rcc history:Shell history
+  rcc certs:SSL certificates
+  rcc docker:Docker
+  rcc xcode:Xcode
+
+Run 'rcc' for interactive menu

@@ -1,0 +1,57 @@
++---------------------------------------+
+| Core Security                         |
++---------------------------------------+
+| ✓ FileVault: Enabled                  |
+| ✓ SIP: Enabled                        |
+| ✓ Gatekeeper: Enabled                 |
+| ✗ Firewall: Disabled                  |
+| ⚠ Stealth Mode: Disabled              |
+| ✓ Software Updates: Up to date        |
++---------------------------------------+
+
++---------------------------------------+
+| Network                               |
++---------------------------------------+
+| ✓ Open Ports: 3 listening             |
+| ✓ DNS Servers: DHCP-provided          |
+| ✓ VPN: None configured                |
+| ⚠ Bluetooth: On                       |
+| ✓ Sharing: None enabled               |
+| ✓ SSH Daemon: Disabled                |
++---------------------------------------+
+
++---------------------------------------+
+| User & Auth                           |
++---------------------------------------+
+| ✓ Auto-Login: Disabled                |
+| ✓ Keychain: 3 available               |
+| ✓ Authorized Keys: None               |
+| ✓ Sudoers: OK                         |
++---------------------------------------+
+
++---------------------------------------+
+| Persistence                           |
++---------------------------------------+
+| ✓ User LaunchAgents: 4 items          |
+| ✓ Cron Jobs: None                     |
+| ✓ Login Items: 9 items                |
++---------------------------------------+
+
++---------------------------------------+
+| Additional                            |
++---------------------------------------+
+| ✓ XProtect: Active                    |
+| ✓ Quarantined Files: 3 (Gatekeeper)   |
+| ✓ .ssh Permissions: Secure            |
++---------------------------------------+
+
+  Summary:  18 pass   2 warn   1 fail
+
+  Would fix (--dry-run):
+    → Firewall: socketfilterfw --enable
+    → Stealth Mode: --setstealthmode on
+
+  ℹ Destructive fixes back up to ~/.raccoon/fix-backups/ first.
+  ℹ Opt out per machine via ~/.raccoon/audit.conf.
+
+✓ Completed

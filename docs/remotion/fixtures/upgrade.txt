@@ -1,0 +1,86 @@
+DRY RUN MODE - no changes made
+
+__RCC_PROGRESS__:0:30:Initializing...
+__RCC_PROGRESS__:0:30:brew: checking...
+__RCC_PROGRESS__:0:30:brew: dry run
+brew: up to date
+__RCC_PROGRESS__:1:30:brew: dry run
+__RCC_PROGRESS__:2:30:brew: dry run
+__RCC_PROGRESS__:3:30:brew: dry run
+__RCC_PROGRESS__:3:30:pip: checking...
+__RCC_PROGRESS__:4:30:pip: checking...
+__RCC_PROGRESS__:4:30:pip: dry run
+pip: outdated packages found
+Package         Version   Latest    Type
+--------------- --------- --------- -----
+anthropic       0.97.0    0.111.0   wheel
+certifi         2026.4.22 2026.6.17 wheel
+decorator       5.2.1     5.3.1     wheel
+docutils        0.22.4    0.23      wheel
+hf-xet          1.5.0     1.5.1     wheel
+huggingface_hub 0.36.2    1.8.0     wheel
+idna            3.13      3.18      wheel
+jiter           0.14.0    0.15.0    wheel
+lxml            6.1.0     6.1.1     wheel
+mpmath          1.3.0     1.4.1     wheel
+nh3             0.3.5     0.3.6     wheel
+openai          2.38.0    2.43.0    wheel
+pydantic        2.13.3    2.13.4    wheel
+pydantic_core   2.46.3    2.46.4    wheel
+rawpy           0.26.1    0.27.0    wheel
+setuptools      69.5.1    82.0.1    wheel
+tiktoken        0.12.0    0.13.0    wheel
+tqdm            4.67.3    4.68.3    wheel
+__RCC_PROGRESS__:5:30:pip: dry run
+__RCC_PROGRESS__:6:30:pip: dry run
+__RCC_PROGRESS__:6:30:npm: checking...
+__RCC_PROGRESS__:7:30:npm: checking...
+__RCC_PROGRESS__:7:30:npm: dry run
+__RCC_PROGRESS__:8:30:npm: dry run
+__RCC_PROGRESS__:9:30:npm: dry run
+__RCC_PROGRESS__:9:30:pnpm: checking...
+pnpm: not installed
+__RCC_PROGRESS__:10:30:pnpm: checking...
+__RCC_PROGRESS__:11:30:pnpm: checking...
+__RCC_PROGRESS__:11:30:bun: checking...
+__RCC_PROGRESS__:11:30:bun: dry run
+__RCC_PROGRESS__:12:30:bun: dry run
+__RCC_PROGRESS__:13:30:bun: dry run
+__RCC_PROGRESS__:13:30:uv: checking...
+__RCC_PROGRESS__:13:30:uv: dry run
+__RCC_PROGRESS__:14:30:uv: dry run
+__RCC_PROGRESS__:15:30:uv: dry run
+__RCC_PROGRESS__:15:30:go: checking...
+__RCC_PROGRESS__:15:30:go: go1.26.4
+__RCC_PROGRESS__:16:30:go: go1.26.4
+__RCC_PROGRESS__:17:30:go: go1.26.4
+__RCC_PROGRESS__:17:30:nvm: checking...
+__RCC_PROGRESS__:17:30:nvm: dry run
+nvm: v20.20.2 -> v24.17.0
+__RCC_PROGRESS__:18:30:nvm: dry run
+__RCC_PROGRESS__:19:30:nvm: dry run
+__RCC_PROGRESS__:20:30:nvm: dry run
+__RCC_PROGRESS__:20:30:rustup: checking...
+__RCC_PROGRESS__:20:30:rustup: not installed
+rustup: not installed
+__RCC_PROGRESS__:21:30:rustup: not installed
+__RCC_PROGRESS__:22:30:rustup: not installed
+__RCC_PROGRESS__:23:30:rustup: not installed
+__RCC_PROGRESS__:23:30:gem: checking...
+__RCC_PROGRESS__:24:30:gem: checking...
+gem: ⚠ /Library/Ruby/Gems not writable — use rbenv or gem install --user-install
+__RCC_PROGRESS__:24:30:gem: permission error, skipping
+__RCC_PROGRESS__:25:30:gem: permission error, skipping
+__RCC_PROGRESS__:26:30:gem: permission error, skipping
+__RCC_PROGRESS__:26:30:docker: checking...
+__RCC_PROGRESS__:26:30:docker: dry run
+docker: would prune images
+__RCC_PROGRESS__:27:30:docker: dry run
+__RCC_PROGRESS__:28:30:docker: dry run
+__RCC_PROGRESS__:28:30:claude: checking...
+__RCC_PROGRESS__:28:30:claude: dry run
+__RCC_PROGRESS__:29:30:claude: dry run
+__RCC_PROGRESS__:30:30:claude: dry run
+
+
+✓ Completed

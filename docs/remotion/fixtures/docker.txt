@@ -1,0 +1,28 @@
+
+-- Docker Status
+
+[1/4] Docker Images...
+| Repository                | Tag             | Size       |
+| ------------------------- | --------------- | ---------- |
+| No images found           | -               | -          |
+✓
+
+[2/4] Docker Containers...
+| Container ID   | Image                | Status          |
+| -------------- | -------------------- | --------------- |
+| No containers found | -                    | -               |
+✓
+
+[3/4] Docker Volumes...
+| Volume Name                    | Driver          |
+| ------------------------------ | --------------- |
+| No volumes found               | -               |
+✓
+
+[4/4] Space Usage...
+| Type                      | Size                 |
+| ------------------------- | -------------------- |
+| Could not get info        | -                    |
+✓
+
+✓ Completed

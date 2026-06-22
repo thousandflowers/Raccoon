@@ -1,0 +1,13 @@
+
+-- Battery Status
+
+| Metric          | Value                |
+| --------------- | -------------------- |
+| Cycle Count     | 640                  |
+| Max Capacity    | 85% (good)           |
+| Condition       | Normal               |
+| Charge Level    | 91%                  |
+| Charging        | Yes                  |
+| Fully Charged   | No                   |
+
+✓ Completed

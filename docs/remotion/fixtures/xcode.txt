@@ -1,0 +1,36 @@
+
+-- Xcode Status
+
+[1/4] iOS Simulators...
+  Available simulators:
+| No simulators found                      |
+✓
+
+[2/4] DerivedData...
+| Metric               | Value                |
+| -------------------- | -------------------- |
+| Size                 | 0B                   |
+| Projects             | 1                    |
+✓
+
+[3/4] Device Support...
+  Installed platforms:
+| /Applications/Xcode.app/Contents/Developer/Platforms |
+| /Applications/Xcode.app/Contents/Developer/Platforms/AppleTVOS.platform |
+| /Applications/Xcode.app/Contents/Developer/Platforms/DriverKit.platform |
+| /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform |
+| /Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform |
+| /Applications/Xcode.app/Contents/Developer/Platforms/XROS.platform |
+| /Applications/Xcode.app/Contents/Developer/Platforms/XRSimulator.platform |
+| /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform |
+| /Applications/Xcode.app/Contents/Developer/Platforms/WatchSimulator.platform |
+| /Applications/Xcode.app/Contents/Developer/Platforms/AppleTVSimulator.platform |
+| /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform |
+✓
+
+[4/4] Xcode Version...
+  Version info:
+| Xcode 26.5                               |
+✓
+
+✓ Completed

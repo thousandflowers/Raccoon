@@ -1,0 +1,12 @@
+┌────────────────────────────────────────────────┐
+│  Raccoon                                         │
+│  macOS companion toolkit                         │
+│                                                  │
+│   upgrade    audit      network    disk          │
+│   memory     ssh        git        ports         │
+│   battery    backup     env        startup       │
+│   trash      fonts      history    certs         │
+│   docker     xcode                               │
+│                                                  │
+│   ←→ Navigate · ↑↓ Rows · Enter Run · Q Quit     │
+└────────────────────────────────────────────────┘

@@ -1,0 +1,30 @@
+
+-- Memory Usage
+
+| Metric                    | Value           |
+| ------------------------- | --------------- |
+| Total RAM                 | 16 GB           |
+| Wired                     | 2836 MB         |
+| Active                    | 3301 MB         |
+| Cached                    | 3340 MB         |
+| Compressed                | 5769 MB         |
+| Swap Total                | 6144.00 MB      |
+| Swap Used                 | 5434.12 MB      |
+| Swap Free                 | 709.88 MB       |
+
+| PID      | COMMAND                        | RSS (MB)   |
+| -------- | ------------------------------ | ---------- |
+| 14752    | /Applications/Dia.app/Contents/MacOS/Dia | 710        |
+| 2738     | claude                         | 523        |
+| 46776    | /Applications/Spotify.app/Contents/Frameworks/Spotify | 451        |
+| 17242    | /Applications/Dia.app/Contents/Frameworks/ArcCore.framework/Helpers/Browser | 441        |
+| 46757    | /Applications/Spotify.app/Contents/MacOS/Spotify | 298        |
+| 95155    | /Applications/Dia.app/Contents/Frameworks/ArcCore.framework/Helpers/Browser | 271        |
+| 40818    | /Applications/Dia.app/Contents/Frameworks/ArcCore.framework/Helpers/Browser | 244        |
+| 20964    | Raycast                        | 195        |
+| 77954    | /Applications/WhatsApp.app/Contents/MacOS/WhatsApp | 164        |
+| 90562    | /Applications/Dia.app/Contents/Frameworks/ArcCore.framework/Helpers/Browser | 151        |
+
+| Total RSS: 12686 MB |
+
+✓ Completed

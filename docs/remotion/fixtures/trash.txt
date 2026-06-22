@@ -1,0 +1,21 @@
+
+-- Trash Status
+
+[1/3] Trash Location...
+| Setting              | Value                          |
+| -------------------- | ------------------------------ |
+| Path                 | /Users/alex/.Trash |
+✓
+
+[2/3] Trash Contents...
+| Size                 | 0                              |
+| Items                | 0                              |
+✓
+
+[3/3] Recent Items (Last 10)...
+| Item                                     |
+| ---------------------------------------- |
+| empty                                    |
+✓
+
+✓ Completed

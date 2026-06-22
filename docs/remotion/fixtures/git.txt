@@ -1,0 +1,25 @@
+
+-- Git Repositories
+
+| Repository                               | Issues               |
+| ---------------------------------------- | -------------------- |
+| alex                  | 325 uncommitted, 1 stashed, 3 no upstream |
+| .nvm                                     | detached HEAD, 1 no upstream |
+| research-tool                         | 23 uncommitted,      |
+| file-forge                                | 65 uncommitted, 1 no upstream |
+| whiteboard-app                         | 1 uncommitted, 1 no upstream |
+| local-llm                               | 2 uncommitted,       |
+| qr-scanner                             | 1 no upstream        |
+| Raccoon                                  | 3 uncommitted,       |
+| text-refine                              | 43 uncommitted, 1 no upstream |
+| wardrobe                                 | 8 uncommitted, 1 no upstream |
+| homebrew-tap                        | 1 uncommitted,       |
+| llm-quant                     | 1 no upstream        |
+| mactools                                 | 1 uncommitted,       |
+| skills                              | 1 uncommitted,       |
+| qr-scanner                            | 2 no upstream        |
+| fast-3d                           | 1 uncommitted,       |
+| chess-bot               | 8 uncommitted,       |
+| zero-app                                 | 5 uncommitted,       |
+
+✓ Completed

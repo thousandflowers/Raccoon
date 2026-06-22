@@ -1,0 +1,58 @@
+
+-- Startup Items
+
+[1/6] User LaunchAgents...
+| Item                                     |
+| ---------------------------------------- |
+| ✓ iMazing2Mac.Mini                     |
+| ✓ GC.Invoker-1.0                       |
+| ✓ ccxprocess                           |
+| ✓ cotypist-watchdog                    |
+| Total: 4 items                           |
+✓
+
+[2/6] System LaunchAgents...
+| Source                         | Count      |
+| ------------------------------ | ---------- |
+| /Library/LaunchAgents/         | 7          |
+✓
+
+[3/6] LaunchDaemons...
+| Source                         | Count      |
+| ------------------------------ | ---------- |
+| /Library/LaunchDaemons/        | 15         |
+✓
+
+[4/6] Login Items...
+| Item                                     |
+| ---------------------------------------- |
+| ✓ Notion                               |
+| ✓ Raycast                              |
+| ✓ AutoRaise                            |
+| ✓ AdobeResourceSynchronizer            |
+| ✓ PhotoSync Companion                  |
+| ✓ Tailscale                            |
+| ✓ DockDoor                             |
+| ✓ Raycast Beta                         |
+| ✓ FigmaAgent                           |
+✓
+
+[5/6] Running Services...
+| Service                             | PID        |
+| ----------------------------------- | ---------- |
+| Total running services              | 551        |
+| io.tailscale.ipn.macsys.login-item-helper | -          |
+| com.apple.SafariHistoryServiceAgent | -          |
+| com.apple.progressd                 | -          |
+| com.apple.enhancedloggingd          | -          |
+| com.apple.cloudphotod               | -          |
+✓
+
+[6/6] System Uptime...
+| Metric                                   |
+| ---------------------------------------- |
+| Uptime: 2 days,  5:47                    |
+| Load: 4.17 3.71 4.39                     |
+✓
+
+✓ Completed
