@@ -133,6 +133,38 @@ rcc history               # shell history analysis
 rcc certs                 # SSL certificate expiry report
 ```
 
+<details>
+<summary>📸 Command demos</summary>
+
+**Security**
+
+![audit](docs/gifs/rcc-audit.gif)
+
+**System info**
+
+![disk](docs/gifs/rcc-disk.gif)
+![network](docs/gifs/rcc-network.gif)
+![memory](docs/gifs/rcc-memory.gif)
+![ports](docs/gifs/rcc-ports.gif)
+![battery](docs/gifs/rcc-battery.gif)
+![backup](docs/gifs/rcc-backup.gif)
+
+**Developer tools**
+
+![upgrade](docs/gifs/rcc-upgrade.gif)
+![docker](docs/gifs/rcc-docker.gif)
+![git](docs/gifs/rcc-git.gif)
+![xcode](docs/gifs/rcc-xcode.gif)
+![certs](docs/gifs/rcc-certs.gif)
+
+**Maintenance**
+
+![startup](docs/gifs/rcc-startup.gif)
+![trash](docs/gifs/rcc-trash.gif)
+![fonts](docs/gifs/rcc-fonts.gif)
+
+</details>
+
 ---
 
 ## All commands
