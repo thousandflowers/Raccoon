@@ -1,7 +1,7 @@
 # 🦝 Raccoon
 
 <p align="center">
-  <img src="docs/gifs/rcc-menu.gif" alt="Raccoon Hero" width="800">
+  <img src="docs/gifs/hero.gif" alt="Raccoon Hero" width="800">
 </p>
 
 > macOS companion toolkit — system info, security audits, dev tools, all from one terminal.
