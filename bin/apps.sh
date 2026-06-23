@@ -94,6 +94,11 @@ update_casks() {
 update_mas() {
 	update_global_progress_info "mas: checking..."
 
+	# mas prints spurious "not indexed in Spotlight" warnings to stderr for
+	# every App Store app; we capture 2>&1, so without this they flood the
+	# buffer and get mislabeled "outdated apps found". mas's own fix:
+	export MAS_NO_AUTO_INDEX=1
+
 	if ! command -v mas >/dev/null 2>&1; then
 		append_progress_output "mas: not installed — run 'brew install mas'"
 		increment_global_progress
