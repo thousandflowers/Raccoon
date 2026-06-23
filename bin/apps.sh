@@ -139,6 +139,19 @@ main() {
 		echo ""
 	fi
 
+	# Cache sudo up front (Touch ID when available) so `brew upgrade --cask
+	# --greedy` casks that need root complete without a prompt mid-progress.
+	# The 200ms progress redraw overwrites/garbles an inline sudo prompt, which
+	# is why brew's sudo password got rejected through `rcc apps` (issue #23).
+	if [[ "$RCC_DRY_RUN" != "true" ]] && command -v brew >/dev/null 2>&1; then
+		if ensure_sudo; then
+			trap stop_sudo_keepalive EXIT
+			start_sudo_keepalive
+		else
+			echo "${YELLOW}⚠ sudo unavailable — casks needing root may be skipped${NC}"
+		fi
+	fi
+
 	# ponytail: 2 slots per updater
 	init_global_progress 4
 
