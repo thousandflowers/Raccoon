@@ -1,0 +1,76 @@
+
+-- Network Status
+
+
+-- [1/10] Interfaces
+
+| Name         | Type            | Value                          |
+| ------------ | --------------- | ------------------------------ |
+lo0          (Loopback):     ::1
+en0          (LAN):          192.168.1.42
+✓
+
+-- [2/10] Listening Ports
+
+| Port     | Service         | Description                    |
+| -------- | --------------- | ------------------------------ |
+5000     AirPlay         Proxy service
+7000     AirPlay         Proxy service
+✓
+
+-- [3/10] Processes...
+
+  Detected:
+    ✓ Proxy
+    ✓ RemoteDesktop
+✓
+
+-- [4/10] Environment Proxies...
+
+  Detected:
+  no environment proxies set
+✓
+
+-- [5/10] NO_PROXY Config...
+
+  Exclusions:
+  no NO_PROXY configured
+✓
+
+-- [6/10] VPNs (scutil --nc)...
+
+  Configured:
+    - Tailscale
+  no active VPNs
+✓
+
+-- [7/10] DNS Servers
+
+| Server                   | Label                          |
+| ------------------------ | ------------------------------ |
+8.8.4.4                  
+8.8.8.8                  
+✓
+
+-- [8/10] Firewall Status...
+
+  Status:
+    ✓ App Firewall: Firewall is enabled. (State = 1)
+✓
+
+-- [9/10] Latency & Connections
+
+| Server       | Latency  | Status     |
+| ------------ | -------- | ---------- |
+Server       Latency  Status
+────────────────────────────────────────
+8.8.8.8      12.431 ms ✓
+1.1.1.1      19.810 ms ✓
+Active:                  58 connections
+✓
+
+-- [10/10] Summary...
+
+  Status: Certain (10/10 scans)
+  Detected: Proxy,RemoteDesktop
+✓ Completed

@@ -159,9 +159,11 @@ rcc certs                 # SSL certificate expiry report
 
 **Maintenance**
 
+![env](docs/gifs/rcc-env.gif)
 ![startup](docs/gifs/rcc-startup.gif)
 ![trash](docs/gifs/rcc-trash.gif)
 ![fonts](docs/gifs/rcc-fonts.gif)
+![history](docs/gifs/rcc-history.gif)
 
 </details>
 

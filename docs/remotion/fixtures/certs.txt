@@ -1,0 +1,16 @@
+
+-- Certificates Status
+
+[1/3] User Keychain Certificates...
+Total               Valid     Expiring      Expired  Self-Signed
+────────────────────────────────────────────────────────────────────────────
+42                     28            0           14            8
+✓
+
+[3/4] Keychain Locations...
+○ /Users/alex/Library/Keychains/login.keychain-db
+○ /Library/Keychains/System.keychain
+○ /System/Library/Keychains/SystemRoot.keychain
+✓ Keychain locations listed
+
+✓ Completed

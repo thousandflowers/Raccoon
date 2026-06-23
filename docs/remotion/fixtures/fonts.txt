@@ -1,0 +1,29 @@
+
+-- Fonts Status
+
+| /Library/Fonts/           | 15                   |
+| /Users/alex/Library/Fonts/ | 797                  |
+✓ Font sources scanned
+
+[2/4] User Fonts...
+| Source                    | Count                |
+| ------------------------- | -------------------- |
+| /Users/alex/Library/Fonts/ | 797                  |
+✓
+
+[3/4] FontConfig Catalog...
+| Metric                    | Count                |
+| ------------------------- | -------------------- |
+| Total fonts               | 895                  |
+| Unique families           | 895                  |
+✓
+
+[4/4] Duplicate & Corrupt Check...
+| Check                     | Result               |
+| ------------------------- | -------------------- |
+| Duplicates                | none found           |
+| Corrupted fonts           | 0                    |
+| Total installed           | 812 fonts            |
+✓
+
+✓ Completed

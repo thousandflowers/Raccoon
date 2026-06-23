@@ -1,0 +1,11 @@
+
+-- Network Ports
+
+| PORT     | PROTO  | PROCESS              | STATE      |
+| -------- | ------ | -------------------- | ---------- |
+| 8        | TCP    | rapportd             | ESTABLISHED |
+| 10       | TCP    | sharingd             | ESTABLISHED |
+| 7000     | TCP    | ControlCe            | LISTEN     |
+| 60338    | TCP    | rapportd             | LISTEN     |
+
+✓ Completed

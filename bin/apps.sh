@@ -94,6 +94,11 @@ update_casks() {
 update_mas() {
 	update_global_progress_info "mas: checking..."
 
+	# mas prints spurious "not indexed in Spotlight" warnings to stderr for
+	# every App Store app; we capture 2>&1, so without this they flood the
+	# buffer and get mislabeled "outdated apps found". mas's own fix:
+	export MAS_NO_AUTO_INDEX=1
+
 	if ! command -v mas >/dev/null 2>&1; then
 		append_progress_output "mas: not installed — run 'brew install mas'"
 		increment_global_progress
@@ -132,6 +137,19 @@ main() {
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		echo "${YELLOW}DRY RUN MODE - no changes made${NC}"
 		echo ""
+	fi
+
+	# Cache sudo up front (Touch ID when available) so `brew upgrade --cask
+	# --greedy` casks that need root complete without a prompt mid-progress.
+	# The 200ms progress redraw overwrites/garbles an inline sudo prompt, which
+	# is why brew's sudo password got rejected through `rcc apps` (issue #23).
+	if [[ "$RCC_DRY_RUN" != "true" ]] && command -v brew >/dev/null 2>&1; then
+		if ensure_sudo; then
+			trap stop_sudo_keepalive EXIT
+			start_sudo_keepalive
+		else
+			echo "${YELLOW}⚠ sudo unavailable — casks needing root may be skipped${NC}"
+		fi
 	fi
 
 	# ponytail: 2 slots per updater

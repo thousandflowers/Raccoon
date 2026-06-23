@@ -1,0 +1,12 @@
+
+-- Time Machine
+
+| Setting              | Value                          |
+| -------------------- | ------------------------------ |
+| Destination          | Not configured                 |
+| Status               | Idle                           |
+| Last Backup          | When                           |
+| -------------------- | ------------------------------ |
+| Backup               | No backup found                |
+
+✓ Completed

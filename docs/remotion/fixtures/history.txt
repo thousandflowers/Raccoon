@@ -1,0 +1,23 @@
+
+-- Shell History
+
+[1/2] Command Counts...
+| Shell      | Commands   |
+| ---------- | ---------- |
+| zsh        | 1480       |
+| bash       | 545        |
+| fish       | 0          |
+| Total      | 2025       |
+✓
+
+[2/2] Recent Commands...
+| Recent Command                      |
+| ----------------------------------- |
+| ffmpeg                              |
+| ffmpeg                              |
+| headroom                            |
+| mo                                  |
+| brew                                |
+✓
+
+✓ Completed
