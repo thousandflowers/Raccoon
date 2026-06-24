@@ -86,6 +86,7 @@ show_audit_help() {
 	echo "  --html        Output in HTML format"
 	echo "  --csv         Output in CSV format"
 	echo "  --json        Output in JSON format"
+	echo "  --explain     Add plain-language notes under failing/warning checks"
 	echo "  --md          Output a client-ready Markdown report"
 	echo "  --rtf         Output a client-ready RTF report (opens in TextEdit/Word)"
 	echo "  --client NAME Client name for the report header (optional)"
@@ -103,6 +104,8 @@ show_audit_help() {
 	echo "            --shop \"MacFix Pro\" --tech \"Mario Rossi\""
 	echo "  rcc audit --rtf --report client.rtf --shop \"MacFix Pro\""
 	echo "  rcc audit --md                 # Markdown to stdout (pipeable)"
+	echo "  rcc audit --explain            # audit with plain-language notes"
+	echo "  rcc audit --deep --explain     # deep scan, explained"
 	echo ""
 	echo "Safety:"
 	echo "  Destructive fixes snapshot originals to ~/.raccoon/fix-backups/ first."
@@ -121,6 +124,7 @@ SHOW_HISTORY=false
 SHOW_DIFF=false
 SCHEDULE_WEEKLY=false
 NOTIFY=false
+EXPLAIN_MODE=false
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -209,6 +213,10 @@ while [[ $# -gt 0 ]]; do
 		SHOW_DIFF=true
 		shift
 		;;
+	--explain)
+		EXPLAIN_MODE=true
+		shift
+		;;
 	--watch)
 		SCHEDULE_WEEKLY=true
 		shift
@@ -269,6 +277,19 @@ print_result() {
 
 	# icon is 1 display column; "x " is its ASCII width stand-in for measuring.
 	_box_row "x ${label}" "${icon} ${colored_label}"
+
+	# --explain: print a plain-language note under failing/warning checks. Only
+	# for text output (never pollutes json/csv/md/rtf). A check with no entry
+	# prints nothing — the explanation is always optional.
+	if [[ "${EXPLAIN_MODE:-false}" == "true" && "$OUTPUT_FORMAT" == "text" ]] &&
+		{ [[ "$status" == "fail" ]] || [[ "$status" == "warn" ]]; }; then
+		local check_name="${label%%: *}"
+		local explanation
+		explanation="$(_check_explain "$check_name")"
+		if [[ -n "$explanation" ]]; then
+			printf '  %s-> %s%s\n' "$GRAY" "$explanation" "$NC"
+		fi
+	fi
 }
 
 print_category() {

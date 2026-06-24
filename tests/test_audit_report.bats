@@ -195,3 +195,26 @@ _set_branding() {
 	[[ -f "$HOME/client.md" ]]
 	grep -q "Security Audit Report" "$HOME/client.md"
 }
+
+# --- Feature 1: --explain -----------------------------------------------------
+@test "_check_explain returns a note for known checks and empty for unknown" {
+	# shellcheck source=/dev/null
+	source "$SCRIPT_DIR/lib/audit/checks.sh"
+	[[ -n "$(_check_explain FileVault)" ]]
+	[[ -n "$(_check_explain Firewall)" ]]
+	# A check with no entry yields an empty string (no spurious explanation).
+	[[ -z "$(_check_explain "No Such Check Name")" ]]
+}
+
+@test "audit --explain prints plain-language notes under issues (text)" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --explain
+	assert_success
+	assert_output_contains "->"
+}
+
+@test "audit --explain --json keeps the notes out of the JSON" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --explain --json
+	assert_success
+	# The machine-readable format must never carry the human notes.
+	[[ "$output" != *"->"* ]]
+}

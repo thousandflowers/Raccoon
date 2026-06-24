@@ -74,6 +74,7 @@ So I took it further. I had a second script I'd run on my sisters' Macs whenever
 rcc audit                 # quick scan
 rcc audit deep            # full scan (requires sudo)
 rcc audit --fix           # auto-fix common issues
+rcc audit --explain       # add plain-language notes to issues
 rcc audit --json          # machine-readable output
 rcc audit --csv           # spreadsheet-ready
 rcc audit --html          # save as HTML report
@@ -193,6 +194,7 @@ rcc certs                 # SSL certificate expiry report
 | `audit` | Security audit (30+ checks) |
 | `audit deep` | Full audit with sudo |
 | `audit fix` | Auto-fix security issues |
+| `audit --explain` | Audit with plain-language notes on issues |
 | `battery` | Health, cycles, temperature |
 | `backup` | Time Machine status |
 | `certs` | SSL certificate expiry |

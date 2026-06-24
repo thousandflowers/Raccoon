@@ -41,6 +41,10 @@ Output just pass/warn/fail counts.
 \fB\-\-json\fR, \fB\-\-csv\fR, \fB\-\-html\fR
 Output format.
 .TP
+\fB\-\-explain\fR
+Print a plain-language note under each failing or warning check (text output
+only; never pollutes \fB\-\-json\fR/\fB\-\-csv\fR). Composable with any other flag.
+.TP
 \fB\-\-md\fR, \fB\-\-rtf\fR
 Client\-ready report as Markdown or RTF (RTF opens in TextEdit/Word). The report
 is data\-driven: it renders every check the audit produces, so new checks appear
