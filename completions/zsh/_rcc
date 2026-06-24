@@ -45,6 +45,7 @@ _rcc() {
         'apps:update GUI apps (App Store + casks)'
         'audit:security audit'
         'network:network interfaces and info'
+        'wifi:Wi-Fi networks and saved passwords'
         'disk:disk space and health'
         'memory:process memory usage'
         'ports:open ports and listeners'

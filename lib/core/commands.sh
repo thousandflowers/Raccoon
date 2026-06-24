@@ -29,6 +29,7 @@ MENU_ITEMS=(
     "audit:Security audit (quick)"
     "audit deep:Security audit (full)"
     "network:Network info"
+    "wifi:Wi-Fi e password"
     "disk:Disk space"
     "memory:Memory usage"
     "---"
@@ -124,36 +125,14 @@ run_cmd() {
     printf '\033[?25h'
     stty sane
     
-    # Cases are 1-based MENU_ITEMS positions. Keep in lockstep with MENU_ITEMS:
-    # positions 8 and 14 are "---" separators and have no command.
-    local c="$1"
-    case "$c" in
-        1) exec "${SCRIPT_DIR}/bin/upgrade.sh" ;;
-        2) exec "${SCRIPT_DIR}/bin/apps.sh" ;;
-        3) exec "${SCRIPT_DIR}/bin/audit.sh" ;;
-        4) exec "${SCRIPT_DIR}/bin/audit.sh" --deep ;;
-        5) exec "${SCRIPT_DIR}/bin/network.sh" ;;
-        6) exec "${SCRIPT_DIR}/bin/disk.sh" ;;
-        7) exec "${SCRIPT_DIR}/bin/memory.sh" ;;
-        9) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --quiet ;;
-        10) exec "${SCRIPT_DIR}/bin/audit.sh" --fix ;;
-        11) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --json ;;
-        12) exec "${SCRIPT_DIR}/bin/audit.sh" --history ;;
-        13) exec "${SCRIPT_DIR}/bin/audit.sh" --watch ;;
-        15) exec "${SCRIPT_DIR}/bin/ssh.sh" ;;
-        16) exec "${SCRIPT_DIR}/bin/git.sh" ;;
-        17) exec "${SCRIPT_DIR}/bin/ports.sh" ;;
-        18) exec "${SCRIPT_DIR}/bin/battery.sh" ;;
-        19) exec "${SCRIPT_DIR}/bin/backup.sh" ;;
-        20) exec "${SCRIPT_DIR}/bin/env.sh" ;;
-        21) exec "${SCRIPT_DIR}/bin/startup.sh" ;;
-        22) exec "${SCRIPT_DIR}/bin/trash.sh" ;;
-        23) exec "${SCRIPT_DIR}/bin/fonts.sh" ;;
-        24) exec "${SCRIPT_DIR}/bin/history.sh" ;;
-        25) exec "${SCRIPT_DIR}/bin/certs.sh" ;;
-        26) exec "${SCRIPT_DIR}/bin/docker.sh" ;;
-        27) exec "${SCRIPT_DIR}/bin/xcode.sh" ;;
-    esac
+    # Data-driven: look up the command for this 1-based MENU_ITEMS position and
+    # run it through the rcc dispatcher. Inserting/removing menu items needs no
+    # change here, and "---" separators carry no command.
+    local item="${MENU_ITEMS[$(($1 - 1))]:-}"
+    [[ -z "$item" || "$item" == "---" ]] && return 0
+    local cmd="${item%%:*}"
+    # shellcheck disable=SC2086  # intentional word split: "audit deep" -> 2 args
+    exec "${SCRIPT_DIR}/rcc" $cmd
 }
 
 show_menu() {
@@ -376,9 +355,12 @@ interactive_main_menu() {
                 read -r -s -n 1 t
                 [[ "$t" == "A" ]] && ((cur > 1)) && cur=$((cur-1))
                 [[ "$t" == "B" ]] && ((cur < TOTAL_OPTIONS)) && cur=$((cur+1))
-                # Separators ("---") sit at 1-based positions 8 and 14; skip over them.
-                [[ $cur -eq 8 || $cur -eq 14 ]] && [[ "$t" == "A" ]] && cur=$((cur-1))
-                [[ $cur -eq 8 || $cur -eq 14 ]] && [[ "$t" == "B" ]] && cur=$((cur+1))
+                # Skip over separators ("---") wherever they are, no hardcoded
+                # positions (positions shift as menu items are added/removed).
+                if _is_separator "$cur"; then
+                    [[ "$t" == "A" ]] && cur=$((cur-1))
+                    [[ "$t" == "B" ]] && cur=$((cur+1))
+                fi
                 ;;
             "") run_cmd "$cur" ;;
             /)

@@ -121,6 +121,7 @@ User LaunchAgents
 ```bash
 rcc disk                  # internal, external & network drives, SMART
 rcc network               # interfaces, Wi‑Fi, DNS, routing
+rcc wifi                  # active network, known SSIDs, Keychain passwords
 rcc memory                # system stats + processes sorted by RAM
 rcc ports                 # open ports & listening services
 rcc battery               # health %, cycles, temperature
@@ -209,6 +210,7 @@ rcc certs                 # SSL certificate expiry report
 | `history` | Shell history analysis |
 | `memory` | System memory + process RSS |
 | `network` | Interfaces, Wi‑Fi, DNS |
+| `wifi` | Active network, known SSIDs, Keychain passwords |
 | `ports` | Open ports & listeners |
 | `ssh` | Key inspection, `--export`, `--export-gpg` |
 | `startup` | Launch agents & login items |

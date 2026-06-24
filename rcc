@@ -38,6 +38,7 @@ case "${1:-""}" in
 			esac
 			;;
 		"network") exec "${SCRIPT_DIR}/bin/network.sh" "${@:2}" ;;
+		"wifi")    exec "${SCRIPT_DIR}/bin/wifi.sh" "${@:2}" ;;
 		"disk")    exec "${SCRIPT_DIR}/bin/disk.sh" "${@:2}" ;;
 		"memory")  exec "${SCRIPT_DIR}/bin/memory.sh" "${@:2}" ;;
 		"startup")
