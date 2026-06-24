@@ -312,7 +312,50 @@ _next_menu_item() {
     echo "$cur"
 }
 
+# Render the first-run welcome box. Split out from show_onboarding so it can be
+# tested without a TTY. BOX_INNER inner width; sides are 1-cell box-drawing chars.
+# ponytail: assumes a UTF-8 terminal for the one emoji line (true — onboarding
+# only runs interactively); the -1 pad compensates for the glyph's double width.
+_render_onboarding() {
+    local BOX_INNER=45 border="" i
+    for ((i = 0; i < BOX_INNER; i++)); do border+="─"; done
+
+    _ob_row() {
+        local text="$1" adj="${2:-0}" pad
+        pad=$((BOX_INNER - ${#text} + adj))
+        [[ $pad -lt 0 ]] && pad=0
+        printf '│%s%*s│\n' "$text" "$pad" ""
+    }
+
+    echo ""
+    echo "┌${border}┐"
+    _ob_row "  🦝 Benvenuto in Raccoon" -1
+    _ob_row ""
+    _ob_row "  Tre cose che puoi fare adesso:"
+    _ob_row ""
+    _ob_row "  rcc audit    — 30+ check di sicurezza"
+    _ob_row "  rcc upgrade  — aggiorna tutto in una volta"
+    _ob_row "  rcc wifi     — reti Wi-Fi e password"
+    _ob_row ""
+    _ob_row "  Naviga con le frecce, Invio per eseguire."
+    _ob_row "  Premi un tasto per continuare..."
+    echo "└${border}┘"
+}
+
+# First-run wizard. Shown once, guarded by the ~/.raccoon/onboarded sentinel and
+# only when stdin is a TTY — piped/non-interactive use skips with zero overhead.
+show_onboarding() {
+    [[ -f "$HOME/.raccoon/onboarded" ]] && return 0
+    [[ -t 0 ]] || return 0
+    _render_onboarding
+    read -r -s -n 1 -t 10 _ || true
+    mkdir -p "$HOME/.raccoon"
+    touch "$HOME/.raccoon/onboarded"
+    clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf '\033[2J\033[H'
+}
+
 interactive_main_menu() {
+    show_onboarding
     local cur=1
     
     trap 'exit 0' INT
