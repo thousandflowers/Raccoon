@@ -66,6 +66,11 @@ and a profile baseline), save the current state, list, or delete.
 Publish the Markdown report as an anonymous public GitHub Gist and print (and
 copy) the link. Network failure is non-fatal. Not available with \fB\-\-quiet\fR.
 .TP
+\fB\-\-sheet\fR, \fB\-\-hours\fR \fIN\fR, \fB\-\-notes\fR \fITEXT\fR
+Generate a fill-in intervention sheet (Markdown, or RTF with \fB\-\-rtf\fR) with
+client, Mac, problems before/after, hours worked, and notes. Honours
+\fB\-\-profile\fR, \fB\-\-report\fR, and \fB\-\-remediation\fR.
+.TP
 \fB\-\-md\fR, \fB\-\-rtf\fR
 Client\-ready report as Markdown or RTF (RTF opens in TextEdit/Word). The report
 is data\-driven: it renders every check the audit produces, so new checks appear

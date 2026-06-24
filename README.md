@@ -204,6 +204,7 @@ rcc certs                 # SSL certificate expiry report
 | `audit --schedule FREQ` | Schedule a deep audit (daily/weekly/monthly); `status`/`remove` |
 | `audit profile` | Per-client profiles (config, branding, baseline); `profile-list` |
 | `audit share` | Publish the report as an anonymous GitHub Gist |
+| `audit --sheet` | Intervention sheet (`--hours`, `--notes`); MD or RTF |
 | `battery` | Health, cycles, temperature |
 | `backup` | Time Machine status |
 | `certs` | SSL certificate expiry |

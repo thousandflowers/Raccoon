@@ -96,6 +96,9 @@ show_audit_help() {
 	echo "  --profile-list    List saved profiles"
 	echo "  --profile-delete NAME Remove a client profile"
 	echo "  --share       Publish the report as an anonymous GitHub Gist and print the link"
+	echo "  --sheet       Generate an intervention sheet (Markdown; --rtf for RTF)"
+	echo "  --hours N     Hours worked, for the intervention sheet"
+	echo "  --notes TEXT  Extra notes, for the intervention sheet"
 	echo "  --md          Output a client-ready Markdown report"
 	echo "  --rtf         Output a client-ready RTF report (opens in TextEdit/Word)"
 	echo "  --client NAME Client name for the report header (optional)"
@@ -124,6 +127,8 @@ show_audit_help() {
 	echo "  rcc audit --profile-list"
 	echo "  rcc audit --deep --share"
 	echo "  rcc audit --deep --profile mario-bianchi --share"
+	echo "  rcc audit --deep --profile mario-bianchi \\"
+	echo "            --remediation --sheet --hours 2 --report intervento.md"
 	echo ""
 	echo "Safety:"
 	echo "  Destructive fixes snapshot originals to ~/.raccoon/fix-backups/ first."
@@ -154,6 +159,9 @@ PROFILE_LIST=false
 PROFILE_DELETE=""
 PROFILE_DIR=""
 SHARE=false
+SHEET=false
+INTERVENTION_HOURS="___"
+INTERVENTION_NOTES=""
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -278,6 +286,16 @@ while [[ $# -gt 0 ]]; do
 	--share)
 		SHARE=true
 		shift
+		;;
+	--sheet)
+		SHEET=true
+		shift
+		;;
+	--hours)
+		if [[ $# -ge 2 && "$2" != -* ]]; then INTERVENTION_HOURS="$2"; shift 2; else shift; fi
+		;;
+	--notes)
+		if [[ $# -ge 2 ]]; then INTERVENTION_NOTES="$2"; shift 2; else shift; fi
 		;;
 	--watch)
 		SCHEDULE_ACTION="weekly"
@@ -1045,6 +1063,7 @@ print_remediation() {
 # secondary field.
 _set_report_context() {
 	REPORT_DATE="$(date '+%Y-%m-%d %H:%M')"
+	REPORT_VERSION="$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo '?')"
 	REPORT_OS="$(sw_vers -productVersion 2>/dev/null || true)"
 	REPORT_MODEL_ID="$(sysctl -n hw.model 2>/dev/null || true)"
 	REPORT_MODEL="$(system_profiler SPHardwareDataType 2>/dev/null | awk -F': ' '/Model Name/{print $2; exit}')"
@@ -1168,7 +1187,33 @@ main() {
 		fi
 		return 0
 	fi
-	
+
+	if [[ "$SHEET" == "true" ]]; then
+		# Quiet run so the sheet reflects the current state (and baseline diff).
+		{
+			run_core_checks
+			run_network_checks
+			run_auth_checks
+			run_persistence_checks
+			run_privacy_checks
+			run_additional_checks
+		} > /dev/null 2>&1
+		_set_report_context
+		if [[ -n "$REPORT_FILE" ]]; then
+			if [[ "$OUTPUT_FORMAT" == "rtf" ]]; then
+				render_intervention_sheet_rtf > "$REPORT_FILE"
+			else
+				render_intervention_sheet > "$REPORT_FILE"
+			fi
+			echo "  Report saved to: $REPORT_FILE"
+		elif [[ "$OUTPUT_FORMAT" == "rtf" ]]; then
+			render_intervention_sheet_rtf
+		else
+			render_intervention_sheet
+		fi
+		return 0
+	fi
+
 	if [[ -n "$SCHEDULE_ACTION" ]]; then
 		case "$SCHEDULE_ACTION" in
 			status) schedule_status ;;

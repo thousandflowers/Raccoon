@@ -238,3 +238,108 @@ render_report_rtf() {
 	printf '{\\i powered by Raccoon}\\par\n'
 	printf '}\n'
 }
+
+# ============================================================================
+# Intervention sheet (scheda intervento) — a fill-in document for the technician
+# ============================================================================
+
+# Status of a check in the baseline file, or "" if absent. Self-contained so
+# report.sh stays testable on its own (no dependency on audit.sh helpers).
+_sheet_prev_status() {
+	[[ -n "${BASELINE_FILE:-}" && -f "${BASELINE_FILE:-/nonexistent}" ]] || { printf ''; return 0; }
+	grep -F "\"name\": \"$1\"" "$BASELINE_FILE" 2>/dev/null |
+		sed -n 's/.*"status": "\([^"]*\)".*/\1/p' | head -1 || true
+}
+
+render_intervention_sheet() {
+	local client="${REPORT_CLIENT:-___}" shop="${REPORT_SHOP:-___}" tech="${REPORT_TECH:-___}"
+	local model="${REPORT_MODEL:-___}" os="${REPORT_OS:-___}" date="${REPORT_DATE:-___}"
+	local hours="${INTERVENTION_HOURS:-___}" notes="${INTERVENTION_NOTES:-}"
+	local ver="${REPORT_VERSION:-?}"
+	[[ -n "${REPORT_MODEL_ID:-}" ]] && model="$model (${REPORT_MODEL_ID})"
+
+	printf -- '---\n'
+	printf '# Scheda Intervento\n'
+	printf '**Data:** %s  \n' "$date"
+	printf '**Tecnico:** %s  \n' "$tech"
+	printf '**Studio/Shop:** %s\n\n' "$shop"
+
+	printf '## Cliente\n'
+	printf '**Nome:** %s  \n' "$client"
+	printf '**Mac:** %s · macOS %s\n\n' "$model" "$os"
+
+	printf '## Interventi eseguiti\n'
+	local entry prev resolved=0
+	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+		_parse_entry "$entry"
+		if [[ "$_PE_STATUS" == "pass" ]]; then
+			prev="$(_sheet_prev_status "$_PE_NAME")"
+			if [[ "$prev" == "fail" || "$prev" == "warn" ]]; then
+				printf -- '- %s\n' "$_PE_NAME"
+				resolved=$((resolved + 1))
+			fi
+		fi
+	done
+	[[ $resolved -eq 0 ]] && printf -- '- ___________\n'
+	printf '\n'
+
+	printf '## Problemi riscontrati e risolti\n'
+	printf '| Check | Prima | Dopo |\n'
+	printf '|-------|-------|------|\n'
+	local before
+	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+		_parse_entry "$entry"
+		before="$(_sheet_prev_status "$_PE_NAME")"
+		[[ -z "$before" ]] && before="-"
+		printf '| %s | %s | %s |\n' "$_PE_NAME" "$before" "$_PE_STATUS"
+	done
+	printf '\n'
+
+	printf '## Ore lavorate\n'
+	printf '**Totale:** %s\n\n' "$hours"
+
+	printf '## Note aggiuntive\n'
+	printf '%s\n\n' "$notes"
+
+	printf -- '---\n'
+	printf '*Generato da Raccoon v%s · %s*\n' "$ver" "$date"
+}
+
+render_intervention_sheet_rtf() {
+	local client="${REPORT_CLIENT:-___}" shop="${REPORT_SHOP:-___}" tech="${REPORT_TECH:-___}"
+	local model="${REPORT_MODEL:-___}" os="${REPORT_OS:-___}" date="${REPORT_DATE:-___}"
+	local hours="${INTERVENTION_HOURS:-___}" notes="${INTERVENTION_NOTES:-}"
+	local ver="${REPORT_VERSION:-?}"
+	[[ -n "${REPORT_MODEL_ID:-}" ]] && model="$model (${REPORT_MODEL_ID})"
+
+	printf '{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Helvetica;}}\n'
+	printf '\\fs28\n'
+	printf '{\\b\\fs36 Scheda Intervento}\\par\n'
+	printf '\\par\n'
+	printf '{\\b Data:} %s\\par\n' "$(rtf_escape "$date")"
+	printf '{\\b Tecnico:} %s\\par\n' "$(rtf_escape "$tech")"
+	printf '{\\b Studio/Shop:} %s\\par\n' "$(rtf_escape "$shop")"
+	printf '\\par\n'
+	printf '{\\b\\fs32 Cliente}\\par\n'
+	printf '%s - %s - macOS %s\\par\n' "$(rtf_escape "$client")" "$(rtf_escape "$model")" "$(rtf_escape "$os")"
+	printf '\\par\n'
+
+	printf '{\\b\\fs32 Problemi riscontrati e risolti}\\par\n'
+	local entry before
+	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+		_parse_entry "$entry"
+		before="$(_sheet_prev_status "$_PE_NAME")"
+		[[ -z "$before" ]] && before="-"
+		printf '%s: %s -> %s\\par\n' "$(rtf_escape "$_PE_NAME")" "$(rtf_escape "$before")" "$(rtf_escape "$_PE_STATUS")"
+	done
+	printf '\\par\n'
+
+	printf '{\\b\\fs32 Ore lavorate}\\par\n'
+	printf '%s\\par\n' "$(rtf_escape "$hours")"
+	printf '\\par\n'
+	printf '{\\b\\fs32 Note aggiuntive}\\par\n'
+	printf '%s\\par\n' "$(rtf_escape "$notes")"
+	printf '\\par\n'
+	printf '{\\i Generato da Raccoon v%s - %s}\\par\n' "$(rtf_escape "$ver")" "$(rtf_escape "$date")"
+	printf '}\n'
+}
