@@ -75,6 +75,7 @@ rcc audit                 # quick scan
 rcc audit deep            # full scan (requires sudo)
 rcc audit --fix           # auto-fix common issues
 rcc audit --explain       # add plain-language notes to issues
+rcc audit --remediation   # client-facing intervention report
 rcc audit --json          # machine-readable output
 rcc audit --csv           # spreadsheet-ready
 rcc audit --html          # save as HTML report
@@ -195,6 +196,7 @@ rcc certs                 # SSL certificate expiry report
 | `audit deep` | Full audit with sudo |
 | `audit fix` | Auto-fix security issues |
 | `audit --explain` | Audit with plain-language notes on issues |
+| `audit --remediation` | Client-facing before/after intervention report |
 | `battery` | Health, cycles, temperature |
 | `backup` | Time Machine status |
 | `certs` | SSL certificate expiry |

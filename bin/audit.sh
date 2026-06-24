@@ -87,6 +87,7 @@ show_audit_help() {
 	echo "  --csv         Output in CSV format"
 	echo "  --json        Output in JSON format"
 	echo "  --explain     Add plain-language notes under failing/warning checks"
+	echo "  --remediation Client-facing intervention report (found/fixed/to-do)"
 	echo "  --md          Output a client-ready Markdown report"
 	echo "  --rtf         Output a client-ready RTF report (opens in TextEdit/Word)"
 	echo "  --client NAME Client name for the report header (optional)"
@@ -125,6 +126,7 @@ SHOW_DIFF=false
 SCHEDULE_WEEKLY=false
 NOTIFY=false
 EXPLAIN_MODE=false
+REMEDIATION_MODE=false
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -215,6 +217,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--explain)
 		EXPLAIN_MODE=true
+		shift
+		;;
+	--remediation)
+		REMEDIATION_MODE=true
 		shift
 		;;
 	--watch)
@@ -343,11 +349,49 @@ print_summary() {
 	_box_border
 }
 
+# Minimal JSON string escaping: backslash and double-quote. Check labels are
+# short single-line strings, so this is sufficient and dependency-free.
+_json_escape() {
+	local s="$1"
+	s="${s//\\/\\\\}"
+	s="${s//\"/\\\"}"
+	printf '%s' "$s"
+}
+
+# Build the per-check results JSON from the in-memory AUDIT_RESULTS model, so a
+# later --diff / --remediation can compare individual checks, not just counts.
+# Emits "" when there are no results (backward-compatible empty array).
+_results_json() {
+	[[ ${#AUDIT_RESULTS[@]} -eq 0 ]] && return 0
+	local entry st cat_ tail_ rest nm val first=1
+	for entry in "${AUDIT_RESULTS[@]}"; do
+		st="${entry%%$'\t'*}"
+		tail_="${entry#*$'\t'}"
+		cat_="${tail_%%$'\t'*}"
+		rest="${tail_#*$'\t'}"
+		if [[ "$rest" == *": "* ]]; then
+			nm="${rest%%: *}"
+			val="${rest#*: }"
+		else
+			nm="$rest"
+			val=""
+		fi
+		if [[ $first -eq 1 ]]; then first=0; else printf ','; fi
+		printf '\n    {"status": "%s", "category": "%s", "name": "%s", "value": "%s"}' \
+			"$(_json_escape "$st")" "$(_json_escape "$cat_")" \
+			"$(_json_escape "$nm")" "$(_json_escape "$val")"
+	done
+	printf '\n  '
+}
+
 save_to_history() {
 	local timestamp
 	timestamp="$(date +%Y-%m-%d_%H:%M:%S)"
 	local history_file="$HISTORY_DIR/audit_${timestamp}.json"
-	
+
+	local results_json
+	results_json="$(_results_json)"
+
 	cat > "$history_file" << EOF
 {
   "timestamp": "$timestamp",
@@ -355,7 +399,7 @@ save_to_history() {
   "warning": $WARN_count,
   "fail": $FAIL_count,
   "deep": $DEEP_SCAN,
-  "results": []
+  "results": [$results_json]
 }
 EOF
 
@@ -399,6 +443,15 @@ show_audit_history() {
 	done
 	
 	echo "  Run 'rcc audit --deep --diff' to compare with previous"
+}
+
+# Look up a check's status inside a history file's "results" array (one JSON
+# object per line). Prints the status or "" if the check is absent. Uses fixed-
+# string grep + sed, no jq.
+_prev_check_status() {
+	local name="$1" file="$2"
+	grep -F "\"name\": \"$name\"" "$file" 2>/dev/null |
+		sed -n 's/.*"status": "\([^"]*\)".*/\1/p' | head -1 || true
 }
 
 show_diff() {
@@ -447,6 +500,30 @@ show_diff() {
 		echo "  ${RED}↑ $fail_diff more failures${NC}"
 	elif [[ $fail_diff -lt 0 ]]; then
 		echo "  ${GREEN}↓ $((-fail_diff)) fewer failures${NC}"
+	fi
+
+	# Per-check changes — only when the previous run recorded individual results
+	# AND the current run produced them. Pre-feature histories (results: []) fall
+	# back to the counter summary above, so this is fully backward compatible.
+	if grep -q '"name":' "$prev_file" 2>/dev/null && [[ ${#AUDIT_RESULTS[@]} -gt 0 ]]; then
+		echo ""
+		echo "  ${PURPLE_BOLD}Changes by check:${NC}"
+		local entry st nm tail_ rest prev
+		for entry in "${AUDIT_RESULTS[@]}"; do
+			st="${entry%%$'\t'*}"
+			tail_="${entry#*$'\t'}"
+			rest="${tail_#*$'\t'}"
+			if [[ "$rest" == *": "* ]]; then nm="${rest%%: *}"; else nm="$rest"; fi
+			prev="$(_prev_check_status "$nm" "$prev_file")"
+			[[ -z "$prev" ]] && continue
+			if [[ "$st" == "pass" && ( "$prev" == "fail" || "$prev" == "warn" ) ]]; then
+				echo "  ${GREEN}✓ $nm resolved${NC}"
+			elif [[ ( "$st" == "fail" || "$st" == "warn" ) && "$prev" == "pass" ]]; then
+				echo "  ${RED}✗ $nm regressed${NC}"
+			elif [[ ( "$st" == "fail" || "$st" == "warn" ) && ( "$prev" == "fail" || "$prev" == "warn" ) ]]; then
+				echo "  ${YELLOW}⚠ $nm still needs attention${NC}"
+			fi
+		done
 	fi
 }
 
@@ -610,6 +687,71 @@ fix_issue() {
 
 
 
+# Client-facing remediation report: what was found, what got fixed since the
+# last run, and what still needs doing. Plain text to stdout; for --md/--rtf the
+# caller uses the full report renderers instead. Reads the current AUDIT_RESULTS
+# and the previous history file (resolved = was fail/warn, now pass). Works with
+# no history (the "resolved" section is just empty).
+print_remediation() {
+	local host date_str version prev_file=""
+	host="$(hostname 2>/dev/null || echo unknown)"
+	date_str="$(date '+%Y-%m-%d %H:%M')"
+	version="$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo '?')"
+	local latest_link="$HISTORY_DIR/latest.json"
+	[[ -L "$latest_link" ]] && prev_file="$(readlink "$latest_link" 2>/dev/null || echo '')"
+
+	echo "Raccoon — Rapporto intervento"
+	echo "Data: $date_str · Host: $host"
+	echo ""
+
+	local entry st nm tail_ rest prev
+
+	echo "Problemi trovati:"
+	local found=0
+	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+		st="${entry%%$'\t'*}"; tail_="${entry#*$'\t'}"; rest="${tail_#*$'\t'}"
+		if [[ "$rest" == *": "* ]]; then nm="${rest%%: *}"; else nm="$rest"; fi
+		if [[ "$st" == "fail" || "$st" == "warn" ]]; then
+			echo "  - $nm"
+			found=$((found + 1))
+		fi
+	done
+	[[ $found -eq 0 ]] && echo "  (nessuno)"
+	echo ""
+
+	echo "Problemi risolti:"
+	local resolved=0
+	if [[ -n "$prev_file" && -f "$prev_file" ]] && grep -q '"name":' "$prev_file" 2>/dev/null; then
+		for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+			st="${entry%%$'\t'*}"; tail_="${entry#*$'\t'}"; rest="${tail_#*$'\t'}"
+			if [[ "$rest" == *": "* ]]; then nm="${rest%%: *}"; else nm="$rest"; fi
+			if [[ "$st" == "pass" ]]; then
+				prev="$(_prev_check_status "$nm" "$prev_file")"
+				if [[ "$prev" == "fail" || "$prev" == "warn" ]]; then
+					echo "  - $nm"
+					resolved=$((resolved + 1))
+				fi
+			fi
+		done
+	fi
+	[[ $resolved -eq 0 ]] && echo "  (nessuno, o nessuna run precedente)"
+	echo ""
+
+	echo "Da completare:"
+	local todo=0
+	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+		st="${entry%%$'\t'*}"; tail_="${entry#*$'\t'}"; rest="${tail_#*$'\t'}"
+		if [[ "$rest" == *": "* ]]; then nm="${rest%%: *}"; else nm="$rest"; fi
+		if [[ "$st" == "fail" || "$st" == "warn" ]]; then
+			echo "  - $nm"
+			todo=$((todo + 1))
+		fi
+	done
+	[[ $todo -eq 0 ]] && echo "  (nessuno)"
+	echo ""
+	echo "Generato da Raccoon v$version"
+}
+
 # Populate system context for client-ready reports. The commercial model name
 # (e.g. "MacBook Pro") via system_profiler costs ~0.3s, so this only runs for
 # md/rtf output; the hw.model identifier (e.g. "MacBookPro18,3") is kept as a
@@ -645,8 +787,48 @@ main() {
 	fi
 	
 	if [[ "$SHOW_DIFF" == "true" ]]; then
+		# Run the checks quietly so the per-check diff has current data; the box
+		# output is suppressed and only the diff summary is printed.
+		{
+			run_core_checks
+			run_network_checks
+			run_auth_checks
+			run_persistence_checks
+			run_privacy_checks
+			run_additional_checks
+		} > /dev/null 2>&1
 		show_diff
 		return
+	fi
+
+	if [[ "$REMEDIATION_MODE" == "true" ]]; then
+		# Quiet run so AUDIT_RESULTS is populated without dumping the audit boxes.
+		{
+			run_core_checks
+			run_network_checks
+			run_auth_checks
+			run_persistence_checks
+			run_privacy_checks
+			run_additional_checks
+		} > /dev/null 2>&1
+		if [[ "$OUTPUT_FORMAT" == "md" || "$OUTPUT_FORMAT" == "rtf" ]]; then
+			_set_report_context
+		fi
+		if [[ -n "$REPORT_FILE" ]]; then
+			case "$OUTPUT_FORMAT" in
+				md) render_report_md > "$REPORT_FILE" ;;
+				rtf) render_report_rtf > "$REPORT_FILE" ;;
+				*) print_remediation > "$REPORT_FILE" ;;
+			esac
+			echo "  Report saved to: $REPORT_FILE"
+		else
+			case "$OUTPUT_FORMAT" in
+				md) render_report_md ;;
+				rtf) render_report_rtf ;;
+				*) print_remediation ;;
+			esac
+		fi
+		return 0
 	fi
 	
 	if [[ "$SCHEDULE_WEEKLY" == "true" ]]; then

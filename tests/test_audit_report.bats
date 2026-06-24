@@ -218,3 +218,82 @@ _set_branding() {
 	# The machine-readable format must never carry the human notes.
 	[[ "$output" != *"->"* ]]
 }
+
+# --- Feature 2: remediation report -------------------------------------------
+@test "an audit run records individual check results in the history JSON" {
+	run bash "$SCRIPT_DIR/bin/audit.sh"
+	assert_success
+	local hf
+	hf="$(ls "$HOME/.raccoon/audit-history"/audit_*.json 2>/dev/null | head -1)"
+	[[ -n "$hf" ]]
+	# results array is now populated, not the old empty [].
+	grep -q '"name":' "$hf"
+	grep -q '"status":' "$hf"
+}
+
+@test "show_diff handles a previous run with individual results without crashing" {
+	local hd="$HOME/.raccoon/audit-history"
+	mkdir -p "$hd"
+	# Pre-feature history: empty results array (backward-compat path).
+	cat > "$hd/audit_2026-01-01_00:00:00.json" <<'JSON'
+{
+  "timestamp": "2026-01-01_00:00:00",
+  "pass": 10,
+  "warning": 5,
+  "fail": 3,
+  "deep": false,
+  "results": []
+}
+JSON
+	# Post-feature history: populated results.
+	cat > "$hd/audit_2026-02-02_00:00:00.json" <<'JSON'
+{
+  "timestamp": "2026-02-02_00:00:00",
+  "pass": 12,
+  "warning": 4,
+  "fail": 2,
+  "deep": false,
+  "results": [
+    {"status": "fail", "category": "Core Security", "name": "Firewall", "value": "Disabled"}
+  ]
+}
+JSON
+	ln -sf "$hd/audit_2026-02-02_00:00:00.json" "$hd/latest.json"
+	run bash "$SCRIPT_DIR/bin/audit.sh" --diff
+	assert_success
+	assert_output_contains "Previous:"
+}
+
+@test "audit --diff against an empty-results history still shows counters" {
+	local hd="$HOME/.raccoon/audit-history"
+	mkdir -p "$hd"
+	cat > "$hd/audit_2026-01-01_00:00:00.json" <<'JSON'
+{
+  "timestamp": "2026-01-01_00:00:00",
+  "pass": 10,
+  "warning": 5,
+  "fail": 3,
+  "deep": false,
+  "results": []
+}
+JSON
+	ln -sf "$hd/audit_2026-01-01_00:00:00.json" "$hd/latest.json"
+	run bash "$SCRIPT_DIR/bin/audit.sh" --diff
+	assert_success
+	assert_output_contains "Previous:"
+}
+
+@test "audit --remediation works without any history" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --remediation
+	assert_success
+	assert_output_contains "Rapporto intervento"
+	assert_output_contains "Problemi trovati"
+	assert_output_contains "Generato da Raccoon"
+}
+
+@test "audit --remediation --report writes the report to a file" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --remediation --report "$HOME/remediation.txt"
+	assert_success
+	[[ -f "$HOME/remediation.txt" ]]
+	grep -q "Rapporto intervento" "$HOME/remediation.txt"
+}

@@ -45,6 +45,11 @@ Output format.
 Print a plain-language note under each failing or warning check (text output
 only; never pollutes \fB\-\-json\fR/\fB\-\-csv\fR). Composable with any other flag.
 .TP
+\fB\-\-remediation\fR
+Print a client-facing intervention report: problems found, problems resolved
+since the previous run, and what still needs doing. Honours \fB\-\-report\fR,
+\fB\-\-md\fR, and \fB\-\-rtf\fR.
+.TP
 \fB\-\-md\fR, \fB\-\-rtf\fR
 Client\-ready report as Markdown or RTF (RTF opens in TextEdit/Word). The report
 is data\-driven: it renders every check the audit produces, so new checks appear
