@@ -15,11 +15,18 @@ show_startup_help() {
 	echo ""
 	echo "Options:"
 	echo "  --json          Output in JSON format"
+	echo "  --clean         Remove orphaned launch agents (interactive, with backup)"
 	echo "  --help, -h      Show this help"
+	echo ""
+	echo "Examples:"
+	echo "  rcc startup            # list startup items and launch agents"
+	echo "  rcc startup clean      # find and remove orphaned user launch agents"
 }
 
 # shellcheck disable=SC2034
 JSON_OUTPUT=false
+CLEAN_MODE=false
+ORPHAN_PLISTS=()
 
 for arg in "$@"; do
 	case "$arg" in
@@ -29,12 +36,105 @@ for arg in "$@"; do
 		;;
 	--json)
 		;;
+	--clean)
+		CLEAN_MODE=true
+		;;
 	*)
 		;;
 	esac
 done
 
+# Extract the executable (first <string> after <key>ProgramArguments</key>) from
+# a launch-agent plist using only awk — no plistutil/xmllint/python.
+_agent_program() {
+	awk '
+		/<key>ProgramArguments<\/key>/ { in_pa = 1; next }
+		in_pa && /<string>/ {
+			line = $0
+			sub(/.*<string>/, "", line)
+			sub(/<\/string>.*/, "", line)
+			print line
+			exit
+		}
+	' "$1" 2>/dev/null
+}
+
+# Collect orphaned user launch agents into ORPHAN_PLISTS: those whose executable
+# is an absolute path that no longer exists on disk. NEVER touches system-level
+# /Library agents (this only scans ~/Library/LaunchAgents), and treats agents
+# whose binary lives under /System or /usr as valid (they may be hidden).
+find_orphan_agents() {
+	ORPHAN_PLISTS=()
+	local dir="$HOME/Library/LaunchAgents"
+	[[ -d "$dir" ]] || return 0
+	local plist exe
+	for plist in "$dir"/*.plist; do
+		[[ -e "$plist" ]] || continue
+		exe="$(_agent_program "$plist")"
+		[[ -z "$exe" ]] && continue           # can't determine target -> leave it
+		case "$exe" in
+			/System/* | /usr/*) continue ;;   # system agents -> not orphan
+			/*) ;;                            # absolute path -> evaluate
+			*) continue ;;                    # non-absolute -> can't verify
+		esac
+		if [[ ! -x "$exe" && ! -f "$exe" ]]; then
+			ORPHAN_PLISTS+=("$plist")
+		fi
+	done
+}
+
+show_orphan_agents() {
+	echo "${YELLOW}Orphaned launch agents found:${NC}"
+	local plist exe
+	for plist in ${ORPHAN_PLISTS[@]+"${ORPHAN_PLISTS[@]}"}; do
+		exe="$(_agent_program "$plist")"
+		echo "  ${plist##*/}"
+		echo "    ${GRAY}missing: $exe${NC}"
+	done
+}
+
+# Interactively remove each orphan. Mirrors audit's --fix safety: back up the
+# plist to ~/.raccoon/fix-backups/<timestamp>/ before unloading and deleting.
+remove_orphan_agents() {
+	local backup_dir plist label answer
+	backup_dir="$HOME/.raccoon/fix-backups/$(date +%Y%m%d-%H%M%S)"
+	for plist in ${ORPHAN_PLISTS[@]+"${ORPHAN_PLISTS[@]}"}; do
+		label="${plist##*/}"
+		printf '  -> Rimuovere %s? [y/N] ' "$label"
+		read -r answer || answer="n"
+		if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
+			mkdir -p "$backup_dir"
+			cp "$plist" "$backup_dir/" 2>/dev/null || true
+			launchctl unload "$plist" 2>/dev/null || true
+			rm -f "$plist"
+			echo "    ${GREEN}✓ Rimosso${NC} ${GRAY}(backup: $backup_dir)${NC}"
+		else
+			echo "    ${GRAY}skip${NC}"
+		fi
+	done
+}
+
 main() {
+	if [[ "$CLEAN_MODE" == "true" ]]; then
+		print_section_header "Clean Orphaned Launch Agents"
+		find_orphan_agents
+		if [[ ${#ORPHAN_PLISTS[@]} -eq 0 ]]; then
+			echo "${GREEN}Nessun launch agent orfano trovato.${NC}"
+			return 0
+		fi
+		show_orphan_agents
+		echo ""
+		local answer
+		printf 'Procedere con la rimozione interattiva? [y/N] '
+		read -r answer || answer="n"
+		if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
+			remove_orphan_agents
+		else
+			echo "${GRAY}Annullato.${NC}"
+		fi
+		return 0
+	fi
+
 	print_section_header "Startup Items"
 
 	echo "${GRAY}[1/6] User LaunchAgents...${NC}"

@@ -113,7 +113,9 @@ Simulators, derived data, SPM packages.
 Shell environment and PATH summary.
 .TP
 .B startup
-Launch agents and login items.
+Launch agents and login items. \fBstartup clean\fR (or \fBstartup --clean\fR)
+interactively removes orphaned user launch agents — those whose executable no
+longer exists — backing up each plist to \fI~/.raccoon/fix-backups/\fR first.
 .TP
 .B trash
 Trash contents and size.

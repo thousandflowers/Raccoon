@@ -145,6 +145,7 @@ rcc xcode                 # simulators, derived data, SPM caches
 ```bash
 rcc env                   # shell environment & PATH breakdown
 rcc startup               # launch agents & login items
+rcc startup clean         # remove orphaned launch agents (interactive)
 rcc trash                 # trash size & empty
 rcc fonts                 # find duplicates & corrupted fonts
 rcc history               # shell history analysis
@@ -211,6 +212,7 @@ rcc certs                 # SSL certificate expiry report
 | `ports` | Open ports & listeners |
 | `ssh` | Key inspection, `--export`, `--export-gpg` |
 | `startup` | Launch agents & login items |
+| `startup clean` | Remove orphaned launch agents (interactive, with backup) |
 | `trash` | Trash contents & size |
 | `upgrade` | Multi‑package update |
 | `xcode` | Simulators, caches, SPM |
