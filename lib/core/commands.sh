@@ -106,12 +106,57 @@ show_commands() {
     echo -e "${GRAY}Run '${GREEN}rcc help${NC}' for full help${NC}"
 }
 
+# Mini sparkline of the last 7 audits under the banner: ● = no failures,
+# ○ = had failures. Shown only with >=2 audits on record. JSON parsed with grep
+# (no jq); ANSI suppressed when stdout is not a terminal (pipe-safe).
+show_health_history() {
+    local dir="$HOME/.raccoon/audit-history"
+    [[ -d "$dir" ]] || return 0
+    local files count
+    files="$(ls "$dir"/audit_*.json 2>/dev/null | sort | tail -7 || true)"
+    [[ -z "$files" ]] && return 0
+    count="$(printf '%s\n' "$files" | grep -c . || true)"
+    [[ "$count" -lt 2 ]] && return 0
+
+    local dots="" passed=0 last_file="" f fail use_color=1
+    [[ -t 1 ]] || use_color=0
+    while IFS= read -r f; do
+        [[ -z "$f" ]] && continue
+        last_file="$f"
+        fail="$(grep -o '"fail": [0-9]*' "$f" | grep -o '[0-9]*' | head -1 || true)"
+        [[ -z "$fail" ]] && fail=0
+        if [[ "$fail" -eq 0 ]]; then
+            passed=$((passed + 1))
+            [[ $use_color -eq 1 ]] && dots+="${GREEN}●${NC}" || dots+="●"
+        else
+            [[ $use_color -eq 1 ]] && dots+="${YELLOW}○${NC}" || dots+="○"
+        fi
+    done <<< "$files"
+
+    # Relative date of the most recent audit, from its filename.
+    local base lastdate today yday rel
+    base="$(basename "$last_file")"
+    lastdate="${base#audit_}"; lastdate="${lastdate%%_*}"
+    today="$(date +%Y-%m-%d)"
+    yday="$(date -v-1d +%Y-%m-%d 2>/dev/null || echo "")"
+    if [[ "$lastdate" == "$today" ]]; then
+        rel="oggi"
+    elif [[ -n "$yday" && "$lastdate" == "$yday" ]]; then
+        rel="ieri"
+    else
+        rel="$(printf '%s' "$lastdate" | awk -F- '{print $3"/"$2}')"
+    fi
+
+    echo "  Ultimi audit: ${dots} (${passed}/${count} · ultimo: ${rel})"
+}
+
 show_brand_banner() {
     echo ""
     echo -e "${GREEN}     _${NC}"
     echo -e "${GREEN}   / \_/\_   ${NC}Raccoon ${TAGLINE}"
     echo -e "${GREEN}  ( o.o )  ${NC}"
     echo -e "${GREEN}   > ^ <${NC}"
+    show_health_history
     echo ""
 }
 
