@@ -99,8 +99,8 @@ show_audit_help() {
 	echo "  --history     Show previous audit runs"
 	echo "  --diff        Compare with previous run"
 	echo "  --watch       Schedule weekly auto-audit"
-	echo "  --alert       Alert on new issues"
-	echo "  --notify      Send notification on issues"
+	echo "  --alert       Send a native macOS notification when issues are found"
+	echo "  --notify      Send a native macOS notification with the result"
 	echo "  --help, -h    Show this help"
 	echo ""
 	echo "Examples:"
@@ -128,6 +128,7 @@ SHOW_HISTORY=false
 SHOW_DIFF=false
 SCHEDULE_WEEKLY=false
 NOTIFY=false
+ALERT_ON_ISSUES=false
 EXPLAIN_MODE=false
 REMEDIATION_MODE=false
 BASELINE_SAVE=false
@@ -608,8 +609,8 @@ schedule_weekly() {
 	<array>
 		<string>${audit_path}</string>
 		<string>--deep</string>
-		<string>--json</string>
 		<string>--alert</string>
+		<string>--notify</string>
 	</array>
 	<key>RunAtLoad</key>
 	<false/>
@@ -633,12 +634,21 @@ EOFPLIST
 }
 
 send_notification() {
-	if [[ $FAIL_count -gt 0 || $WARN_count -gt 0 ]]; then
-		local title="Security Audit: Issues Found"
-		local body="$FAIL_count failures, $WARN_count warnings"
-		
-		osascript -e "display notification \"$body\" with title \"$title\"" 2>/dev/null || true
+	local title body subtitle
+	if [[ $FAIL_count -gt 0 ]]; then
+		title="🦝 Raccoon — Problemi critici"
+		subtitle="$FAIL_count problemi, $WARN_count avvisi"
+		body="Esegui 'rcc audit --explain' per i dettagli"
+	elif [[ $WARN_count -gt 0 ]]; then
+		title="🦝 Raccoon — Attenzione"
+		subtitle="$WARN_count avvisi"
+		body="Esegui 'rcc audit' per i dettagli"
+	else
+		title="🦝 Raccoon — Tutto OK"
+		subtitle="Tutti i check passati"
+		body=""
 	fi
+	osascript -e "display notification \"$body\" with title \"$title\" subtitle \"$subtitle\"" 2>/dev/null || true
 }
 
 print_output_html() {
@@ -990,7 +1000,12 @@ main() {
 	if [[ "$NOTIFY" == "true" ]]; then
 		send_notification
 	fi
-	
+
+	# --alert: notify only when there is something to act on.
+	if [[ "$ALERT_ON_ISSUES" == "true" && ( $FAIL_count -gt 0 || $WARN_count -gt 0 ) ]]; then
+		send_notification
+	fi
+
 	if [[ "$OUTPUT_FORMAT" == "md" || "$OUTPUT_FORMAT" == "rtf" ]]; then
 		_set_report_context
 	fi

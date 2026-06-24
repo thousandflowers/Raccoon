@@ -345,3 +345,15 @@ JSON
 	assert_success
 	[[ -f "$HOME/.raccoon/baseline.json" ]]
 }
+
+# --- Feature 3.2: alerts / notifications -------------------------------------
+@test "send_notification exits 0 when there are no issues" {
+	# osascript may fail in CI; the function guards it with || true.
+	run bash -c "source '$SCRIPT_DIR/bin/audit.sh'; PASS_count=5 WARN_count=0 FAIL_count=0; send_notification"
+	assert_success
+}
+
+@test "audit --alert exits 0" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --alert
+	assert_success
+}
