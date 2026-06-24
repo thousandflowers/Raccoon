@@ -27,6 +27,10 @@ _rcc() {
 			# shellcheck disable=SC2207
 			COMPREPLY=($(compgen -W '--active --known --passwords --json --help -h' -- "$cur"))
 			;;
+		disk)
+			# shellcheck disable=SC2207
+			COMPREPLY=($(compgen -W '--large --min --top --json --help -h' -- "$cur"))
+			;;
 		help|--version|-V)
 			COMPREPLY=()
 			;;

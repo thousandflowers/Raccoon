@@ -120,6 +120,7 @@ User LaunchAgents
 
 ```bash
 rcc disk                  # internal, external & network drives, SMART
+rcc disk large            # biggest files (--min SIZE, --top N)
 rcc network               # interfaces, Wi‑Fi, DNS, routing
 rcc wifi                  # active network, known SSIDs, Keychain passwords
 rcc memory                # system stats + processes sorted by RAM
@@ -204,6 +205,7 @@ rcc certs                 # SSL certificate expiry report
 | `backup` | Time Machine status |
 | `certs` | SSL certificate expiry |
 | `disk` | Internal, external & network drives, SMART |
+| `disk large` | Biggest files (`--min SIZE`, `--top N`) |
 | `docker` | Images, containers, volumes |
 | `env` | Shell environment & PATH |
 | `fonts` | Font duplicates & issues |

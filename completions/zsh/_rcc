@@ -77,6 +77,8 @@ _rcc() {
       case "$line[1]" in
         audit)  _rcc_audit_opts ;;
         upgrade|apps) _arguments '--dry-run[show what would be upgraded]' '-n[show what would be upgraded]' ;;
+        wifi)   _arguments '--active[active connection]' '--known[saved networks]' '--passwords[reveal Keychain passwords]' '--json[JSON format]' ;;
+        disk)   _arguments '--large[find biggest files]' '--min[minimum file size]' '--top[how many to show]' '--json[JSON format]' ;;
       esac
       ;;
   esac

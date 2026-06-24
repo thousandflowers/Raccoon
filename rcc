@@ -39,7 +39,12 @@ case "${1:-""}" in
 			;;
 		"network") exec "${SCRIPT_DIR}/bin/network.sh" "${@:2}" ;;
 		"wifi")    exec "${SCRIPT_DIR}/bin/wifi.sh" "${@:2}" ;;
-		"disk")    exec "${SCRIPT_DIR}/bin/disk.sh" "${@:2}" ;;
+		"disk")
+			case "${2:-}" in
+				"large") exec "${SCRIPT_DIR}/bin/disk.sh" --large "${@:3}" ;;
+				*)       exec "${SCRIPT_DIR}/bin/disk.sh" "${@:2}" ;;
+			esac
+			;;
 		"memory")  exec "${SCRIPT_DIR}/bin/memory.sh" "${@:2}" ;;
 		"startup")
 			case "${2:-}" in
