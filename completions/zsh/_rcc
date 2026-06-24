@@ -22,6 +22,7 @@ _rcc_audit_opts() {
     '--baseline:save current state as reference baseline'
     '--baseline-diff:compare current state against baseline'
     '--baseline-reset:remove the saved baseline'
+    '--schedule:schedule a deep audit (daily|weekly|monthly|status|remove)'
     '--history:show previous audit runs'
     '--diff:compare with previous run'
     '--watch:schedule weekly auto-audit'

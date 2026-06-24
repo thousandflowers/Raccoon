@@ -357,3 +357,35 @@ JSON
 	run bash "$SCRIPT_DIR/bin/audit.sh" --alert
 	assert_success
 }
+
+# --- Feature 3.5: schedule ---------------------------------------------------
+@test "audit --schedule weekly creates the LaunchAgent plist" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --schedule weekly
+	assert_success
+	[[ -f "$HOME/Library/LaunchAgents/com.raccoon.audit.plist" ]]
+	grep -q "<key>Weekday</key>" "$HOME/Library/LaunchAgents/com.raccoon.audit.plist"
+}
+
+@test "audit --schedule status with no schedule reports none" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --schedule status
+	assert_success
+	assert_output_contains "Nessuno schedule"
+}
+
+@test "audit --schedule remove with no schedule exits 0" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --schedule remove
+	assert_success
+	assert_output_contains "Schedule rimosso"
+}
+
+@test "audit --watch still works (alias for --schedule weekly)" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --watch
+	assert_success
+	[[ -f "$HOME/Library/LaunchAgents/com.raccoon.audit.plist" ]]
+}
+
+@test "audit --schedule monthly sets a monthly interval" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --schedule monthly
+	assert_success
+	grep -q "<key>Day</key>" "$HOME/Library/LaunchAgents/com.raccoon.audit.plist"
+}

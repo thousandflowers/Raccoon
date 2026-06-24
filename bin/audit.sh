@@ -98,7 +98,10 @@ show_audit_help() {
 	echo "  --tech NAME   Technician name for the report header (optional)"
 	echo "  --history     Show previous audit runs"
 	echo "  --diff        Compare with previous run"
-	echo "  --watch       Schedule weekly auto-audit"
+	echo "  --watch       Alias for --schedule weekly"
+	echo "  --schedule FREQ   Schedule a deep audit: daily, weekly, or monthly"
+	echo "  --schedule status Show whether a schedule is active"
+	echo "  --schedule remove Remove the active schedule"
 	echo "  --alert       Send a native macOS notification when issues are found"
 	echo "  --notify      Send a native macOS notification with the result"
 	echo "  --help, -h    Show this help"
@@ -126,7 +129,7 @@ REPORT_FILE=""
 OUTPUT_FORMAT="text"
 SHOW_HISTORY=false
 SHOW_DIFF=false
-SCHEDULE_WEEKLY=false
+SCHEDULE_ACTION=""
 NOTIFY=false
 ALERT_ON_ISSUES=false
 EXPLAIN_MODE=false
@@ -243,8 +246,17 @@ while [[ $# -gt 0 ]]; do
 		shift
 		;;
 	--watch)
-		SCHEDULE_WEEKLY=true
+		SCHEDULE_ACTION="weekly"
 		shift
+		;;
+	--schedule)
+		if [[ $# -ge 2 && "$2" != -* ]]; then
+			SCHEDULE_ACTION="$2"
+			shift 2
+		else
+			SCHEDULE_ACTION="weekly"
+			shift
+		fi
 		;;
 	--alert)
 		# shellcheck disable=SC2034
@@ -593,12 +605,36 @@ show_diff() {
 	fi
 }
 
-schedule_weekly() {
-	local plist_file="$HOME/Library/LaunchAgents/com.raccoon.audit.plist"
+SCHEDULE_PLIST="$HOME/Library/LaunchAgents/com.raccoon.audit.plist"
+
+# Schedule a recurring deep audit (with notifications). FREQ is daily, weekly,
+# or monthly, mapped to the matching StartCalendarInterval.
+schedule_audit() {
+	local freq="$1" interval label
+	case "$freq" in
+		daily)
+			interval=$'\t\t<key>Hour</key>\n\t\t<integer>9</integer>\n\t\t<key>Minute</key>\n\t\t<integer>0</integer>'
+			label="every day at 9:00 AM"
+			;;
+		weekly)
+			interval=$'\t\t<key>Weekday</key>\n\t\t<integer>0</integer>\n\t\t<key>Hour</key>\n\t\t<integer>9</integer>\n\t\t<key>Minute</key>\n\t\t<integer>0</integer>'
+			label="Sundays at 9:00 AM"
+			;;
+		monthly)
+			interval=$'\t\t<key>Day</key>\n\t\t<integer>1</integer>\n\t\t<key>Hour</key>\n\t\t<integer>9</integer>\n\t\t<key>Minute</key>\n\t\t<integer>0</integer>'
+			label="the 1st of each month at 9:00 AM"
+			;;
+		*)
+			echo "Frequenza non valida: $freq (usa daily, weekly o monthly)" >&2
+			return 1
+			;;
+	esac
+
 	local audit_path
 	audit_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/audit.sh"
-	
-	cat > "$plist_file" << EOFPLIST
+	mkdir -p "$HOME/Library/LaunchAgents"
+
+	cat > "$SCHEDULE_PLIST" << EOFPLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -615,22 +651,33 @@ schedule_weekly() {
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StartCalendarInterval</key>
-	<array>
-		<dict>
-			<key>Weekday</key>
-			<integer>0</integer>
-			<key>Hour</key>
-			<integer>9</integer>
-			<key>Minute</key>
-			<integer>0</integer>
-		</dict>
-	</array>
+	<dict>
+${interval}
+	</dict>
 </dict>
 </plist>
 EOFPLIST
 
-	launchctl load "$plist_file" 2>/dev/null || true
-	echo "  Weekly audit scheduled (Sundays at 9:00 AM)"
+	launchctl unload "$SCHEDULE_PLIST" 2>/dev/null || true
+	launchctl load "$SCHEDULE_PLIST" 2>/dev/null || true
+	echo "  Audit scheduled — $label"
+}
+
+schedule_status() {
+	if [[ -f "$SCHEDULE_PLIST" ]] && launchctl list com.raccoon.audit >/dev/null 2>&1; then
+		local freq="daily"
+		grep -q "<key>Weekday</key>" "$SCHEDULE_PLIST" && freq="weekly"
+		grep -q "<key>Day</key>" "$SCHEDULE_PLIST" && freq="monthly"
+		echo "Attivo — $freq"
+	else
+		echo "Nessuno schedule attivo."
+	fi
+}
+
+schedule_remove() {
+	launchctl unload "$SCHEDULE_PLIST" 2>/dev/null || true
+	rm -f "$SCHEDULE_PLIST"
+	echo "Schedule rimosso."
 }
 
 send_notification() {
@@ -926,14 +973,23 @@ main() {
 		return 0
 	fi
 	
-	if [[ "$SCHEDULE_WEEKLY" == "true" ]]; then
-		print_section_header "Schedule Weekly Audit"
-		schedule_weekly
-		echo ""
-		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+	if [[ -n "$SCHEDULE_ACTION" ]]; then
+		case "$SCHEDULE_ACTION" in
+			status) schedule_status ;;
+			remove) schedule_remove ;;
+			daily | weekly | monthly)
+				print_section_header "Schedule Audit"
+				schedule_audit "$SCHEDULE_ACTION"
+				echo ""
+				echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+				;;
+			*)
+				echo "Uso: rcc audit --schedule daily|weekly|monthly|status|remove" >&2
+				;;
+		esac
 		return
 	fi
-	
+
 	if [[ "$QUIET_MODE" == "true" ]]; then
 		DEEP_SCAN=true
 	fi

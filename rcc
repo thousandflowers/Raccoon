@@ -33,7 +33,8 @@ case "${1:-""}" in
 				"quiet") exec "${SCRIPT_DIR}/bin/audit.sh" --deep --quiet "${@:3}" ;;
 				"json")  exec "${SCRIPT_DIR}/bin/audit.sh" --deep --json "${@:3}" ;;
 				"history") exec "${SCRIPT_DIR}/bin/audit.sh" --history "${@:3}" ;;
-				"watch") exec "${SCRIPT_DIR}/bin/audit.sh" --watch "${@:3}" ;;
+				"watch") exec "${SCRIPT_DIR}/bin/audit.sh" --schedule weekly "${@:3}" ;;
+				"schedule") exec "${SCRIPT_DIR}/bin/audit.sh" --schedule "${@:3}" ;;
 				*)       exec "${SCRIPT_DIR}/bin/audit.sh" "${@:2}" ;;
 			esac
 			;;

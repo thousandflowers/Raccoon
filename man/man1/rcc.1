@@ -54,6 +54,10 @@ since the previous run, and what still needs doing. Honours \fB\-\-report\fR,
 Save the current state as a signed reference baseline (\fI~/.raccoon/baseline.json\fR),
 compare the current state against it (regressions since that moment), or remove it.
 .TP
+\fB\-\-schedule\fR \fIdaily|weekly|monthly|status|remove\fR
+Schedule a recurring deep audit via a LaunchAgent (9:00 AM), show whether one is
+active, or remove it. \fB\-\-watch\fR is an alias for \fB\-\-schedule weekly\fR.
+.TP
 \fB\-\-md\fR, \fB\-\-rtf\fR
 Client\-ready report as Markdown or RTF (RTF opens in TextEdit/Word). The report
 is data\-driven: it renders every check the audit produces, so new checks appear
