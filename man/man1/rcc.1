@@ -41,8 +41,18 @@ Output just pass/warn/fail counts.
 \fB\-\-json\fR, \fB\-\-csv\fR, \fB\-\-html\fR
 Output format.
 .TP
+\fB\-\-md\fR, \fB\-\-rtf\fR
+Client\-ready report as Markdown or RTF (RTF opens in TextEdit/Word). The report
+is data\-driven: it renders every check the audit produces, so new checks appear
+automatically with no change to the report code.
+.TP
+\fB\-\-client\fR \fINAME\fR, \fB\-\-shop\fR \fINAME\fR, \fB\-\-tech\fR \fINAME\fR
+Optional branding for the report header/footer. With none set, a default
+Raccoon header/footer is used.
+.TP
 \fB\-\-report\fR \fIFILE\fR
-Save report to file.
+Save report to file. When no explicit format flag is given, the format is
+inferred from the file extension (\fI.md\fR, \fI.rtf\fR, \fI.json\fR, \fI.csv\fR, \fI.html\fR).
 .TP
 \fB\-\-history\fR
 Show previous audit runs.
@@ -114,6 +124,23 @@ Print version.
 .TP
 .B help, \-\-help, \-h
 Show help.
+.SH EXAMPLES
+.TP
+Client\-ready Markdown report with full branding:
+.EX
+rcc audit \-\-md \-\-report client.md \-\-client "Jane Doe" \\
+    \-\-shop "MacFix Pro" \-\-tech "Mario Rossi"
+.EE
+.TP
+Branded RTF report (opens in TextEdit/Word):
+.EX
+rcc audit \-\-rtf \-\-report client.rtf \-\-shop "MacFix Pro"
+.EE
+.TP
+Markdown to stdout (pipeable, default Raccoon header):
+.EX
+rcc audit \-\-md
+.EE
 .SH FILES
 .TP
 .I ~/.raccoon/

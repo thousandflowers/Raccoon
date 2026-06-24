@@ -1,0 +1,240 @@
+# shellcheck shell=bash
+# Client-ready audit report renderers (Markdown + RTF).
+#
+# DATA-DRIVEN BY DESIGN: these renderers consume ONLY the global AUDIT_RESULTS
+# array — the single source of truth populated by print_category in audit.sh.
+# They never reference a hardcoded list of checks. Add, remove, or rename a
+# check in lib/audit/checks.sh and it flows through here automatically.
+#
+# AUDIT_RESULTS entry format (TAB-separated, set once in print_category):
+#     "<status>\t<category>\t<Name>: <Value>"
+#   status   ∈ pass | warn | fail
+#   category human category label (e.g. "Core Security")
+#   the rest is "Name: Value" (split on the first ": ")
+#
+# Branding / system context is read from globals with safe defaults so the
+# renderers stay pure and testable in isolation:
+#   REPORT_CLIENT REPORT_SHOP REPORT_TECH   (branding, all optional)
+#   REPORT_MODEL  REPORT_MODEL_ID           (Mac model, commercial + identifier)
+#   REPORT_OS     REPORT_DATE               (macOS version, date/time string)
+#
+# Targets bash 3.2 (macOS /bin/bash): no associative arrays, no namerefs.
+
+# --- Optional plain-language descriptions -----------------------------------
+# OPTIONAL lookup, keyed by check name. An unknown name yields "" — the renderer
+# never breaks or skips a check that lacks an entry. New checks need no entry;
+# descriptions can be added here later at any pace. Decoupled from the audit.
+# Seeded with the four checks MSP technicians most often explain to clients.
+check_description() {
+	case "$1" in
+		FileVault)  printf '%s' "Encrypts the disk so the data is unreadable if the Mac is lost or stolen." ;;
+		SIP)        printf '%s' "System Integrity Protection stops even admins and malware from altering protected system files." ;;
+		Firewall)   printf '%s' "Blocks unsolicited incoming network connections from other machines." ;;
+		Gatekeeper) printf '%s' "Ensures only signed, notarised apps can run, blocking untrusted software." ;;
+		*)          printf '%s' "" ;;
+	esac
+}
+
+# --- Status presentation -----------------------------------------------------
+_status_word() {
+	case "$1" in
+		pass) printf 'Good' ;;
+		warn) printf 'Warning' ;;
+		fail) printf 'Critical' ;;
+		*)    printf 'Unknown' ;;
+	esac
+}
+
+_status_symbol() {
+	case "$1" in
+		pass) printf '✓' ;;
+		warn) printf '⚠' ;;
+		fail) printf '✗' ;;
+		*)    printf '•' ;;
+	esac
+}
+
+# _report_counts -> "total good warn fail" computed from AUDIT_RESULTS.
+# Totals are derived here so the renderers are self-contained (no reliance on
+# the audit's running counters) and fully testable from synthetic data.
+_report_counts() {
+	local total=0 good=0 warn=0 fail=0 entry st
+	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+		st="${entry%%$'\t'*}"
+		total=$((total + 1))
+		case "$st" in
+			pass) good=$((good + 1)) ;;
+			warn) warn=$((warn + 1)) ;;
+			fail) fail=$((fail + 1)) ;;
+		esac
+	done
+	printf '%d %d %d %d' "$total" "$good" "$warn" "$fail"
+}
+
+# Split a TAB-record into the globals _PE_STATUS / _PE_CAT / _PE_NAME / _PE_VALUE
+# (bash 3.2 has no namerefs). Value is everything after the first ": " in the
+# "Name: Value" remainder; a remainder without ": " yields the whole string as
+# the name and an empty value.
+_parse_entry() {
+	local entry="$1"
+	_PE_STATUS="${entry%%$'\t'*}"
+	local tail="${entry#*$'\t'}"
+	_PE_CAT="${tail%%$'\t'*}"
+	local rest="${tail#*$'\t'}"
+	if [[ "$rest" == *": "* ]]; then
+		_PE_NAME="${rest%%: *}"
+		_PE_VALUE="${rest#*: }"
+	else
+		_PE_NAME="$rest"
+		_PE_VALUE=""
+	fi
+}
+
+# ============================================================================
+# Markdown
+# ============================================================================
+render_report_md() {
+	local title_org="${REPORT_SHOP:-Raccoon}"
+
+	printf '# %s — Security Audit Report\n\n' "$title_org"
+	[[ -n "${REPORT_CLIENT:-}" ]] && printf '**Client:** %s  \n' "$REPORT_CLIENT"
+	[[ -n "${REPORT_TECH:-}"   ]] && printf '**Technician:** %s  \n' "$REPORT_TECH"
+	local model="${REPORT_MODEL:-Mac}"
+	[[ -n "${REPORT_MODEL_ID:-}" ]] && model="$model (${REPORT_MODEL_ID})"
+	printf '**Mac:** %s  \n' "$model"
+	printf '**macOS:** %s  \n' "${REPORT_OS:-Unknown}"
+	printf '**Date:** %s\n\n' "${REPORT_DATE:-}"
+
+	local total good warn fail
+	read -r total good warn fail <<<"$(_report_counts)"
+	printf '## Summary\n\n'
+	printf '**%d** checks · ✓ %d good · ⚠ %d warnings · ✗ %d critical\n\n' \
+		"$total" "$good" "$warn" "$fail"
+
+	local entry desc current_cat=""
+	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+		_parse_entry "$entry"
+		if [[ "$_PE_CAT" != "$current_cat" ]]; then
+			printf '\n## %s\n\n' "$_PE_CAT"
+			current_cat="$_PE_CAT"
+		fi
+		printf -- '- %s **%s** (%s)' "$(_status_symbol "$_PE_STATUS")" "$_PE_NAME" "$(_status_word "$_PE_STATUS")"
+		[[ -n "$_PE_VALUE" ]] && printf -- ' — %s' "$_PE_VALUE"
+		printf '\n'
+		desc="$(check_description "$_PE_NAME")"
+		[[ -n "$desc" ]] && printf '  _%s_\n' "$desc"
+	done
+
+	printf '\n---\n'
+	printf 'Generated by %s · %s\n\n' "$title_org" "${REPORT_DATE:-}"
+	printf '_powered by Raccoon_\n'
+}
+
+# ============================================================================
+# RTF
+# ============================================================================
+
+# rtf_escape STRING -> RTF-safe text.
+# Escapes the RTF delimiters \ { } and converts every non-ASCII character to
+# BOTH a Unicode word (\uN, the real code point) and a byte-level fallback
+# (\'hh for code points <=255, else "?"), emitted in parallel so modern
+# (Word/Pages) and legacy readers both render accented client names correctly.
+# Forces LC_ALL=C for deterministic byte-wise iteration and decodes UTF-8 by
+# hand, so it behaves identically on bash 3.2 and bash 5.
+# ponytail: BMP only — code points >0xFFFF (emoji, astral planes) become "?";
+# add UTF-16 surrogate-pair emission here if astral support is ever needed.
+rtf_escape() {
+	local LC_ALL=C
+	local s="$1" out="" i len ord ch n cp j cb cbo s16
+	len="${#s}"
+	i=0
+	while [ "$i" -lt "$len" ]; do
+		ch="${s:i:1}"
+		ord="$(printf '%d' "'$ch")"
+		ord=$((ord & 0xff))
+		if [ "$ord" -lt 128 ]; then
+			case "$ch" in
+				'\') out="$out\\\\" ;;
+				'{') out="$out\\{" ;;
+				'}') out="$out\\}" ;;
+				*)   out="$out$ch" ;;
+			esac
+			i=$((i + 1))
+			continue
+		fi
+		# Determine UTF-8 sequence length and seed the code point.
+		if   [ "$ord" -ge 240 ]; then n=4; cp=$((ord & 0x07))
+		elif [ "$ord" -ge 224 ]; then n=3; cp=$((ord & 0x0f))
+		elif [ "$ord" -ge 192 ]; then n=2; cp=$((ord & 0x1f))
+		else n=1; cp="$ord"; fi   # stray continuation byte: treat as-is
+		j=1
+		while [ "$j" -lt "$n" ]; do
+			cb="${s:$((i + j)):1}"
+			cbo="$(printf '%d' "'$cb")"
+			cbo=$((cbo & 0xff))
+			cp=$(((cp << 6) | (cbo & 0x3f)))
+			j=$((j + 1))
+		done
+		i=$((i + n))
+		if [ "$cp" -le 65535 ]; then
+			s16="$cp"
+			[ "$cp" -gt 32767 ] && s16=$((cp - 65536))   # \uN is signed 16-bit
+			if [ "$cp" -le 255 ]; then
+				out="$out\\u${s16}\\'$(printf '%02x' "$cp")"
+			else
+				out="$out\\u${s16}?"
+			fi
+		else
+			out="$out?"
+		fi
+	done
+	printf '%s' "$out"
+}
+
+render_report_rtf() {
+	local title_org="${REPORT_SHOP:-Raccoon}"
+
+	# RTF preamble. \fs28 ~14pt body. Bold via \b ... \b0. ASCII separators keep
+	# the structure robust; accented text in fields is handled by rtf_escape.
+	printf '{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Helvetica;}}\n'
+	printf '\\fs28\n'
+
+	printf '{\\b\\fs36 %s - Security Audit Report}\\par\n' "$(rtf_escape "$title_org")"
+	printf '\\par\n'
+
+	[[ -n "${REPORT_CLIENT:-}" ]] && printf '{\\b Client:} %s\\par\n' "$(rtf_escape "$REPORT_CLIENT")"
+	[[ -n "${REPORT_TECH:-}"   ]] && printf '{\\b Technician:} %s\\par\n' "$(rtf_escape "$REPORT_TECH")"
+	local model="${REPORT_MODEL:-Mac}"
+	[[ -n "${REPORT_MODEL_ID:-}" ]] && model="$model (${REPORT_MODEL_ID})"
+	printf '{\\b Mac:} %s\\par\n' "$(rtf_escape "$model")"
+	printf '{\\b macOS:} %s\\par\n' "$(rtf_escape "${REPORT_OS:-Unknown}")"
+	printf '{\\b Date:} %s\\par\n' "$(rtf_escape "${REPORT_DATE:-}")"
+	printf '\\par\n'
+
+	local total good warn fail
+	read -r total good warn fail <<<"$(_report_counts)"
+	printf '{\\b\\fs32 Summary}\\par\n'
+	printf '%d checks: %d good, %d warnings, %d critical\\par\n' \
+		"$total" "$good" "$warn" "$fail"
+	printf '\\par\n'
+
+	local entry desc current_cat=""
+	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+		_parse_entry "$entry"
+		if [[ "$_PE_CAT" != "$current_cat" ]]; then
+			[[ -n "$current_cat" ]] && printf '\\par\n'
+			printf '{\\b\\fs32 %s}\\par\n' "$(rtf_escape "$_PE_CAT")"
+			current_cat="$_PE_CAT"
+		fi
+		printf '[%s] {\\b %s}' "$(_status_word "$_PE_STATUS")" "$(rtf_escape "$_PE_NAME")"
+		[[ -n "$_PE_VALUE" ]] && printf ': %s' "$(rtf_escape "$_PE_VALUE")"
+		printf '\\par\n'
+		desc="$(check_description "$_PE_NAME")"
+		[[ -n "$desc" ]] && printf '{\\i %s}\\par\n' "$(rtf_escape "$desc")"
+	done
+
+	printf '\\par\n'
+	printf 'Generated by %s - %s\\par\n' "$(rtf_escape "$title_org")" "$(rtf_escape "${REPORT_DATE:-}")"
+	printf '{\\i powered by Raccoon}\\par\n'
+	printf '}\n'
+}

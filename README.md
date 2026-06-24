@@ -75,11 +75,25 @@ rcc audit --fix           # auto-fix common issues
 rcc audit --json          # machine-readable output
 rcc audit --csv           # spreadsheet-ready
 rcc audit --html          # save as HTML report
-rcc audit --report out    # save report to file
+rcc audit --md            # client-ready Markdown report
+rcc audit --rtf           # client-ready RTF (opens in TextEdit/Word)
+rcc audit --report out    # save report to file (format inferred from extension)
 rcc audit history         # view past audits
 rcc audit --diff          # changes since last audit
 rcc audit watch           # schedule weekly scan via LaunchAgent
 ```
+
+**Client-ready reports.** `--md` and `--rtf` produce a branded document a
+technician can hand to a client. Add `--client`, `--shop`, and `--tech` for the
+header/footer (all optional — without them you get a default Raccoon report):
+
+```bash
+rcc audit --md --report client.md \
+  --client "Jane Doe" --shop "MacFix Pro" --tech "Mario Rossi"
+```
+
+The reporter is data-driven: it renders whatever checks the audit produces, so
+new checks show up automatically with no change to the report code.
 
 **Safe by default.** `--fix` never imposes a one-size-fits-all setting — a config
 that looks odd on one Mac is often legitimate on another:

@@ -8,10 +8,22 @@ SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 source "$SCRIPT_DIR/../lib/audit/checks.sh"
+# shellcheck source=lib/core/report.sh
+source "$SCRIPT_DIR/../lib/core/report.sh"
 
 PASS_count=0
 WARN_count=0
 FAIL_count=0
+
+# Single source of truth for the data-driven reporters. Every check flows
+# through print_category, which appends one TAB record per result here. The
+# Markdown/RTF renderers consume ONLY this array — no check is hardcoded.
+declare -a AUDIT_RESULTS=()
+
+# Branding (optional) and system context for client-ready reports.
+REPORT_CLIENT=""
+REPORT_SHOP=""
+REPORT_TECH=""
 declare -a FIX_QUEUE=()
 
 # Fixes that mutate user data snapshot the original here first, so a wrong
@@ -74,12 +86,23 @@ show_audit_help() {
 	echo "  --html        Output in HTML format"
 	echo "  --csv         Output in CSV format"
 	echo "  --json        Output in JSON format"
+	echo "  --md          Output a client-ready Markdown report"
+	echo "  --rtf         Output a client-ready RTF report (opens in TextEdit/Word)"
+	echo "  --client NAME Client name for the report header (optional)"
+	echo "  --shop NAME   Shop/company name for branding (optional)"
+	echo "  --tech NAME   Technician name for the report header (optional)"
 	echo "  --history     Show previous audit runs"
 	echo "  --diff        Compare with previous run"
 	echo "  --watch       Schedule weekly auto-audit"
 	echo "  --alert       Alert on new issues"
 	echo "  --notify      Send notification on issues"
 	echo "  --help, -h    Show this help"
+	echo ""
+	echo "Examples:"
+	echo "  rcc audit --md --report client.md --client \"Jane Doe\" \\"
+	echo "            --shop \"MacFix Pro\" --tech \"Mario Rossi\""
+	echo "  rcc audit --rtf --report client.rtf --shop \"MacFix Pro\""
+	echo "  rcc audit --md                 # Markdown to stdout (pipeable)"
 	echo ""
 	echo "Safety:"
 	echo "  Destructive fixes snapshot originals to ~/.raccoon/fix-backups/ first."
@@ -146,6 +169,38 @@ while [[ $# -gt 0 ]]; do
 		OUTPUT_FORMAT="json"
 		shift
 		;;
+	--md)
+		OUTPUT_FORMAT="md"
+		shift
+		;;
+	--rtf)
+		OUTPUT_FORMAT="rtf"
+		shift
+		;;
+	--client)
+		REPORT_CLIENT="$2"
+		shift 2
+		;;
+	--client=*)
+		REPORT_CLIENT="${1#--client=}"
+		shift
+		;;
+	--shop)
+		REPORT_SHOP="$2"
+		shift 2
+		;;
+	--shop=*)
+		REPORT_SHOP="${1#--shop=}"
+		shift
+		;;
+	--tech)
+		REPORT_TECH="$2"
+		shift 2
+		;;
+	--tech=*)
+		REPORT_TECH="${1#--tech=}"
+		shift
+		;;
 	--history)
 		SHOW_HISTORY=true
 		shift
@@ -172,6 +227,19 @@ while [[ $# -gt 0 ]]; do
 		;;
 	esac
 done
+
+# An explicit --md/--rtf/--json/--csv/--html flag wins. If none was given but a
+# --report file carries a known extension, infer the format from it so
+# `--report client.md` just works.
+if [[ "$OUTPUT_FORMAT" == "text" && -n "$REPORT_FILE" ]]; then
+	case "$REPORT_FILE" in
+		*.md | *.markdown) OUTPUT_FORMAT="md" ;;
+		*.rtf)             OUTPUT_FORMAT="rtf" ;;
+		*.json)            OUTPUT_FORMAT="json" ;;
+		*.csv)             OUTPUT_FORMAT="csv" ;;
+		*.html | *.htm)    OUTPUT_FORMAT="html" ;;
+	esac
+fi
 
 HISTORY_DIR="$HOME/.raccoon/audit-history"
 [[ -d "$HISTORY_DIR" ]] || mkdir -p "$HISTORY_DIR"
@@ -215,6 +283,10 @@ print_category() {
 
 	for item in "${items[@]}"; do
 		local status="${item%%:*}" rest="${item#*:}"
+		# Capture into the single data model consumed by every reporter. This is
+		# the one funnel all checks pass through, so md/rtf/etc stay decoupled
+		# from the check list automatically.
+		AUDIT_RESULTS+=("${status}"$'\t'"${name}"$'\t'"${rest}")
 		print_result "$status" "$rest"
 	done
 
@@ -517,6 +589,20 @@ fix_issue() {
 
 
 
+# Populate system context for client-ready reports. The commercial model name
+# (e.g. "MacBook Pro") via system_profiler costs ~0.3s, so this only runs for
+# md/rtf output; the hw.model identifier (e.g. "MacBookPro18,3") is kept as a
+# secondary field.
+_set_report_context() {
+	REPORT_DATE="$(date '+%Y-%m-%d %H:%M')"
+	REPORT_OS="$(sw_vers -productVersion 2>/dev/null || true)"
+	REPORT_MODEL_ID="$(sysctl -n hw.model 2>/dev/null || true)"
+	REPORT_MODEL="$(system_profiler SPHardwareDataType 2>/dev/null | awk -F': ' '/Model Name/{print $2; exit}')"
+	if [[ -z "$REPORT_MODEL" ]]; then
+		REPORT_MODEL="$REPORT_MODEL_ID"
+	fi
+}
+
 main() {
 	load_fix_skips
 
@@ -613,21 +699,29 @@ main() {
 		send_notification
 	fi
 	
+	if [[ "$OUTPUT_FORMAT" == "md" || "$OUTPUT_FORMAT" == "rtf" ]]; then
+		_set_report_context
+	fi
+
 	if [[ -n "$REPORT_FILE" ]]; then
 		case "$OUTPUT_FORMAT" in
 			html) print_output_html > "$REPORT_FILE" ;;
 			csv) print_output_csv > "$REPORT_FILE" ;;
 			json) print_output_json > "$REPORT_FILE" ;;
+			md) render_report_md > "$REPORT_FILE" ;;
+			rtf) render_report_rtf > "$REPORT_FILE" ;;
 			*) print_summary > "$REPORT_FILE" ;;
 		esac
 		echo "  Report saved to: $REPORT_FILE"
 	fi
-	
+
 	if [[ "$OUTPUT_FORMAT" != "text" ]]; then
 		case "$OUTPUT_FORMAT" in
 			html) print_output_html ;;
 			csv) print_output_csv ;;
 			json) print_output_json ;;
+			md) render_report_md ;;
+			rtf) render_report_rtf ;;
 		esac
 		return 0
 	fi
