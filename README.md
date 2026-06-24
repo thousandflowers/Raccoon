@@ -9,6 +9,8 @@
 [![CI](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go_TUI-Bubble_Tea-00ADD8?logo=go)](ui/)
+![ShellCheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-bats-blue)
 
 Zero dependencies beyond macOS + git. 1500+ lines of shellcheck-clean Bash.
 
