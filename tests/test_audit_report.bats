@@ -297,3 +297,51 @@ JSON
 	[[ -f "$HOME/remediation.txt" ]]
 	grep -q "Rapporto intervento" "$HOME/remediation.txt"
 }
+
+# --- Feature 3.1: baseline ---------------------------------------------------
+@test "audit --baseline writes a baseline.json with individual results" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --baseline
+	assert_success
+	[[ -f "$HOME/.raccoon/baseline.json" ]]
+	grep -q '"name":' "$HOME/.raccoon/baseline.json"
+	assert_output_contains "Baseline salvato"
+}
+
+@test "audit --baseline-diff without a baseline explains and exits 0" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --baseline-diff
+	assert_success
+	assert_output_contains "Nessun baseline trovato"
+}
+
+@test "audit --baseline-diff with a baseline shows the baseline comparison" {
+	mkdir -p "$HOME/.raccoon"
+	cat > "$HOME/.raccoon/baseline.json" <<'JSON'
+{
+  "timestamp": "2026-01-01_09:00:00",
+  "pass": 10,
+  "warning": 5,
+  "fail": 3,
+  "deep": false,
+  "results": [
+    {"status": "fail", "category": "Core Security", "name": "Firewall", "value": "Disabled"}
+  ]
+}
+JSON
+	run bash "$SCRIPT_DIR/bin/audit.sh" --baseline-diff
+	assert_success
+	assert_output_contains "Confronto con baseline"
+}
+
+@test "audit --baseline-reset without a baseline exits 0" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --baseline-reset
+	assert_success
+	assert_output_contains "Nessun baseline da rimuovere"
+}
+
+@test "audit --baseline-reset declined keeps the baseline file" {
+	mkdir -p "$HOME/.raccoon"
+	echo '{"timestamp":"x","results":[]}' > "$HOME/.raccoon/baseline.json"
+	run bash "$SCRIPT_DIR/bin/audit.sh" --baseline-reset <<< "n"
+	assert_success
+	[[ -f "$HOME/.raccoon/baseline.json" ]]
+}

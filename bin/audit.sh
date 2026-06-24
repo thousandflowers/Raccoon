@@ -88,6 +88,9 @@ show_audit_help() {
 	echo "  --json        Output in JSON format"
 	echo "  --explain     Add plain-language notes under failing/warning checks"
 	echo "  --remediation Client-facing intervention report (found/fixed/to-do)"
+	echo "  --baseline    Save the current state as a signed reference baseline"
+	echo "  --baseline-diff   Compare the current state against the baseline"
+	echo "  --baseline-reset  Remove the saved baseline"
 	echo "  --md          Output a client-ready Markdown report"
 	echo "  --rtf         Output a client-ready RTF report (opens in TextEdit/Word)"
 	echo "  --client NAME Client name for the report header (optional)"
@@ -127,6 +130,9 @@ SCHEDULE_WEEKLY=false
 NOTIFY=false
 EXPLAIN_MODE=false
 REMEDIATION_MODE=false
+BASELINE_SAVE=false
+BASELINE_DIFF=false
+BASELINE_RESET=false
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -223,6 +229,18 @@ while [[ $# -gt 0 ]]; do
 		REMEDIATION_MODE=true
 		shift
 		;;
+	--baseline)
+		BASELINE_SAVE=true
+		shift
+		;;
+	--baseline-diff)
+		BASELINE_DIFF=true
+		shift
+		;;
+	--baseline-reset)
+		BASELINE_RESET=true
+		shift
+		;;
 	--watch)
 		SCHEDULE_WEEKLY=true
 		shift
@@ -257,6 +275,8 @@ fi
 
 HISTORY_DIR="$HOME/.raccoon/audit-history"
 [[ -d "$HISTORY_DIR" ]] || mkdir -p "$HISTORY_DIR"
+
+BASELINE_FILE="$HOME/.raccoon/baseline.json"
 
 print_result() {
 	local status="$1"
@@ -384,15 +404,13 @@ _results_json() {
 	printf '\n  '
 }
 
-save_to_history() {
-	local timestamp
+# Write the current audit state (counts + per-check results) as JSON to a file.
+# Shared by history snapshots and the signed baseline so both have one format.
+_write_audit_json() {
+	local file="$1" timestamp results_json
 	timestamp="$(date +%Y-%m-%d_%H:%M:%S)"
-	local history_file="$HISTORY_DIR/audit_${timestamp}.json"
-
-	local results_json
 	results_json="$(_results_json)"
-
-	cat > "$history_file" << EOF
+	cat > "$file" << EOF
 {
   "timestamp": "$timestamp",
   "pass": $PASS_count,
@@ -402,12 +420,52 @@ save_to_history() {
   "results": [$results_json]
 }
 EOF
+}
+
+save_to_history() {
+	local timestamp
+	timestamp="$(date +%Y-%m-%d_%H:%M:%S)"
+	local history_file="$HISTORY_DIR/audit_${timestamp}.json"
+
+	_write_audit_json "$history_file"
 
 	local latest_link="$HISTORY_DIR/latest.json"
 	ln -sf "$history_file" "$latest_link" 2>/dev/null || true
 
 	# Rotate: keep last 30 audit files
 	find "$HISTORY_DIR" -name 'audit_*.json' -maxdepth 1 -exec ls -t {} + 2>/dev/null | tail -n +31 | xargs rm -f 2>/dev/null || true
+}
+
+# Baseline: a signed reference snapshot. Later audits compare against it with
+# --baseline-diff to surface regressions since that moment (not just the last run).
+save_baseline() {
+	mkdir -p "$HOME/.raccoon"
+	_write_audit_json "$BASELINE_FILE"
+	echo "${GREEN}✓ Baseline salvato — $(date)${NC}"
+}
+
+show_baseline_diff() {
+	if [[ ! -f "$BASELINE_FILE" ]]; then
+		echo "Nessun baseline trovato. Esegui prima rcc audit --baseline."
+		return 0
+	fi
+	local bdate
+	bdate="$(grep -o '"timestamp": "[^"]*"' "$BASELINE_FILE" | head -1 | sed 's/.*"timestamp": "\([^"]*\)".*/\1/')"
+	show_diff "$BASELINE_FILE" "-- Confronto con baseline del ${bdate} --"
+}
+
+baseline_reset() {
+	if [[ ! -f "$BASELINE_FILE" ]]; then
+		echo "Nessun baseline da rimuovere."
+		return 0
+	fi
+	local answer
+	printf 'Rimuovere il baseline? [y/N] '
+	read -r answer || answer="n"
+	if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
+		rm -f "$BASELINE_FILE"
+		echo "Baseline rimosso."
+	fi
 }
 
 show_audit_history() {
@@ -455,18 +513,25 @@ _prev_check_status() {
 }
 
 show_diff() {
-	echo "${PURPLE_BOLD}-- Diff with Previous Run--${NC}"
-	echo ""
-	
-	local latest_link="$HISTORY_DIR/latest.json"
-	if [[ ! -L "$latest_link" ]]; then
-		echo "  No previous run found"
-		return
+	# Optional args: $1 = file to compare against (default: latest history),
+	# $2 = custom header. Lets --baseline-diff reuse this against baseline.json.
+	local prev_file="${1:-}" header="${2:-}"
+	if [[ -n "$header" ]]; then
+		echo "${PURPLE_BOLD}${header}${NC}"
+	else
+		echo "${PURPLE_BOLD}-- Diff with Previous Run--${NC}"
 	fi
-	
-	local prev_file
-	prev_file="$(readlink "$latest_link")"
-	
+	echo ""
+
+	if [[ -z "$prev_file" ]]; then
+		local latest_link="$HISTORY_DIR/latest.json"
+		if [[ ! -L "$latest_link" ]]; then
+			echo "  No previous run found"
+			return
+		fi
+		prev_file="$(readlink "$latest_link")"
+	fi
+
 	local curr_pass="$PASS_count"
 	local curr_warn="$WARN_count"
 	local curr_fail="$FAIL_count"
@@ -786,6 +851,11 @@ main() {
 		return
 	fi
 	
+	if [[ "$BASELINE_RESET" == "true" ]]; then
+		baseline_reset
+		return
+	fi
+
 	if [[ "$SHOW_DIFF" == "true" ]]; then
 		# Run the checks quietly so the per-check diff has current data; the box
 		# output is suppressed and only the diff summary is printed.
@@ -798,6 +868,21 @@ main() {
 			run_additional_checks
 		} > /dev/null 2>&1
 		show_diff
+		return
+	fi
+
+	if [[ "$BASELINE_DIFF" == "true" ]]; then
+		# Quiet run so AUDIT_RESULTS holds the current state to compare against
+		# the saved baseline.
+		{
+			run_core_checks
+			run_network_checks
+			run_auth_checks
+			run_persistence_checks
+			run_privacy_checks
+			run_additional_checks
+		} > /dev/null 2>&1
+		show_baseline_diff
 		return
 	fi
 
@@ -870,7 +955,11 @@ main() {
 	run_persistence_checks
 	run_privacy_checks
 	run_additional_checks
-	
+
+	if [[ "$BASELINE_SAVE" == "true" ]]; then
+		save_baseline
+	fi
+
 	print_summary
 
 	if [[ ${#FIX_QUEUE[@]} -gt 0 && "$AUTO_FIX" != "true" && "$OUTPUT_FORMAT" == "text" && "$QUIET_MODE" != "true" ]]; then

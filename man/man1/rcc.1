@@ -50,6 +50,10 @@ Print a client-facing intervention report: problems found, problems resolved
 since the previous run, and what still needs doing. Honours \fB\-\-report\fR,
 \fB\-\-md\fR, and \fB\-\-rtf\fR.
 .TP
+\fB\-\-baseline\fR, \fB\-\-baseline\-diff\fR, \fB\-\-baseline\-reset\fR
+Save the current state as a signed reference baseline (\fI~/.raccoon/baseline.json\fR),
+compare the current state against it (regressions since that moment), or remove it.
+.TP
 \fB\-\-md\fR, \fB\-\-rtf\fR
 Client\-ready report as Markdown or RTF (RTF opens in TextEdit/Word). The report
 is data\-driven: it renders every check the audit produces, so new checks appear
