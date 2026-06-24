@@ -27,6 +27,7 @@ _rcc_audit_opts() {
     '--profile-save:save current state as a client profile'
     '--profile-list:list saved profiles'
     '--profile-delete:remove a client profile'
+    '--share:publish report as an anonymous GitHub Gist'
     '--history:show previous audit runs'
     '--diff:compare with previous run'
     '--watch:schedule weekly auto-audit'

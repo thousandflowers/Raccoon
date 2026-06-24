@@ -62,6 +62,10 @@ active, or remove it. \fB\-\-watch\fR is an alias for \fB\-\-schedule weekly\fR.
 Per-client profiles in \fI~/.raccoon/profiles/<name>/\fR: load (config, branding,
 and a profile baseline), save the current state, list, or delete.
 .TP
+\fB\-\-share\fR
+Publish the Markdown report as an anonymous public GitHub Gist and print (and
+copy) the link. Network failure is non-fatal. Not available with \fB\-\-quiet\fR.
+.TP
 \fB\-\-md\fR, \fB\-\-rtf\fR
 Client\-ready report as Markdown or RTF (RTF opens in TextEdit/Word). The report
 is data\-driven: it renders every check the audit produces, so new checks appear

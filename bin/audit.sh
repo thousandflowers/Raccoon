@@ -95,6 +95,7 @@ show_audit_help() {
 	echo "  --profile-save NAME   Save the current state as a client profile"
 	echo "  --profile-list    List saved profiles"
 	echo "  --profile-delete NAME Remove a client profile"
+	echo "  --share       Publish the report as an anonymous GitHub Gist and print the link"
 	echo "  --md          Output a client-ready Markdown report"
 	echo "  --rtf         Output a client-ready RTF report (opens in TextEdit/Word)"
 	echo "  --client NAME Client name for the report header (optional)"
@@ -121,6 +122,8 @@ show_audit_help() {
 	echo "  rcc audit --deep --profile mario-bianchi --report intervento.md"
 	echo "  rcc audit --profile-save mario-bianchi"
 	echo "  rcc audit --profile-list"
+	echo "  rcc audit --deep --share"
+	echo "  rcc audit --deep --profile mario-bianchi --share"
 	echo ""
 	echo "Safety:"
 	echo "  Destructive fixes snapshot originals to ~/.raccoon/fix-backups/ first."
@@ -150,6 +153,7 @@ PROFILE_SAVE=""
 PROFILE_LIST=false
 PROFILE_DELETE=""
 PROFILE_DIR=""
+SHARE=false
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -270,6 +274,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--profile-delete)
 		if [[ $# -ge 2 && "$2" != -* ]]; then PROFILE_DELETE="$2"; shift 2; else shift; fi
+		;;
+	--share)
+		SHARE=true
+		shift
 		;;
 	--watch)
 		SCHEDULE_ACTION="weekly"
@@ -599,6 +607,42 @@ profile_delete() {
 	if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
 		rm -rf "$dir"
 		echo "Rimosso."
+	fi
+}
+
+# --- Share via GitHub Gist ---------------------------------------------------
+# Build the anonymous-gist JSON payload from the Markdown report. Split out so it
+# is testable without the network. JSON string escaping via python3, with a sed
+# fallback for macOS < 12.
+_share_payload() {
+	local md esc
+	md="$(render_report_md)"
+	if command -v python3 >/dev/null 2>&1; then
+		esc="$(printf '%s' "$md" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')"
+	else
+		esc="\"$(printf '%s' "$md" | sed 's/\\/\\\\/g; s/"/\\"/g' | awk '{printf "%s\\n", $0}')\""
+	fi
+	printf '{"public":true,"description":"Raccoon audit - %s - %s","files":{"raccoon-audit.md":{"content":%s}}}' \
+		"$(hostname)" "$(date)" "$esc"
+}
+
+# Publish the report as an anonymous public Gist and print the link. No GitHub
+# token required. Network/API failure is non-fatal (exit 0). curl is overridable
+# via RACCOON_CURL for testing.
+share_report() {
+	local url payload curl_cmd="${RACCOON_CURL:-curl}"
+	payload="$(_share_payload)"
+	url="$("$curl_cmd" -s -X POST https://api.github.com/gists \
+		-H "Content-Type: application/json" \
+		-d "$payload" 2>/dev/null |
+		grep -o '"html_url": "[^"]*"' | head -1 | grep -o 'https://[^"]*' || true)"
+	if [[ -z "$url" ]]; then
+		echo "Condivisione non disponibile (nessuna connessione o API GitHub non raggiungibile)."
+		return 0
+	fi
+	echo "${GREEN}✓ Report condiviso:${NC} $url"
+	if printf '%s' "$url" | pbcopy 2>/dev/null; then
+		echo "  (copiato negli appunti)"
 	fi
 }
 
@@ -1013,6 +1057,12 @@ main() {
 	load_fix_skips
 	load_profile
 
+	# --share has nothing to publish in --quiet (no report is built); skip it.
+	if [[ "$SHARE" == "true" && "$QUIET_MODE" == "true" ]]; then
+		echo "⚠ --share ignorato con --quiet" >&2
+		SHARE=false
+	fi
+
 	# Touch ID (pam_tid) works even when launched headless from the TUI, so try
 	# it unconditionally rather than gating on a tty. Only mark sudo unavailable
 	# when auth genuinely can't happen.
@@ -1208,7 +1258,7 @@ main() {
 		send_notification
 	fi
 
-	if [[ "$OUTPUT_FORMAT" == "md" || "$OUTPUT_FORMAT" == "rtf" ]]; then
+	if [[ "$OUTPUT_FORMAT" == "md" || "$OUTPUT_FORMAT" == "rtf" || "$SHARE" == "true" ]]; then
 		_set_report_context
 	fi
 
@@ -1222,6 +1272,12 @@ main() {
 			*) print_summary > "$REPORT_FILE" ;;
 		esac
 		echo "  Report saved to: $REPORT_FILE"
+	fi
+
+	# --share publishes the Markdown report regardless of output format, so it
+	# runs before the non-text early-return (--md --share both work).
+	if [[ "$SHARE" == "true" ]]; then
+		share_report
 	fi
 
 	if [[ "$OUTPUT_FORMAT" != "text" ]]; then

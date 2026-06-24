@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # rcc bash completion — source this file or add to bash_completion.d
 
-_rcc_audit_opts='--deep --fix --dry-run --force --quiet --report --json --csv --html --md --rtf --explain --remediation --baseline --baseline-diff --baseline-reset --history --diff --watch --schedule --profile --profile-save --profile-list --profile-delete --alert --notify --help -h'
+_rcc_audit_opts='--deep --fix --dry-run --force --quiet --report --json --csv --html --md --rtf --explain --remediation --baseline --baseline-diff --baseline-reset --history --diff --watch --schedule --profile --profile-save --profile-list --profile-delete --share --alert --notify --help -h'
 
 _rcc() {
 	# shellcheck disable=SC2034

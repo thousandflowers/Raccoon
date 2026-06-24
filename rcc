@@ -37,6 +37,7 @@ case "${1:-""}" in
 				"schedule") exec "${SCRIPT_DIR}/bin/audit.sh" --schedule "${@:3}" ;;
 				"profile") exec "${SCRIPT_DIR}/bin/audit.sh" --profile "${@:3}" ;;
 				"profile-list") exec "${SCRIPT_DIR}/bin/audit.sh" --profile-list "${@:3}" ;;
+				"share") exec "${SCRIPT_DIR}/bin/audit.sh" --share "${@:3}" ;;
 				*)       exec "${SCRIPT_DIR}/bin/audit.sh" "${@:2}" ;;
 			esac
 			;;
