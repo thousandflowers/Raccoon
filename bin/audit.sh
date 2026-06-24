@@ -91,6 +91,10 @@ show_audit_help() {
 	echo "  --baseline    Save the current state as a signed reference baseline"
 	echo "  --baseline-diff   Compare the current state against the baseline"
 	echo "  --baseline-reset  Remove the saved baseline"
+	echo "  --profile NAME    Load a client profile (config, branding, baseline)"
+	echo "  --profile-save NAME   Save the current state as a client profile"
+	echo "  --profile-list    List saved profiles"
+	echo "  --profile-delete NAME Remove a client profile"
 	echo "  --md          Output a client-ready Markdown report"
 	echo "  --rtf         Output a client-ready RTF report (opens in TextEdit/Word)"
 	echo "  --client NAME Client name for the report header (optional)"
@@ -113,6 +117,10 @@ show_audit_help() {
 	echo "  rcc audit --md                 # Markdown to stdout (pipeable)"
 	echo "  rcc audit --explain            # audit with plain-language notes"
 	echo "  rcc audit --deep --explain     # deep scan, explained"
+	echo "  rcc audit --profile mario-bianchi"
+	echo "  rcc audit --deep --profile mario-bianchi --report intervento.md"
+	echo "  rcc audit --profile-save mario-bianchi"
+	echo "  rcc audit --profile-list"
 	echo ""
 	echo "Safety:"
 	echo "  Destructive fixes snapshot originals to ~/.raccoon/fix-backups/ first."
@@ -137,6 +145,11 @@ REMEDIATION_MODE=false
 BASELINE_SAVE=false
 BASELINE_DIFF=false
 BASELINE_RESET=false
+PROFILE_NAME=""
+PROFILE_SAVE=""
+PROFILE_LIST=false
+PROFILE_DELETE=""
+PROFILE_DIR=""
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -245,6 +258,19 @@ while [[ $# -gt 0 ]]; do
 		BASELINE_RESET=true
 		shift
 		;;
+	--profile)
+		if [[ $# -ge 2 && "$2" != -* ]]; then PROFILE_NAME="$2"; shift 2; else shift; fi
+		;;
+	--profile-save)
+		if [[ $# -ge 2 && "$2" != -* ]]; then PROFILE_SAVE="$2"; shift 2; else shift; fi
+		;;
+	--profile-list)
+		PROFILE_LIST=true
+		shift
+		;;
+	--profile-delete)
+		if [[ $# -ge 2 && "$2" != -* ]]; then PROFILE_DELETE="$2"; shift 2; else shift; fi
+		;;
 	--watch)
 		SCHEDULE_ACTION="weekly"
 		shift
@@ -290,6 +316,7 @@ HISTORY_DIR="$HOME/.raccoon/audit-history"
 [[ -d "$HISTORY_DIR" ]] || mkdir -p "$HISTORY_DIR"
 
 BASELINE_FILE="$HOME/.raccoon/baseline.json"
+PROFILES_DIR="$HOME/.raccoon/profiles"
 
 print_result() {
 	local status="$1"
@@ -478,6 +505,100 @@ baseline_reset() {
 	if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
 		rm -f "$BASELINE_FILE"
 		echo "Baseline rimosso."
+	fi
+}
+
+# --- Client profiles ---------------------------------------------------------
+# A profile (~/.raccoon/profiles/<name>/) remembers per-Mac settings: extra
+# checks to skip (config), client/shop/tech (meta), and its own baseline.json.
+# load_profile is called early in main so the active profile shapes the audit,
+# the report header, and which baseline --baseline-diff compares against.
+load_profile() {
+	[[ -z "$PROFILE_NAME" ]] && return 0
+	PROFILE_DIR="$PROFILES_DIR/$PROFILE_NAME"
+	if [[ ! -d "$PROFILE_DIR" ]]; then
+		mkdir -p "$PROFILE_DIR"
+		echo "Nuovo profilo '$PROFILE_NAME' creato."
+	fi
+	# Append the profile's skip list to FIX_SKIP (same format as audit.conf).
+	if [[ -f "$PROFILE_DIR/config" ]]; then
+		local extra
+		extra="$(grep -v '^[[:space:]]*#' "$PROFILE_DIR/config" 2>/dev/null | grep -v '^[[:space:]]*$' || true)"
+		if [[ -n "$extra" ]]; then
+			if [[ -n "${FIX_SKIP:-}" ]]; then
+				FIX_SKIP="$FIX_SKIP"$'\n'"$extra"
+			else
+				FIX_SKIP="$extra"
+			fi
+		fi
+	fi
+	# Meta overrides branding (a saved profile is the source of truth for it).
+	if [[ -f "$PROFILE_DIR/meta" ]]; then
+		local c s t
+		c="$(sed -n 's/^CLIENT=//p' "$PROFILE_DIR/meta" | head -1)"
+		s="$(sed -n 's/^SHOP=//p' "$PROFILE_DIR/meta" | head -1)"
+		t="$(sed -n 's/^TECH=//p' "$PROFILE_DIR/meta" | head -1)"
+		[[ -n "$c" ]] && REPORT_CLIENT="$c"
+		[[ -n "$s" ]] && REPORT_SHOP="$s"
+		[[ -n "$t" ]] && REPORT_TECH="$t"
+	fi
+	# Use the profile's baseline for --baseline / --baseline-diff.
+	BASELINE_FILE="$PROFILE_DIR/baseline.json"
+}
+
+profile_save() {
+	local name="$1" dir="$PROFILES_DIR/$1"
+	mkdir -p "$dir"
+	local client="$REPORT_CLIENT" shop="$REPORT_SHOP" tech="$REPORT_TECH"
+	if [[ -t 0 ]]; then
+		[[ -z "$client" ]] && { printf 'Cliente: '; read -r client || client=""; }
+		[[ -z "$shop" ]] && { printf 'Shop/Studio: '; read -r shop || shop=""; }
+		[[ -z "$tech" ]] && { printf 'Tecnico: '; read -r tech || tech=""; }
+	fi
+	{
+		echo "CLIENT=$client"
+		echo "SHOP=$shop"
+		echo "TECH=$tech"
+		echo "SAVED=$(date)"
+	} > "$dir/meta"
+	# Snapshot the current state as the profile baseline, if we have results.
+	if [[ ${#AUDIT_RESULTS[@]} -gt 0 ]]; then
+		_write_audit_json "$dir/baseline.json"
+	fi
+	echo "Profilo '$name' salvato."
+}
+
+profile_list() {
+	if [[ ! -d "$PROFILES_DIR" ]] || [[ -z "$(ls -A "$PROFILES_DIR" 2>/dev/null || true)" ]]; then
+		echo "Nessun profilo salvato."
+		return 0
+	fi
+	local d name client shop saved
+	for d in "$PROFILES_DIR"/*/; do
+		[[ -d "$d" ]] || continue
+		name="$(basename "$d")"
+		client=""; shop=""; saved=""
+		if [[ -f "$d/meta" ]]; then
+			client="$(sed -n 's/^CLIENT=//p' "$d/meta" | head -1)"
+			shop="$(sed -n 's/^SHOP=//p' "$d/meta" | head -1)"
+			saved="$(sed -n 's/^SAVED=//p' "$d/meta" | head -1)"
+		fi
+		echo "  ${name} — ${client:-?} / ${shop:-?} (${saved:-?})"
+	done
+}
+
+profile_delete() {
+	local dir="$PROFILES_DIR/$1"
+	if [[ ! -d "$dir" ]]; then
+		echo "Profilo '$1' non trovato."
+		return 0
+	fi
+	local answer
+	printf "Rimuovere profilo '%s'? [y/N] " "$1"
+	read -r answer || answer="n"
+	if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
+		rm -rf "$dir"
+		echo "Rimosso."
 	fi
 }
 
@@ -890,6 +1011,7 @@ _set_report_context() {
 
 main() {
 	load_fix_skips
+	load_profile
 
 	# Touch ID (pam_tid) works even when launched headless from the TUI, so try
 	# it unconditionally rather than gating on a tty. Only mark sudo unavailable
@@ -907,7 +1029,31 @@ main() {
 		show_audit_history
 		return
 	fi
-	
+
+	if [[ "$PROFILE_LIST" == "true" ]]; then
+		profile_list
+		return
+	fi
+
+	if [[ -n "$PROFILE_DELETE" ]]; then
+		profile_delete "$PROFILE_DELETE"
+		return
+	fi
+
+	if [[ -n "$PROFILE_SAVE" ]]; then
+		# Quiet run so the saved profile baseline reflects the current state.
+		{
+			run_core_checks
+			run_network_checks
+			run_auth_checks
+			run_persistence_checks
+			run_privacy_checks
+			run_additional_checks
+		} > /dev/null 2>&1
+		profile_save "$PROFILE_SAVE"
+		return
+	fi
+
 	if [[ "$BASELINE_RESET" == "true" ]]; then
 		baseline_reset
 		return

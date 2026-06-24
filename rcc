@@ -35,6 +35,8 @@ case "${1:-""}" in
 				"history") exec "${SCRIPT_DIR}/bin/audit.sh" --history "${@:3}" ;;
 				"watch") exec "${SCRIPT_DIR}/bin/audit.sh" --schedule weekly "${@:3}" ;;
 				"schedule") exec "${SCRIPT_DIR}/bin/audit.sh" --schedule "${@:3}" ;;
+				"profile") exec "${SCRIPT_DIR}/bin/audit.sh" --profile "${@:3}" ;;
+				"profile-list") exec "${SCRIPT_DIR}/bin/audit.sh" --profile-list "${@:3}" ;;
 				*)       exec "${SCRIPT_DIR}/bin/audit.sh" "${@:2}" ;;
 			esac
 			;;

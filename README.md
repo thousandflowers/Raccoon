@@ -202,6 +202,7 @@ rcc certs                 # SSL certificate expiry report
 | `audit --remediation` | Client-facing before/after intervention report |
 | `audit --baseline` | Save a reference baseline; `--baseline-diff` shows regressions since |
 | `audit --schedule FREQ` | Schedule a deep audit (daily/weekly/monthly); `status`/`remove` |
+| `audit profile` | Per-client profiles (config, branding, baseline); `profile-list` |
 | `battery` | Health, cycles, temperature |
 | `backup` | Time Machine status |
 | `certs` | SSL certificate expiry |
