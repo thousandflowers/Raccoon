@@ -19,9 +19,13 @@ _rcc() {
 			# shellcheck disable=SC2207,SC2016
 			COMPREPLY=($(compgen -W '$_rcc_audit_opts' -- "$cur"))
 			;;
-		upgrade|apps)
+		upgrade)
 			# shellcheck disable=SC2207
 			COMPREPLY=($(compgen -W '--dry-run -n --help -h' -- "$cur"))
+			;;
+		apps)
+			# shellcheck disable=SC2207
+			COMPREPLY=($(compgen -W '--dry-run -n --no-catalog --no-sparkle --auto-launch --help -h' -- "$cur"))
 			;;
 		wifi)
 			# shellcheck disable=SC2207

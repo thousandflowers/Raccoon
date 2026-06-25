@@ -9,15 +9,30 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_apps_help() {
-	print_help_header "apps" "Update installed GUI apps" "[--dry-run]"
-	echo "  --dry-run, -n    Show what would be updated without updating"
+	print_help_header "apps" "Update installed GUI apps" "[options]"
+	echo "  Updates all apps in four layers, in order:"
+	echo "    1. Mac App Store      (mas)"
+	echo "    2. Homebrew casks     (brew upgrade --cask --greedy)"
+	echo "    3. Homebrew catalog   (7000+ apps matched by name, no install needed)"
+	echo "    4. Sparkle feed       (apps with SUFeedURL in their plist)"
 	echo ""
-	echo "  Updates: Mac App Store (mas) + Homebrew casks (--greedy)"
-	echo "  Greedy also refreshes apps that normally self-update."
+	echo "  Apps with built-in auto-updaters (Slack, Chrome, Zoom...) are detected"
+	echo "  and skipped by default. Use --auto-launch to open them so their internal"
+	echo "  updater triggers."
+	echo ""
+	echo "  Options:"
+	echo "    --dry-run, -n    Show what would be updated, without updating"
+	echo "    --no-catalog     Skip the Homebrew catalog lookup (layer 3)"
+	echo "    --no-sparkle     Skip the Sparkle feed check (layer 4)"
+	echo "    --auto-launch    Open auto-updater apps to trigger their update"
+	echo "    --help, -h       This help"
 	echo ""
 }
 
 RCC_DRY_RUN=false
+RCC_NO_CATALOG=false
+RCC_NO_SPARKLE=false
+RCC_AUTO_LAUNCH=false
 
 for arg in "$@"; do
 	case "$arg" in
@@ -27,6 +42,15 @@ for arg in "$@"; do
 		;;
 	--dry-run | -n)
 		RCC_DRY_RUN=true
+		;;
+	--no-catalog)
+		RCC_NO_CATALOG=true
+		;;
+	--no-sparkle)
+		RCC_NO_SPARKLE=true
+		;;
+	--auto-launch)
+		RCC_AUTO_LAUNCH=true
 		;;
 	esac
 done
@@ -50,7 +74,7 @@ _parse_mas() {
 }
 
 # ============================================================
-# Updaters — each increments global progress exactly twice
+# Layer 1-2 — Mac App Store + Homebrew casks (each increments twice)
 # ============================================================
 
 update_casks() {
@@ -144,8 +168,304 @@ update_mas() {
 }
 
 # ============================================================
+# Catalog helpers (pure bash / awk / grep — no python/jq)
+# ============================================================
+
+# Build a token<TAB>app_name<TAB>version<TAB>auto_updates lookup from the
+# Homebrew cask catalog JSON (one cask per line). Skips deprecated/disabled.
+_build_cask_lookup() {
+	grep '"app":\[' "$CASK_CATALOG_FILE" 2>/dev/null |
+		grep -v '"deprecated":true' |
+		grep -v '"disabled":true' |
+		awk '
+			{
+				line = $0
+				token = line; sub(/.*"token":"/, "", token); sub(/".*/, "", token)
+				ver = line; sub(/.*"version":"/, "", ver); sub(/".*/, "", ver)
+				auto = "0"; if (line ~ /"auto_updates":true/) auto = "1"
+				app = line; sub(/.*"app":\["/, "", app); sub(/\.app.*/, "", app)
+				if (app != line) print token "\t" app ".app\t" ver "\t" auto
+			}
+		' >"$CASK_LOOKUP_FILE" 2>/dev/null || true
+}
+
+# Look up "<Name>.app" (column 2, tab-delimited) and print its lookup row, or "".
+_lookup_app() {
+	local tab
+	tab="$(printf '\t')"
+	grep -iF "${tab}${1}${tab}" "$CASK_LOOKUP_FILE" 2>/dev/null | head -1 || true
+}
+
+# Print an .app bundle's version (CFBundleShortVersionString, then CFBundleVersion).
+_local_version() {
+	defaults read "$1/Contents/Info" CFBundleShortVersionString 2>/dev/null ||
+		defaults read "$1/Contents/Info" CFBundleVersion 2>/dev/null ||
+		echo ""
+}
+
+# Return 0 (true) when $1 (local) is older than $2 (remote). Bash 3.2 safe:
+# field-by-field on dots, no sort -V (unavailable on BSD sort).
+_version_outdated() {
+	[[ "$1" == "$2" ]] && return 1
+	local IFS=.
+	# shellcheck disable=SC2206  # intentional split of dotted version into fields
+	local -a L=($1) R=($2)
+	local i l r
+	for i in 0 1 2 3; do
+		l="${L[$i]:-0}"
+		r="${R[$i]:-0}"
+		l="${l%%[^0-9]*}"
+		r="${r%%[^0-9]*}"
+		l="${l:-0}"
+		r="${r:-0}"
+		((l < r)) && return 0
+		((l > r)) && return 1
+	done
+	return 1
+}
+
+# Download and install a DMG/ZIP/PKG from a URL. No external dependencies.
+_install_from_url() {
+	local app_name="$1" local_ver="$2" remote_ver="$3" url="$4"
+	local ext="${url##*.}"
+	ext="${ext%%\?*}"
+	ext="$(echo "$ext" | tr '[:upper:]' '[:lower:]')"
+
+	local tmp
+	tmp="$(mktemp /tmp/raccoon-dl-XXXXXX)"
+
+	update_global_progress_info "apps: downloading $app_name..."
+	if ! curl -fsSL --max-time 120 "$url" -o "$tmp" 2>/dev/null; then
+		rm -f "$tmp"
+		append_progress_output "apps: ✗ $app_name — download failed (skipped)"
+		return 0
+	fi
+
+	# cp/installer don't read stdin; sudo prompts on /dev/tty by default and the
+	# session is pre-cached, so no stdin redirect is needed here.
+	case "$ext" in
+	dmg)
+		local mnt
+		mnt="$(mktemp -d /tmp/raccoon-mnt-XXXXXX)"
+		if ! hdiutil attach -nobrowse -quiet -mountpoint "$mnt" "$tmp" 2>/dev/null; then
+			rm -f "$tmp"
+			rmdir "$mnt" 2>/dev/null || true
+			return 0
+		fi
+		local src
+		src="$(find "$mnt" -maxdepth 3 -name "*.app" -not -path "*/.*" 2>/dev/null | head -1 || true)"
+		if [[ -n "$src" ]]; then
+			local dst bak
+			dst="/Applications/$(basename "$src")"
+			if [[ -d "$dst" ]]; then
+				bak="$dst.raccoon-bak-$(date +%Y%m%d%H%M%S)"
+				mv "$dst" "$bak" 2>/dev/null || sudo mv "$dst" "$bak" 2>/dev/null || true
+			fi
+			cp -R "$src" /Applications/ 2>/dev/null ||
+				sudo cp -R "$src" /Applications/ 2>/dev/null || true
+			xattr -dr com.apple.quarantine "/Applications/$(basename "$src")" 2>/dev/null || true
+		fi
+		hdiutil detach -quiet "$mnt" 2>/dev/null || true
+		rm -rf "$mnt"
+		;;
+	zip)
+		local udir
+		udir="$(mktemp -d /tmp/raccoon-unz-XXXXXX)"
+		unzip -q "$tmp" -d "$udir" 2>/dev/null || true
+		local src
+		src="$(find "$udir" -maxdepth 4 -name "*.app" -not -path "*/.*" 2>/dev/null | head -1 || true)"
+		if [[ -n "$src" ]]; then
+			cp -R "$src" /Applications/ 2>/dev/null ||
+				sudo cp -R "$src" /Applications/ 2>/dev/null || true
+			xattr -dr com.apple.quarantine "/Applications/$(basename "$src")" 2>/dev/null || true
+		fi
+		rm -rf "$udir"
+		;;
+	pkg)
+		sudo installer -pkg "$tmp" -target / 2>/dev/null || true
+		;;
+	*)
+		append_progress_output "apps: ✗ $app_name — unknown format .$ext (skipped)"
+		rm -f "$tmp"
+		return 0
+		;;
+	esac
+
+	rm -f "$tmp"
+	append_progress_output "apps: ✓ $app_name ($local_ver → $remote_ver)"
+}
+
+# Directories scanned for .app bundles. Overridable for testing.
+_app_dirs() {
+	if [[ -n "${RCC_APP_DIRS:-}" ]]; then
+		printf '%s' "$RCC_APP_DIRS"
+	else
+		printf '%s' "/Applications $HOME/Applications"
+	fi
+}
+
+# ============================================================
+# Layer 3 — Homebrew catalog (match installed apps by name)
+# ============================================================
+
+update_homebrew_catalog() {
+	# Guard: no catalog available.
+	if [[ -z "${CASK_CATALOG_FILE:-}" ]]; then
+		increment_global_progress
+		increment_global_progress
+		return 0
+	fi
+
+	update_global_progress_info "catalog: building lookup..."
+	if [[ ! -s "${CASK_LOOKUP_FILE:-}" ]]; then
+		CASK_LOOKUP_FILE="$(mktemp /tmp/raccoon-lu-XXXXXX)"
+		_build_cask_lookup
+	fi
+	increment_global_progress
+
+	update_global_progress_info "catalog: scanning Applications..."
+
+	# Casks already handled by layer 2 — skip those tokens.
+	local brew_casks=""
+	command -v brew >/dev/null 2>&1 && brew_casks="$(brew list --cask 2>/dev/null || true)"
+
+	local updated=0 launched=0 skipped=0 not_found=0
+	local app_dir app_path app_name match token remote_ver auto local_ver
+
+	# shellcheck disable=SC2046  # intentional word-split of the dir list
+	for app_dir in $(_app_dirs); do
+		[[ -d "$app_dir" ]] || continue
+		for app_path in "$app_dir"/*.app; do
+			[[ -d "$app_path" ]] || continue
+			app_name="$(basename "$app_path" .app)"
+
+			match="$(_lookup_app "${app_name}.app")"
+			if [[ -z "$match" ]]; then
+				((not_found++)) || true
+				continue
+			fi
+
+			token="$(echo "$match" | cut -f1)"
+			remote_ver="$(echo "$match" | cut -f3)"
+			auto="$(echo "$match" | cut -f4)"
+
+			if echo "$brew_casks" | grep -qx "$token" 2>/dev/null; then
+				((skipped++)) || true
+				continue
+			fi
+
+			local_ver="$(_local_version "$app_path")"
+			[[ -z "$local_ver" ]] && continue
+
+			if ! _version_outdated "$local_ver" "$remote_ver"; then
+				((skipped++)) || true
+				continue
+			fi
+
+			if [[ "$RCC_DRY_RUN" == "true" ]]; then
+				if [[ "$auto" == "1" ]]; then
+					append_progress_output "catalog: $app_name $local_ver — has auto-updater (use --auto-launch to trigger)"
+				else
+					append_progress_output "catalog: $app_name $local_ver → $remote_ver"
+				fi
+				continue
+			fi
+
+			if [[ "$auto" == "1" ]]; then
+				if [[ "${RCC_AUTO_LAUNCH:-false}" == "true" ]]; then
+					update_global_progress_info "catalog: opening $app_name for auto-update..."
+					open -a "$app_name" --hide 2>/dev/null || true
+					sleep 3
+					((launched++)) || true
+				else
+					((skipped++)) || true
+				fi
+			else
+				update_global_progress_info "catalog: updating $app_name via brew cask..."
+				local brew_stdin=/dev/null
+				{ true >/dev/tty; } 2>/dev/null && brew_stdin=/dev/tty
+				brew install --cask "$token" --force <"$brew_stdin" 2>&1 | progress_pipe _parse_cask || true
+				echo "$app_name" >>"${PROCESSED_APPS_FILE:-/dev/null}"
+				((updated++)) || true
+			fi
+		done
+	done
+
+	append_progress_output "catalog: $updated updated, $launched launched, $skipped up to date/skipped, $not_found not in catalog"
+	increment_global_progress
+}
+
+# ============================================================
+# Layer 4 — Sparkle (SUFeedURL appcasts)
+# ============================================================
+
+update_sparkle_apps() {
+	update_global_progress_info "sparkle: scanning..."
+	increment_global_progress
+
+	local updated=0 skipped=0
+	local app_dir app_path app_name feed xml remote_ver local_ver dl_url
+
+	# shellcheck disable=SC2046  # intentional word-split of the dir list
+	for app_dir in $(_app_dirs); do
+		[[ -d "$app_dir" ]] || continue
+		for app_path in "$app_dir"/*.app; do
+			[[ -d "$app_path" ]] || continue
+			app_name="$(basename "$app_path" .app)"
+
+			if grep -qx "$app_name" "${PROCESSED_APPS_FILE:-/dev/null}" 2>/dev/null; then
+				continue
+			fi
+
+			feed="$(defaults read "$app_path/Contents/Info" SUFeedURL 2>/dev/null || true)"
+			[[ -z "$feed" ]] && continue
+
+			xml="$(curl -fsSL --max-time 10 "$feed" 2>/dev/null || true)"
+			[[ -z "$xml" ]] && continue
+
+			remote_ver="$(echo "$xml" | grep -o '<sparkle:shortVersionString>[^<]*' | head -1 | sed 's/<sparkle:shortVersionString>//' || true)"
+			if [[ -z "$remote_ver" ]]; then
+				remote_ver="$(echo "$xml" | grep -o 'sparkle:version="[^"]*"' | head -1 | sed 's/sparkle:version="//;s/"//' || true)"
+			fi
+			[[ -z "$remote_ver" ]] && continue
+
+			local_ver="$(_local_version "$app_path")"
+			[[ -z "$local_ver" ]] && continue
+
+			if ! _version_outdated "$local_ver" "$remote_ver"; then
+				((skipped++)) || true
+				continue
+			fi
+
+			dl_url="$(echo "$xml" | grep -o 'url="https://[^"]*\.\(dmg\|zip\|pkg\)' | head -1 | sed 's/url="//' || true)"
+			[[ -z "$dl_url" ]] && continue
+
+			if [[ "$RCC_DRY_RUN" == "true" ]]; then
+				append_progress_output "sparkle: $app_name $local_ver → $remote_ver"
+				continue
+			fi
+
+			_install_from_url "$app_name" "$local_ver" "$remote_ver" "$dl_url"
+			echo "$app_name" >>"${PROCESSED_APPS_FILE:-/dev/null}"
+			((updated++)) || true
+		done
+	done
+
+	append_progress_output "sparkle: $updated updated, $skipped up to date"
+	increment_global_progress
+}
+
+# ============================================================
 # Main
 # ============================================================
+
+_rcc_apps_cleanup() {
+	stop_sudo_keepalive 2>/dev/null || true
+	[[ -n "${CASK_CATALOG_FILE:-}" ]] && rm -f "$CASK_CATALOG_FILE"
+	[[ -n "${CASK_LOOKUP_FILE:-}" ]] && rm -f "$CASK_LOOKUP_FILE"
+	[[ -n "${PROCESSED_APPS_FILE:-}" ]] && rm -f "$PROCESSED_APPS_FILE"
+	return 0
+}
 
 main() {
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
@@ -153,24 +473,53 @@ main() {
 		echo ""
 	fi
 
-	# Cache sudo up front (Touch ID when available) so `brew upgrade --cask
-	# --greedy` casks that need root complete without a prompt mid-progress.
-	# The 200ms progress redraw overwrites/garbles an inline sudo prompt, which
-	# is why brew's sudo password got rejected through `rcc apps` (issue #23).
+	trap _rcc_apps_cleanup EXIT
+
+	# Cache sudo up front (Touch ID when available) so casks/pkgs that need root
+	# complete without a prompt mid-progress (issue #23).
 	if [[ "$RCC_DRY_RUN" != "true" ]] && command -v brew >/dev/null 2>&1; then
 		if ensure_sudo; then
-			trap stop_sudo_keepalive EXIT
 			start_sudo_keepalive
 		else
 			echo "${YELLOW}⚠ sudo unavailable — casks needing root may be skipped${NC}"
 		fi
 	fi
 
-	# ponytail: 2 slots per updater
-	init_global_progress 4
+	# 2 slots per layer: mas, casks, catalog, sparkle.
+	init_global_progress 8
 
-	update_casks
 	update_mas
+	update_casks
+
+	# Layer 3 — Homebrew catalog.
+	# ponytail: re-downloads the ~5MB catalog each run; cache under ~/.raccoon
+	# with a daily TTL if the latency ever matters.
+	if [[ "$RCC_NO_CATALOG" != "true" ]] && command -v brew >/dev/null 2>&1; then
+		update_global_progress_info "catalog: downloading..."
+		CASK_CATALOG_FILE="$(mktemp /tmp/raccoon-cat-XXXXXX)"
+		if curl -fsSL --max-time 30 "https://formulae.brew.sh/api/cask.json" -o "$CASK_CATALOG_FILE" 2>/dev/null; then
+			PROCESSED_APPS_FILE="$(mktemp /tmp/raccoon-proc-XXXXXX)"
+			CASK_LOOKUP_FILE=""
+			update_homebrew_catalog
+		else
+			CASK_CATALOG_FILE=""
+			append_progress_output "catalog: unavailable (no network)"
+			increment_global_progress
+			increment_global_progress
+		fi
+	else
+		increment_global_progress
+		increment_global_progress
+	fi
+
+	# Layer 4 — Sparkle.
+	if [[ "$RCC_NO_SPARKLE" != "true" ]]; then
+		PROCESSED_APPS_FILE="${PROCESSED_APPS_FILE:-$(mktemp /tmp/raccoon-proc-XXXXXX)}"
+		update_sparkle_apps
+	else
+		increment_global_progress
+		increment_global_progress
+	fi
 
 	finish_global_progress
 	echo ""
@@ -178,4 +527,6 @@ main() {
 	print_success "Completed"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]:-$0}" == "${0}" ]]; then
+	main "$@"
+fi

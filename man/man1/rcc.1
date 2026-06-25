@@ -19,6 +19,23 @@ Update Homebrew, pip, npm, gem, rustup, nvm.
 Show what would be upgraded.
 .RE
 .TP
+.B apps
+Update installed GUI apps in four layers: Mac App Store (\fBmas\fR), Homebrew
+casks (\fB\-\-greedy\fR), the Homebrew cask catalog (7000+ apps matched to
+/Applications by name, no install required), and Sparkle feeds
+(\fBSUFeedURL\fR). Apps with built-in auto-updaters are skipped by default.
+.RS
+.TP
+\fB\-\-dry-run\fR, \fB\-n\fR
+Show what would be updated.
+.TP
+\fB\-\-no-catalog\fR, \fB\-\-no-sparkle\fR
+Skip the Homebrew catalog (layer 3) or the Sparkle feed check (layer 4).
+.TP
+\fB\-\-auto-launch\fR
+Open auto-updater apps so their internal updater triggers.
+.RE
+.TP
 .B audit
 Security audit (30+ checks).
 .RS

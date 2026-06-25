@@ -173,13 +173,20 @@ rcc certs                 # SSL certificate expiry report
 ```bash
 rcc upgrade               # update brew, pip, npm, gem at once
 rcc upgrade --dry-run     # preview upgrades without running them
-rcc apps                  # update GUI apps (App Store + Homebrew casks)
+rcc apps                  # update apps in 4 layers (see below)
 rcc apps --dry-run        # preview app updates without running them
 rcc ssh                   # inspect keys, --export, --export-gpg
 rcc git                   # status, branches, stash, cleanup
 rcc docker                # images, containers, volumes
 rcc xcode                 # simulators, derived data, SPM caches
 ```
+
+`rcc apps` updates in four layers, in order: Mac App Store (`mas`), Homebrew
+casks (`--greedy`), the Homebrew cask catalog (7000+ apps matched to
+`/Applications` by name — no install required, parsed with pure awk), and
+Sparkle feeds (apps with a `SUFeedURL` in their plist). Apps with built-in
+auto-updaters are detected and skipped by default; `--auto-launch` opens them
+to trigger their own updater. Skip a layer with `--no-catalog` / `--no-sparkle`.
 
 <details>
 <summary>📸 Command demos</summary>
@@ -221,7 +228,7 @@ rcc xcode                 # simulators, derived data, SPM caches
 
 | Command | Description |
 |---------|-------------|
-| `apps` | Update GUI apps (App Store + casks) |
+| `apps` | Update all apps (App Store, Homebrew, catalog 7000+, Sparkle) |
 | `audit` | Security audit (30+ checks) |
 | `audit deep` | Full audit with sudo |
 | `audit fix` | Auto-fix security issues |

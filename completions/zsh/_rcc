@@ -86,7 +86,8 @@ _rcc() {
       # shellcheck disable=SC1087,SC2195
       case "$line[1]" in
         audit)  _rcc_audit_opts ;;
-        upgrade|apps) _arguments '--dry-run[show what would be upgraded]' '-n[show what would be upgraded]' ;;
+        upgrade) _arguments '--dry-run[show what would be upgraded]' '-n[show what would be upgraded]' ;;
+        apps) _arguments '--dry-run[preview]' '-n[preview]' '--no-catalog[skip Homebrew catalog]' '--no-sparkle[skip Sparkle feeds]' '--auto-launch[open auto-updater apps]' ;;
         wifi)   _arguments '--active[active connection]' '--known[saved networks]' '--passwords[reveal Keychain passwords]' '--json[JSON format]' ;;
         disk)   _arguments '--large[find biggest files]' '--min[minimum file size]' '--top[how many to show]' '--json[JSON format]' ;;
         fleet)  _values 'fleet command' audit status add remove list '--hosts[hosts file]' '--parallel[max connections]' '--report[aggregate report]' '--json[JSON format]' '--explain[plain-language notes]' ;;
