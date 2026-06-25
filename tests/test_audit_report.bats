@@ -8,6 +8,8 @@ load test_helper
 setup() {
 	setup_raccoon_env
 	# shellcheck source=/dev/null
+	source "$SCRIPT_DIR/lib/audit/checks.sh"   # _check_explain, used by the report
+	# shellcheck source=/dev/null
 	source "$SCRIPT_DIR/lib/core/report.sh"
 }
 
@@ -62,7 +64,7 @@ _set_branding() {
 	assert_output_contains "✓ **FileVault**"
 	assert_output_contains "✗ **Firewall**"
 	# FileVault has a seeded plain-language description.
-	assert_output_contains "Encrypts the disk"
+	assert_output_contains "Encrypts the whole disk"
 }
 
 # --- RTF, full branding ------------------------------------------------------
@@ -136,8 +138,8 @@ _set_branding() {
 	assert_success
 	assert_output_contains "Totally Undocumented Check"
 	assert_output_contains "some value"
-	# check_description returns nothing for unknown names.
-	[[ "$(check_description "Totally Undocumented Check")" == "" ]]
+	# _check_explain returns nothing for unknown names.
+	[[ "$(_check_explain "Totally Undocumented Check")" == "" ]]
 }
 
 # --- A check with an empty value renders the name only -----------------------

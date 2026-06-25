@@ -698,15 +698,6 @@ show_audit_history() {
 	echo "  Run 'rcc audit --deep --diff' to compare with previous"
 }
 
-# Look up a check's status inside a history file's "results" array (one JSON
-# object per line). Prints the status or "" if the check is absent. Uses fixed-
-# string grep + sed, no jq.
-_prev_check_status() {
-	local name="$1" file="$2"
-	grep -F "\"name\": \"$name\"" "$file" 2>/dev/null |
-		sed -n 's/.*"status": "\([^"]*\)".*/\1/p' | head -1 || true
-}
-
 show_diff() {
 	# Optional args: $1 = file to compare against (default: latest history),
 	# $2 = custom header. Lets --baseline-diff reuse this against baseline.json.
@@ -774,7 +765,7 @@ show_diff() {
 			tail_="${entry#*$'\t'}"
 			rest="${tail_#*$'\t'}"
 			if [[ "$rest" == *": "* ]]; then nm="${rest%%: *}"; else nm="$rest"; fi
-			prev="$(_prev_check_status "$nm" "$prev_file")"
+			prev="$(_json_check_status "$prev_file" "$nm")"
 			[[ -z "$prev" ]] && continue
 			if [[ "$st" == "pass" && ( "$prev" == "fail" || "$prev" == "warn" ) ]]; then
 				echo "  ${GREEN}✓ $nm resolved${NC}"
@@ -1033,7 +1024,7 @@ print_remediation() {
 			st="${entry%%$'\t'*}"; tail_="${entry#*$'\t'}"; rest="${tail_#*$'\t'}"
 			if [[ "$rest" == *": "* ]]; then nm="${rest%%: *}"; else nm="$rest"; fi
 			if [[ "$st" == "pass" ]]; then
-				prev="$(_prev_check_status "$nm" "$prev_file")"
+				prev="$(_json_check_status "$prev_file" "$nm")"
 				if [[ "$prev" == "fail" || "$prev" == "warn" ]]; then
 					echo "  - $nm"
 					resolved=$((resolved + 1))
@@ -1063,6 +1054,19 @@ print_remediation() {
 # (e.g. "MacBook Pro") via system_profiler costs ~0.3s, so this only runs for
 # md/rtf output; the hw.model identifier (e.g. "MacBookPro18,3") is kept as a
 # secondary field.
+# Run every check group with box output suppressed (populates AUDIT_RESULTS and
+# the counters). Used by diff/baseline-diff/remediation/sheet/profile-save.
+_run_checks_quiet() {
+	{
+		run_core_checks
+		run_network_checks
+		run_auth_checks
+		run_persistence_checks
+		run_privacy_checks
+		run_additional_checks
+	} > /dev/null 2>&1
+}
+
 _set_report_context() {
 	REPORT_DATE="$(date '+%Y-%m-%d %H:%M')"
 	REPORT_VERSION="$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo '?')"
@@ -1113,14 +1117,7 @@ main() {
 
 	if [[ -n "$PROFILE_SAVE" ]]; then
 		# Quiet run so the saved profile baseline reflects the current state.
-		{
-			run_core_checks
-			run_network_checks
-			run_auth_checks
-			run_persistence_checks
-			run_privacy_checks
-			run_additional_checks
-		} > /dev/null 2>&1
+		_run_checks_quiet
 		profile_save "$PROFILE_SAVE"
 		return
 	fi
@@ -1133,14 +1130,7 @@ main() {
 	if [[ "$SHOW_DIFF" == "true" ]]; then
 		# Run the checks quietly so the per-check diff has current data; the box
 		# output is suppressed and only the diff summary is printed.
-		{
-			run_core_checks
-			run_network_checks
-			run_auth_checks
-			run_persistence_checks
-			run_privacy_checks
-			run_additional_checks
-		} > /dev/null 2>&1
+		_run_checks_quiet
 		show_diff
 		return
 	fi
@@ -1148,28 +1138,14 @@ main() {
 	if [[ "$BASELINE_DIFF" == "true" ]]; then
 		# Quiet run so AUDIT_RESULTS holds the current state to compare against
 		# the saved baseline.
-		{
-			run_core_checks
-			run_network_checks
-			run_auth_checks
-			run_persistence_checks
-			run_privacy_checks
-			run_additional_checks
-		} > /dev/null 2>&1
+		_run_checks_quiet
 		show_baseline_diff
 		return
 	fi
 
 	if [[ "$REMEDIATION_MODE" == "true" ]]; then
 		# Quiet run so AUDIT_RESULTS is populated without dumping the audit boxes.
-		{
-			run_core_checks
-			run_network_checks
-			run_auth_checks
-			run_persistence_checks
-			run_privacy_checks
-			run_additional_checks
-		} > /dev/null 2>&1
+		_run_checks_quiet
 		if [[ "$OUTPUT_FORMAT" == "md" || "$OUTPUT_FORMAT" == "rtf" ]]; then
 			_set_report_context
 		fi
@@ -1192,14 +1168,7 @@ main() {
 
 	if [[ "$SHEET" == "true" ]]; then
 		# Quiet run so the sheet reflects the current state (and baseline diff).
-		{
-			run_core_checks
-			run_network_checks
-			run_auth_checks
-			run_persistence_checks
-			run_privacy_checks
-			run_additional_checks
-		} > /dev/null 2>&1
+		_run_checks_quiet
 		_set_report_context
 		if [[ -n "$REPORT_FILE" ]]; then
 			if [[ "$OUTPUT_FORMAT" == "rtf" ]]; then
@@ -1250,14 +1219,7 @@ main() {
 	fi
 
 	if [[ "$QUIET_MODE" == "true" ]]; then
-		{
-			run_core_checks
-			run_network_checks
-			run_auth_checks
-			run_persistence_checks
-			run_privacy_checks
-			run_additional_checks
-		} > /dev/null 2>&1
+		_run_checks_quiet
 		case "$OUTPUT_FORMAT" in
 			json) print_output_json ;;
 			csv) print_output_csv ;;

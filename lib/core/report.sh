@@ -20,20 +20,9 @@
 #
 # Targets bash 3.2 (macOS /bin/bash): no associative arrays, no namerefs.
 
-# --- Optional plain-language descriptions -----------------------------------
-# OPTIONAL lookup, keyed by check name. An unknown name yields "" — the renderer
-# never breaks or skips a check that lacks an entry. New checks need no entry;
-# descriptions can be added here later at any pace. Decoupled from the audit.
-# Seeded with the four checks MSP technicians most often explain to clients.
-check_description() {
-	case "$1" in
-		FileVault)  printf '%s' "Encrypts the disk so the data is unreadable if the Mac is lost or stolen." ;;
-		SIP)        printf '%s' "System Integrity Protection stops even admins and malware from altering protected system files." ;;
-		Firewall)   printf '%s' "Blocks unsolicited incoming network connections from other machines." ;;
-		Gatekeeper) printf '%s' "Ensures only signed, notarised apps can run, blocking untrusted software." ;;
-		*)          printf '%s' "" ;;
-	esac
-}
+# Plain-language descriptions reuse _check_explain (lib/audit/checks.sh): the MD
+# report prints just its first sentence under each check. Sourced together by
+# audit.sh / fleet.sh.
 
 # --- Status presentation -----------------------------------------------------
 _status_word() {
@@ -121,7 +110,7 @@ render_report_md() {
 		printf -- '- %s **%s** (%s)' "$(_status_symbol "$_PE_STATUS")" "$_PE_NAME" "$(_status_word "$_PE_STATUS")"
 		[[ -n "$_PE_VALUE" ]] && printf -- ' — %s' "$_PE_VALUE"
 		printf '\n'
-		desc="$(check_description "$_PE_NAME")"
+		desc="$(_check_explain "$_PE_NAME")"; desc="${desc%%. *}"
 		[[ -n "$desc" ]] && printf '  _%s_\n' "$desc"
 	done
 
@@ -229,7 +218,7 @@ render_report_rtf() {
 		printf '[%s] {\\b %s}' "$(_status_word "$_PE_STATUS")" "$(rtf_escape "$_PE_NAME")"
 		[[ -n "$_PE_VALUE" ]] && printf ': %s' "$(rtf_escape "$_PE_VALUE")"
 		printf '\\par\n'
-		desc="$(check_description "$_PE_NAME")"
+		desc="$(_check_explain "$_PE_NAME")"; desc="${desc%%. *}"
 		[[ -n "$desc" ]] && printf '{\\i %s}\\par\n' "$(rtf_escape "$desc")"
 	done
 
@@ -242,14 +231,6 @@ render_report_rtf() {
 # ============================================================================
 # Intervention sheet (scheda intervento) — a fill-in document for the technician
 # ============================================================================
-
-# Status of a check in the baseline file, or "" if absent. Self-contained so
-# report.sh stays testable on its own (no dependency on audit.sh helpers).
-_sheet_prev_status() {
-	[[ -n "${BASELINE_FILE:-}" && -f "${BASELINE_FILE:-/nonexistent}" ]] || { printf ''; return 0; }
-	grep -F "\"name\": \"$1\"" "$BASELINE_FILE" 2>/dev/null |
-		sed -n 's/.*"status": "\([^"]*\)".*/\1/p' | head -1 || true
-}
 
 render_intervention_sheet() {
 	local client="${REPORT_CLIENT:-___}" shop="${REPORT_SHOP:-___}" tech="${REPORT_TECH:-___}"
@@ -273,7 +254,7 @@ render_intervention_sheet() {
 	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
 		_parse_entry "$entry"
 		if [[ "$_PE_STATUS" == "pass" ]]; then
-			prev="$(_sheet_prev_status "$_PE_NAME")"
+			prev="$(_json_check_status "${BASELINE_FILE:-}" "$_PE_NAME")"
 			if [[ "$prev" == "fail" || "$prev" == "warn" ]]; then
 				printf -- '- %s\n' "$_PE_NAME"
 				resolved=$((resolved + 1))
@@ -289,7 +270,7 @@ render_intervention_sheet() {
 	local before
 	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
 		_parse_entry "$entry"
-		before="$(_sheet_prev_status "$_PE_NAME")"
+		before="$(_json_check_status "${BASELINE_FILE:-}" "$_PE_NAME")"
 		[[ -z "$before" ]] && before="-"
 		printf '| %s | %s | %s |\n' "$_PE_NAME" "$before" "$_PE_STATUS"
 	done
@@ -328,7 +309,7 @@ render_intervention_sheet_rtf() {
 	local entry before
 	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
 		_parse_entry "$entry"
-		before="$(_sheet_prev_status "$_PE_NAME")"
+		before="$(_json_check_status "${BASELINE_FILE:-}" "$_PE_NAME")"
 		[[ -z "$before" ]] && before="-"
 		printf '%s: %s -> %s\\par\n' "$(rtf_escape "$_PE_NAME")" "$(rtf_escape "$before")" "$(rtf_escape "$_PE_STATUS")"
 	done

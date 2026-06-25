@@ -639,3 +639,13 @@ flush_progress_to_terminal() {
     # Clear the buffer so it doesn't get printed again
     RCC_PROGRESS_BUFFER=()
 }
+
+# Status of a check (by name) in a JSON file's "results" array, or "" if the
+# file is missing or the check is absent. Shared by audit diff/baseline and the
+# intervention sheet. Fixed-string grep + sed, no jq.
+_json_check_status() {
+    local file="$1" name="$2"
+    [[ -n "$file" && -f "$file" ]] || { printf ''; return 0; }
+    grep -F "\"name\": \"$name\"" "$file" 2>/dev/null |
+        sed -n 's/.*"status": "\([^"]*\)".*/\1/p' | head -1 || true
+}
