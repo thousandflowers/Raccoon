@@ -173,7 +173,14 @@ upgrade_homebrew() {
 	increment_global_progress
 
 	update_global_progress_info "brew: upgrading..."
-	GIT_TERMINAL_PROMPT=0 brew upgrade 2>&1 </dev/null | progress_pipe _parse_brew_upgrade || true
+	# Same sudo-prompt safety as `rcc apps` (issue #23): never feed sudo /dev/null
+	# (instant EOF -> empty password -> rejection without Touch ID). Use the
+	# controlling TTY when present, fall back to /dev/null only when headless.
+	local brew_stdin=/dev/null
+	if { true >/dev/tty; } 2>/dev/null; then
+		brew_stdin=/dev/tty
+	fi
+	GIT_TERMINAL_PROMPT=0 brew upgrade <"$brew_stdin" | progress_pipe _parse_brew_upgrade || true
 
 	increment_global_progress
 }

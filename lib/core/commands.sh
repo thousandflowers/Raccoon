@@ -29,6 +29,7 @@ MENU_ITEMS=(
     "audit:Security audit (quick)"
     "audit deep:Security audit (full)"
     "network:Network info"
+    "wifi:Wi-Fi e password"
     "disk:Disk space"
     "memory:Memory usage"
     "---"
@@ -37,6 +38,7 @@ MENU_ITEMS=(
     "audit json:audit --json"
     "audit history:audit --history"
     "audit watch:audit --watch"
+    "fleet:Audit flotta Mac via SSH"
     "---"
     "ssh:SSH keys"
     "git:Git repos"
@@ -105,12 +107,57 @@ show_commands() {
     echo -e "${GRAY}Run '${GREEN}rcc help${NC}' for full help${NC}"
 }
 
+# Mini sparkline of the last 7 audits under the banner: ● = no failures,
+# ○ = had failures. Shown only with >=2 audits on record. JSON parsed with grep
+# (no jq); ANSI suppressed when stdout is not a terminal (pipe-safe).
+show_health_history() {
+    local dir="$HOME/.raccoon/audit-history"
+    [[ -d "$dir" ]] || return 0
+    local files count
+    files="$(ls "$dir"/audit_*.json 2>/dev/null | sort | tail -7 || true)"
+    [[ -z "$files" ]] && return 0
+    count="$(printf '%s\n' "$files" | grep -c . || true)"
+    [[ "$count" -lt 2 ]] && return 0
+
+    local dots="" passed=0 last_file="" f fail use_color=1
+    [[ -t 1 ]] || use_color=0
+    while IFS= read -r f; do
+        [[ -z "$f" ]] && continue
+        last_file="$f"
+        fail="$(grep -o '"fail": [0-9]*' "$f" | grep -o '[0-9]*' | head -1 || true)"
+        [[ -z "$fail" ]] && fail=0
+        if [[ "$fail" -eq 0 ]]; then
+            passed=$((passed + 1))
+            [[ $use_color -eq 1 ]] && dots+="${GREEN}●${NC}" || dots+="●"
+        else
+            [[ $use_color -eq 1 ]] && dots+="${YELLOW}○${NC}" || dots+="○"
+        fi
+    done <<< "$files"
+
+    # Relative date of the most recent audit, from its filename.
+    local base lastdate today yday rel
+    base="$(basename "$last_file")"
+    lastdate="${base#audit_}"; lastdate="${lastdate%%_*}"
+    today="$(date +%Y-%m-%d)"
+    yday="$(date -v-1d +%Y-%m-%d 2>/dev/null || echo "")"
+    if [[ "$lastdate" == "$today" ]]; then
+        rel="oggi"
+    elif [[ -n "$yday" && "$lastdate" == "$yday" ]]; then
+        rel="ieri"
+    else
+        rel="$(printf '%s' "$lastdate" | awk -F- '{print $3"/"$2}')"
+    fi
+
+    echo "  Ultimi audit: ${dots} (${passed}/${count} · ultimo: ${rel})"
+}
+
 show_brand_banner() {
     echo ""
     echo -e "${GREEN}     _${NC}"
     echo -e "${GREEN}   / \_/\_   ${NC}Raccoon ${TAGLINE}"
     echo -e "${GREEN}  ( o.o )  ${NC}"
     echo -e "${GREEN}   > ^ <${NC}"
+    show_health_history
     echo ""
 }
 
@@ -124,36 +171,14 @@ run_cmd() {
     printf '\033[?25h'
     stty sane
     
-    # Cases are 1-based MENU_ITEMS positions. Keep in lockstep with MENU_ITEMS:
-    # positions 8 and 14 are "---" separators and have no command.
-    local c="$1"
-    case "$c" in
-        1) exec "${SCRIPT_DIR}/bin/upgrade.sh" ;;
-        2) exec "${SCRIPT_DIR}/bin/apps.sh" ;;
-        3) exec "${SCRIPT_DIR}/bin/audit.sh" ;;
-        4) exec "${SCRIPT_DIR}/bin/audit.sh" --deep ;;
-        5) exec "${SCRIPT_DIR}/bin/network.sh" ;;
-        6) exec "${SCRIPT_DIR}/bin/disk.sh" ;;
-        7) exec "${SCRIPT_DIR}/bin/memory.sh" ;;
-        9) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --quiet ;;
-        10) exec "${SCRIPT_DIR}/bin/audit.sh" --fix ;;
-        11) exec "${SCRIPT_DIR}/bin/audit.sh" --deep --json ;;
-        12) exec "${SCRIPT_DIR}/bin/audit.sh" --history ;;
-        13) exec "${SCRIPT_DIR}/bin/audit.sh" --watch ;;
-        15) exec "${SCRIPT_DIR}/bin/ssh.sh" ;;
-        16) exec "${SCRIPT_DIR}/bin/git.sh" ;;
-        17) exec "${SCRIPT_DIR}/bin/ports.sh" ;;
-        18) exec "${SCRIPT_DIR}/bin/battery.sh" ;;
-        19) exec "${SCRIPT_DIR}/bin/backup.sh" ;;
-        20) exec "${SCRIPT_DIR}/bin/env.sh" ;;
-        21) exec "${SCRIPT_DIR}/bin/startup.sh" ;;
-        22) exec "${SCRIPT_DIR}/bin/trash.sh" ;;
-        23) exec "${SCRIPT_DIR}/bin/fonts.sh" ;;
-        24) exec "${SCRIPT_DIR}/bin/history.sh" ;;
-        25) exec "${SCRIPT_DIR}/bin/certs.sh" ;;
-        26) exec "${SCRIPT_DIR}/bin/docker.sh" ;;
-        27) exec "${SCRIPT_DIR}/bin/xcode.sh" ;;
-    esac
+    # Data-driven: look up the command for this 1-based MENU_ITEMS position and
+    # run it through the rcc dispatcher. Inserting/removing menu items needs no
+    # change here, and "---" separators carry no command.
+    local item="${MENU_ITEMS[$(($1 - 1))]:-}"
+    [[ -z "$item" || "$item" == "---" ]] && return 0
+    local cmd="${item%%:*}"
+    # shellcheck disable=SC2086  # intentional word split: "audit deep" -> 2 args
+    exec "${SCRIPT_DIR}/rcc" $cmd
 }
 
 show_menu() {
@@ -312,7 +337,50 @@ _next_menu_item() {
     echo "$cur"
 }
 
+# Render the first-run welcome box. Split out from show_onboarding so it can be
+# tested without a TTY. BOX_INNER inner width; sides are 1-cell box-drawing chars.
+# ponytail: assumes a UTF-8 terminal for the one emoji line (true — onboarding
+# only runs interactively); the -1 pad compensates for the glyph's double width.
+_render_onboarding() {
+    local BOX_INNER=45 border="" i
+    for ((i = 0; i < BOX_INNER; i++)); do border+="─"; done
+
+    _ob_row() {
+        local text="$1" adj="${2:-0}" pad
+        pad=$((BOX_INNER - ${#text} + adj))
+        [[ $pad -lt 0 ]] && pad=0
+        printf '│%s%*s│\n' "$text" "$pad" ""
+    }
+
+    echo ""
+    echo "┌${border}┐"
+    _ob_row "  🦝 Benvenuto in Raccoon" -1
+    _ob_row ""
+    _ob_row "  Tre cose che puoi fare adesso:"
+    _ob_row ""
+    _ob_row "  rcc audit    — 30+ check di sicurezza"
+    _ob_row "  rcc upgrade  — aggiorna tutto in una volta"
+    _ob_row "  rcc wifi     — reti Wi-Fi e password"
+    _ob_row ""
+    _ob_row "  Naviga con le frecce, Invio per eseguire."
+    _ob_row "  Premi un tasto per continuare..."
+    echo "└${border}┘"
+}
+
+# First-run wizard. Shown once, guarded by the ~/.raccoon/onboarded sentinel and
+# only when stdin is a TTY — piped/non-interactive use skips with zero overhead.
+show_onboarding() {
+    [[ -f "$HOME/.raccoon/onboarded" ]] && return 0
+    [[ -t 0 ]] || return 0
+    _render_onboarding
+    read -r -s -n 1 -t 10 _ || true
+    mkdir -p "$HOME/.raccoon"
+    touch "$HOME/.raccoon/onboarded"
+    clear >/dev/null 2>&1 || tput clear >/dev/null 2>&1 || printf '\033[2J\033[H'
+}
+
 interactive_main_menu() {
+    show_onboarding
     local cur=1
     
     trap 'exit 0' INT
@@ -333,9 +401,12 @@ interactive_main_menu() {
                 read -r -s -n 1 t
                 [[ "$t" == "A" ]] && ((cur > 1)) && cur=$((cur-1))
                 [[ "$t" == "B" ]] && ((cur < TOTAL_OPTIONS)) && cur=$((cur+1))
-                # Separators ("---") sit at 1-based positions 8 and 14; skip over them.
-                [[ $cur -eq 8 || $cur -eq 14 ]] && [[ "$t" == "A" ]] && cur=$((cur-1))
-                [[ $cur -eq 8 || $cur -eq 14 ]] && [[ "$t" == "B" ]] && cur=$((cur+1))
+                # Skip over separators ("---") wherever they are, no hardcoded
+                # positions (positions shift as menu items are added/removed).
+                if _is_separator "$cur"; then
+                    [[ "$t" == "A" ]] && cur=$((cur-1))
+                    [[ "$t" == "B" ]] && cur=$((cur+1))
+                fi
                 ;;
             "") run_cmd "$cur" ;;
             /)

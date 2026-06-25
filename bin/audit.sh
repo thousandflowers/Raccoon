@@ -8,10 +8,22 @@ SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 source "$SCRIPT_DIR/../lib/audit/checks.sh"
+# shellcheck source=lib/core/report.sh
+source "$SCRIPT_DIR/../lib/core/report.sh"
 
 PASS_count=0
 WARN_count=0
 FAIL_count=0
+
+# Single source of truth for the data-driven reporters. Every check flows
+# through print_category, which appends one TAB record per result here. The
+# Markdown/RTF renderers consume ONLY this array — no check is hardcoded.
+declare -a AUDIT_RESULTS=()
+
+# Branding (optional) and system context for client-ready reports.
+REPORT_CLIENT=""
+REPORT_SHOP=""
+REPORT_TECH=""
 declare -a FIX_QUEUE=()
 
 # Fixes that mutate user data snapshot the original here first, so a wrong
@@ -74,12 +86,49 @@ show_audit_help() {
 	echo "  --html        Output in HTML format"
 	echo "  --csv         Output in CSV format"
 	echo "  --json        Output in JSON format"
+	echo "  --explain     Add plain-language notes under failing/warning checks"
+	echo "  --remediation Client-facing intervention report (found/fixed/to-do)"
+	echo "  --baseline    Save the current state as a signed reference baseline"
+	echo "  --baseline-diff   Compare the current state against the baseline"
+	echo "  --baseline-reset  Remove the saved baseline"
+	echo "  --profile NAME    Load a client profile (config, branding, baseline)"
+	echo "  --profile-save NAME   Save the current state as a client profile"
+	echo "  --profile-list    List saved profiles"
+	echo "  --profile-delete NAME Remove a client profile"
+	echo "  --share       Publish the report as an anonymous GitHub Gist and print the link"
+	echo "  --sheet       Generate an intervention sheet (Markdown; --rtf for RTF)"
+	echo "  --hours N     Hours worked, for the intervention sheet"
+	echo "  --notes TEXT  Extra notes, for the intervention sheet"
+	echo "  --md          Output a client-ready Markdown report"
+	echo "  --rtf         Output a client-ready RTF report (opens in TextEdit/Word)"
+	echo "  --client NAME Client name for the report header (optional)"
+	echo "  --shop NAME   Shop/company name for branding (optional)"
+	echo "  --tech NAME   Technician name for the report header (optional)"
 	echo "  --history     Show previous audit runs"
 	echo "  --diff        Compare with previous run"
-	echo "  --watch       Schedule weekly auto-audit"
-	echo "  --alert       Alert on new issues"
-	echo "  --notify      Send notification on issues"
+	echo "  --watch       Alias for --schedule weekly"
+	echo "  --schedule FREQ   Schedule a deep audit: daily, weekly, or monthly"
+	echo "  --schedule status Show whether a schedule is active"
+	echo "  --schedule remove Remove the active schedule"
+	echo "  --alert       Send a native macOS notification when issues are found"
+	echo "  --notify      Send a native macOS notification with the result"
 	echo "  --help, -h    Show this help"
+	echo ""
+	echo "Examples:"
+	echo "  rcc audit --md --report client.md --client \"Jane Doe\" \\"
+	echo "            --shop \"MacFix Pro\" --tech \"Mario Rossi\""
+	echo "  rcc audit --rtf --report client.rtf --shop \"MacFix Pro\""
+	echo "  rcc audit --md                 # Markdown to stdout (pipeable)"
+	echo "  rcc audit --explain            # audit with plain-language notes"
+	echo "  rcc audit --deep --explain     # deep scan, explained"
+	echo "  rcc audit --profile mario-bianchi"
+	echo "  rcc audit --deep --profile mario-bianchi --report intervento.md"
+	echo "  rcc audit --profile-save mario-bianchi"
+	echo "  rcc audit --profile-list"
+	echo "  rcc audit --deep --share"
+	echo "  rcc audit --deep --profile mario-bianchi --share"
+	echo "  rcc audit --deep --profile mario-bianchi \\"
+	echo "            --remediation --sheet --hours 2 --report intervento.md"
 	echo ""
 	echo "Safety:"
 	echo "  Destructive fixes snapshot originals to ~/.raccoon/fix-backups/ first."
@@ -96,8 +145,23 @@ REPORT_FILE=""
 OUTPUT_FORMAT="text"
 SHOW_HISTORY=false
 SHOW_DIFF=false
-SCHEDULE_WEEKLY=false
+SCHEDULE_ACTION=""
 NOTIFY=false
+ALERT_ON_ISSUES=false
+EXPLAIN_MODE=false
+REMEDIATION_MODE=false
+BASELINE_SAVE=false
+BASELINE_DIFF=false
+BASELINE_RESET=false
+PROFILE_NAME=""
+PROFILE_SAVE=""
+PROFILE_LIST=false
+PROFILE_DELETE=""
+PROFILE_DIR=""
+SHARE=false
+SHEET=false
+INTERVENTION_HOURS="___"
+INTERVENTION_NOTES=""
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -123,7 +187,6 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--quiet | -q)
 		QUIET_MODE=true
-		DEEP_SCAN=true
 		shift
 		;;
 	--report)
@@ -146,6 +209,38 @@ while [[ $# -gt 0 ]]; do
 		OUTPUT_FORMAT="json"
 		shift
 		;;
+	--md)
+		OUTPUT_FORMAT="md"
+		shift
+		;;
+	--rtf)
+		OUTPUT_FORMAT="rtf"
+		shift
+		;;
+	--client)
+		REPORT_CLIENT="$2"
+		shift 2
+		;;
+	--client=*)
+		REPORT_CLIENT="${1#--client=}"
+		shift
+		;;
+	--shop)
+		REPORT_SHOP="$2"
+		shift 2
+		;;
+	--shop=*)
+		REPORT_SHOP="${1#--shop=}"
+		shift
+		;;
+	--tech)
+		REPORT_TECH="$2"
+		shift 2
+		;;
+	--tech=*)
+		REPORT_TECH="${1#--tech=}"
+		shift
+		;;
 	--history)
 		SHOW_HISTORY=true
 		shift
@@ -154,9 +249,65 @@ while [[ $# -gt 0 ]]; do
 		SHOW_DIFF=true
 		shift
 		;;
-	--watch)
-		SCHEDULE_WEEKLY=true
+	--explain)
+		EXPLAIN_MODE=true
 		shift
+		;;
+	--remediation)
+		REMEDIATION_MODE=true
+		shift
+		;;
+	--baseline)
+		BASELINE_SAVE=true
+		shift
+		;;
+	--baseline-diff)
+		BASELINE_DIFF=true
+		shift
+		;;
+	--baseline-reset)
+		BASELINE_RESET=true
+		shift
+		;;
+	--profile)
+		if [[ $# -ge 2 && "$2" != -* ]]; then PROFILE_NAME="$2"; shift 2; else shift; fi
+		;;
+	--profile-save)
+		if [[ $# -ge 2 && "$2" != -* ]]; then PROFILE_SAVE="$2"; shift 2; else shift; fi
+		;;
+	--profile-list)
+		PROFILE_LIST=true
+		shift
+		;;
+	--profile-delete)
+		if [[ $# -ge 2 && "$2" != -* ]]; then PROFILE_DELETE="$2"; shift 2; else shift; fi
+		;;
+	--share)
+		SHARE=true
+		shift
+		;;
+	--sheet)
+		SHEET=true
+		shift
+		;;
+	--hours)
+		if [[ $# -ge 2 && "$2" != -* ]]; then INTERVENTION_HOURS="$2"; shift 2; else shift; fi
+		;;
+	--notes)
+		if [[ $# -ge 2 ]]; then INTERVENTION_NOTES="$2"; shift 2; else shift; fi
+		;;
+	--watch)
+		SCHEDULE_ACTION="weekly"
+		shift
+		;;
+	--schedule)
+		if [[ $# -ge 2 && "$2" != -* ]]; then
+			SCHEDULE_ACTION="$2"
+			shift 2
+		else
+			SCHEDULE_ACTION="weekly"
+			shift
+		fi
 		;;
 	--alert)
 		# shellcheck disable=SC2034
@@ -173,8 +324,24 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
+# An explicit --md/--rtf/--json/--csv/--html flag wins. If none was given but a
+# --report file carries a known extension, infer the format from it so
+# `--report client.md` just works.
+if [[ "$OUTPUT_FORMAT" == "text" && -n "$REPORT_FILE" ]]; then
+	case "$REPORT_FILE" in
+		*.md | *.markdown) OUTPUT_FORMAT="md" ;;
+		*.rtf)             OUTPUT_FORMAT="rtf" ;;
+		*.json)            OUTPUT_FORMAT="json" ;;
+		*.csv)             OUTPUT_FORMAT="csv" ;;
+		*.html | *.htm)    OUTPUT_FORMAT="html" ;;
+	esac
+fi
+
 HISTORY_DIR="$HOME/.raccoon/audit-history"
 [[ -d "$HISTORY_DIR" ]] || mkdir -p "$HISTORY_DIR"
+
+BASELINE_FILE="$HOME/.raccoon/baseline.json"
+PROFILES_DIR="$HOME/.raccoon/profiles"
 
 print_result() {
 	local status="$1"
@@ -201,6 +368,19 @@ print_result() {
 
 	# icon is 1 display column; "x " is its ASCII width stand-in for measuring.
 	_box_row "x ${label}" "${icon} ${colored_label}"
+
+	# --explain: print a plain-language note under failing/warning checks. Only
+	# for text output (never pollutes json/csv/md/rtf). A check with no entry
+	# prints nothing — the explanation is always optional.
+	if [[ "${EXPLAIN_MODE:-false}" == "true" && "$OUTPUT_FORMAT" == "text" ]] &&
+		{ [[ "$status" == "fail" ]] || [[ "$status" == "warn" ]]; }; then
+		local check_name="${label%%: *}"
+		local explanation
+		explanation="$(_check_explain "$check_name")"
+		if [[ -n "$explanation" ]]; then
+			printf '  %s-> %s%s\n' "$GRAY" "$explanation" "$NC"
+		fi
+	fi
 }
 
 print_category() {
@@ -215,6 +395,10 @@ print_category() {
 
 	for item in "${items[@]}"; do
 		local status="${item%%:*}" rest="${item#*:}"
+		# Capture into the single data model consumed by every reporter. This is
+		# the one funnel all checks pass through, so md/rtf/etc stay decoupled
+		# from the check list automatically.
+		AUDIT_RESULTS+=("${status}"$'\t'"${name}"$'\t'"${rest}")
 		print_result "$status" "$rest"
 	done
 
@@ -250,27 +434,233 @@ print_summary() {
 	_box_border
 }
 
-save_to_history() {
-	local timestamp
+# Minimal JSON string escaping: backslash and double-quote. Check labels are
+# short single-line strings, so this is sufficient and dependency-free.
+_json_escape() {
+	local s="$1"
+	s="${s//\\/\\\\}"
+	s="${s//\"/\\\"}"
+	printf '%s' "$s"
+}
+
+# Build the per-check results JSON from the in-memory AUDIT_RESULTS model, so a
+# later --diff / --remediation can compare individual checks, not just counts.
+# Emits "" when there are no results (backward-compatible empty array).
+_results_json() {
+	[[ ${#AUDIT_RESULTS[@]} -eq 0 ]] && return 0
+	local entry st cat_ tail_ rest nm val first=1
+	for entry in "${AUDIT_RESULTS[@]}"; do
+		st="${entry%%$'\t'*}"
+		tail_="${entry#*$'\t'}"
+		cat_="${tail_%%$'\t'*}"
+		rest="${tail_#*$'\t'}"
+		if [[ "$rest" == *": "* ]]; then
+			nm="${rest%%: *}"
+			val="${rest#*: }"
+		else
+			nm="$rest"
+			val=""
+		fi
+		if [[ $first -eq 1 ]]; then first=0; else printf ','; fi
+		printf '\n    {"status": "%s", "category": "%s", "name": "%s", "value": "%s"}' \
+			"$(_json_escape "$st")" "$(_json_escape "$cat_")" \
+			"$(_json_escape "$nm")" "$(_json_escape "$val")"
+	done
+	printf '\n  '
+}
+
+# Write the current audit state (counts + per-check results) as JSON to a file.
+# Shared by history snapshots and the signed baseline so both have one format.
+_write_audit_json() {
+	local file="$1" timestamp results_json
 	timestamp="$(date +%Y-%m-%d_%H:%M:%S)"
-	local history_file="$HISTORY_DIR/audit_${timestamp}.json"
-	
-	cat > "$history_file" << EOF
+	results_json="$(_results_json)"
+	cat > "$file" << EOF
 {
   "timestamp": "$timestamp",
   "pass": $PASS_count,
   "warning": $WARN_count,
   "fail": $FAIL_count,
   "deep": $DEEP_SCAN,
-  "results": []
+  "results": [$results_json]
 }
 EOF
+}
+
+save_to_history() {
+	local timestamp
+	timestamp="$(date +%Y-%m-%d_%H:%M:%S)"
+	local history_file="$HISTORY_DIR/audit_${timestamp}.json"
+
+	_write_audit_json "$history_file"
 
 	local latest_link="$HISTORY_DIR/latest.json"
 	ln -sf "$history_file" "$latest_link" 2>/dev/null || true
 
 	# Rotate: keep last 30 audit files
 	find "$HISTORY_DIR" -name 'audit_*.json' -maxdepth 1 -exec ls -t {} + 2>/dev/null | tail -n +31 | xargs rm -f 2>/dev/null || true
+}
+
+# Baseline: a signed reference snapshot. Later audits compare against it with
+# --baseline-diff to surface regressions since that moment (not just the last run).
+save_baseline() {
+	mkdir -p "$HOME/.raccoon"
+	_write_audit_json "$BASELINE_FILE"
+	echo "${GREEN}✓ Baseline salvato — $(date)${NC}"
+}
+
+show_baseline_diff() {
+	if [[ ! -f "$BASELINE_FILE" ]]; then
+		echo "Nessun baseline trovato. Esegui prima rcc audit --baseline."
+		return 0
+	fi
+	local bdate
+	bdate="$(grep -o '"timestamp": "[^"]*"' "$BASELINE_FILE" | head -1 | sed 's/.*"timestamp": "\([^"]*\)".*/\1/')"
+	show_diff "$BASELINE_FILE" "-- Confronto con baseline del ${bdate} --"
+}
+
+baseline_reset() {
+	if [[ ! -f "$BASELINE_FILE" ]]; then
+		echo "Nessun baseline da rimuovere."
+		return 0
+	fi
+	local answer
+	printf 'Rimuovere il baseline? [y/N] '
+	read -r answer || answer="n"
+	if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
+		rm -f "$BASELINE_FILE"
+		echo "Baseline rimosso."
+	fi
+}
+
+# --- Client profiles ---------------------------------------------------------
+# A profile (~/.raccoon/profiles/<name>/) remembers per-Mac settings: extra
+# checks to skip (config), client/shop/tech (meta), and its own baseline.json.
+# load_profile is called early in main so the active profile shapes the audit,
+# the report header, and which baseline --baseline-diff compares against.
+load_profile() {
+	[[ -z "$PROFILE_NAME" ]] && return 0
+	PROFILE_DIR="$PROFILES_DIR/$PROFILE_NAME"
+	if [[ ! -d "$PROFILE_DIR" ]]; then
+		mkdir -p "$PROFILE_DIR"
+		echo "Nuovo profilo '$PROFILE_NAME' creato."
+	fi
+	# Append the profile's skip list to FIX_SKIP (same format as audit.conf).
+	if [[ -f "$PROFILE_DIR/config" ]]; then
+		local extra
+		extra="$(grep -v '^[[:space:]]*#' "$PROFILE_DIR/config" 2>/dev/null | grep -v '^[[:space:]]*$' || true)"
+		if [[ -n "$extra" ]]; then
+			if [[ -n "${FIX_SKIP:-}" ]]; then
+				FIX_SKIP="$FIX_SKIP"$'\n'"$extra"
+			else
+				FIX_SKIP="$extra"
+			fi
+		fi
+	fi
+	# Meta overrides branding (a saved profile is the source of truth for it).
+	if [[ -f "$PROFILE_DIR/meta" ]]; then
+		local c s t
+		c="$(sed -n 's/^CLIENT=//p' "$PROFILE_DIR/meta" | head -1)"
+		s="$(sed -n 's/^SHOP=//p' "$PROFILE_DIR/meta" | head -1)"
+		t="$(sed -n 's/^TECH=//p' "$PROFILE_DIR/meta" | head -1)"
+		[[ -n "$c" ]] && REPORT_CLIENT="$c"
+		[[ -n "$s" ]] && REPORT_SHOP="$s"
+		[[ -n "$t" ]] && REPORT_TECH="$t"
+	fi
+	# Use the profile's baseline for --baseline / --baseline-diff.
+	BASELINE_FILE="$PROFILE_DIR/baseline.json"
+}
+
+profile_save() {
+	local name="$1" dir="$PROFILES_DIR/$1"
+	mkdir -p "$dir"
+	local client="$REPORT_CLIENT" shop="$REPORT_SHOP" tech="$REPORT_TECH"
+	if [[ -t 0 ]]; then
+		[[ -z "$client" ]] && { printf 'Cliente: '; read -r client || client=""; }
+		[[ -z "$shop" ]] && { printf 'Shop/Studio: '; read -r shop || shop=""; }
+		[[ -z "$tech" ]] && { printf 'Tecnico: '; read -r tech || tech=""; }
+	fi
+	{
+		echo "CLIENT=$client"
+		echo "SHOP=$shop"
+		echo "TECH=$tech"
+		echo "SAVED=$(date)"
+	} > "$dir/meta"
+	# Snapshot the current state as the profile baseline, if we have results.
+	if [[ ${#AUDIT_RESULTS[@]} -gt 0 ]]; then
+		_write_audit_json "$dir/baseline.json"
+	fi
+	echo "Profilo '$name' salvato."
+}
+
+profile_list() {
+	if [[ ! -d "$PROFILES_DIR" ]] || [[ -z "$(ls -A "$PROFILES_DIR" 2>/dev/null || true)" ]]; then
+		echo "Nessun profilo salvato."
+		return 0
+	fi
+	local d name client shop saved
+	for d in "$PROFILES_DIR"/*/; do
+		[[ -d "$d" ]] || continue
+		name="$(basename "$d")"
+		client=""; shop=""; saved=""
+		if [[ -f "$d/meta" ]]; then
+			client="$(sed -n 's/^CLIENT=//p' "$d/meta" | head -1)"
+			shop="$(sed -n 's/^SHOP=//p' "$d/meta" | head -1)"
+			saved="$(sed -n 's/^SAVED=//p' "$d/meta" | head -1)"
+		fi
+		echo "  ${name} — ${client:-?} / ${shop:-?} (${saved:-?})"
+	done
+}
+
+profile_delete() {
+	local dir="$PROFILES_DIR/$1"
+	if [[ ! -d "$dir" ]]; then
+		echo "Profilo '$1' non trovato."
+		return 0
+	fi
+	local answer
+	printf "Rimuovere profilo '%s'? [y/N] " "$1"
+	read -r answer || answer="n"
+	if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
+		rm -rf "$dir"
+		echo "Rimosso."
+	fi
+}
+
+# --- Share via GitHub Gist ---------------------------------------------------
+# Build the anonymous-gist JSON payload from the Markdown report. Split out so it
+# is testable without the network. JSON string escaping via python3, with a sed
+# fallback for macOS < 12.
+_share_payload() {
+	local md esc
+	md="$(render_report_md)"
+	if command -v python3 >/dev/null 2>&1; then
+		esc="$(printf '%s' "$md" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')"
+	else
+		esc="\"$(printf '%s' "$md" | sed 's/\\/\\\\/g; s/"/\\"/g' | awk '{printf "%s\\n", $0}')\""
+	fi
+	printf '{"public":true,"description":"Raccoon audit - %s - %s","files":{"raccoon-audit.md":{"content":%s}}}' \
+		"$(hostname)" "$(date)" "$esc"
+}
+
+# Publish the report as an anonymous public Gist and print the link. No GitHub
+# token required. Network/API failure is non-fatal (exit 0). curl is overridable
+# via RACCOON_CURL for testing.
+share_report() {
+	local url payload curl_cmd="${RACCOON_CURL:-curl}"
+	payload="$(_share_payload)"
+	url="$("$curl_cmd" -s -X POST https://api.github.com/gists \
+		-H "Content-Type: application/json" \
+		-d "$payload" 2>/dev/null |
+		grep -o '"html_url": "[^"]*"' | head -1 | grep -o 'https://[^"]*' || true)"
+	if [[ -z "$url" ]]; then
+		echo "Condivisione non disponibile (nessuna connessione o API GitHub non raggiungibile)."
+		return 0
+	fi
+	echo "${GREEN}✓ Report condiviso:${NC} $url"
+	if printf '%s' "$url" | pbcopy 2>/dev/null; then
+		echo "  (copiato negli appunti)"
+	fi
 }
 
 show_audit_history() {
@@ -309,18 +699,25 @@ show_audit_history() {
 }
 
 show_diff() {
-	echo "${PURPLE_BOLD}-- Diff with Previous Run--${NC}"
-	echo ""
-	
-	local latest_link="$HISTORY_DIR/latest.json"
-	if [[ ! -L "$latest_link" ]]; then
-		echo "  No previous run found"
-		return
+	# Optional args: $1 = file to compare against (default: latest history),
+	# $2 = custom header. Lets --baseline-diff reuse this against baseline.json.
+	local prev_file="${1:-}" header="${2:-}"
+	if [[ -n "$header" ]]; then
+		echo "${PURPLE_BOLD}${header}${NC}"
+	else
+		echo "${PURPLE_BOLD}-- Diff with Previous Run--${NC}"
 	fi
-	
-	local prev_file
-	prev_file="$(readlink "$latest_link")"
-	
+	echo ""
+
+	if [[ -z "$prev_file" ]]; then
+		local latest_link="$HISTORY_DIR/latest.json"
+		if [[ ! -L "$latest_link" ]]; then
+			echo "  No previous run found"
+			return
+		fi
+		prev_file="$(readlink "$latest_link")"
+	fi
+
 	local curr_pass="$PASS_count"
 	local curr_warn="$WARN_count"
 	local curr_fail="$FAIL_count"
@@ -355,14 +752,62 @@ show_diff() {
 	elif [[ $fail_diff -lt 0 ]]; then
 		echo "  ${GREEN}↓ $((-fail_diff)) fewer failures${NC}"
 	fi
+
+	# Per-check changes — only when the previous run recorded individual results
+	# AND the current run produced them. Pre-feature histories (results: []) fall
+	# back to the counter summary above, so this is fully backward compatible.
+	if grep -q '"name":' "$prev_file" 2>/dev/null && [[ ${#AUDIT_RESULTS[@]} -gt 0 ]]; then
+		echo ""
+		echo "  ${PURPLE_BOLD}Changes by check:${NC}"
+		local entry st nm tail_ rest prev
+		for entry in "${AUDIT_RESULTS[@]}"; do
+			st="${entry%%$'\t'*}"
+			tail_="${entry#*$'\t'}"
+			rest="${tail_#*$'\t'}"
+			if [[ "$rest" == *": "* ]]; then nm="${rest%%: *}"; else nm="$rest"; fi
+			prev="$(_json_check_status "$prev_file" "$nm")"
+			[[ -z "$prev" ]] && continue
+			if [[ "$st" == "pass" && ( "$prev" == "fail" || "$prev" == "warn" ) ]]; then
+				echo "  ${GREEN}✓ $nm resolved${NC}"
+			elif [[ ( "$st" == "fail" || "$st" == "warn" ) && "$prev" == "pass" ]]; then
+				echo "  ${RED}✗ $nm regressed${NC}"
+			elif [[ ( "$st" == "fail" || "$st" == "warn" ) && ( "$prev" == "fail" || "$prev" == "warn" ) ]]; then
+				echo "  ${YELLOW}⚠ $nm still needs attention${NC}"
+			fi
+		done
+	fi
 }
 
-schedule_weekly() {
-	local plist_file="$HOME/Library/LaunchAgents/com.raccoon.audit.plist"
+SCHEDULE_PLIST="$HOME/Library/LaunchAgents/com.raccoon.audit.plist"
+
+# Schedule a recurring deep audit (with notifications). FREQ is daily, weekly,
+# or monthly, mapped to the matching StartCalendarInterval.
+schedule_audit() {
+	local freq="$1" interval label
+	case "$freq" in
+		daily)
+			interval=$'\t\t<key>Hour</key>\n\t\t<integer>9</integer>\n\t\t<key>Minute</key>\n\t\t<integer>0</integer>'
+			label="every day at 9:00 AM"
+			;;
+		weekly)
+			interval=$'\t\t<key>Weekday</key>\n\t\t<integer>0</integer>\n\t\t<key>Hour</key>\n\t\t<integer>9</integer>\n\t\t<key>Minute</key>\n\t\t<integer>0</integer>'
+			label="Sundays at 9:00 AM"
+			;;
+		monthly)
+			interval=$'\t\t<key>Day</key>\n\t\t<integer>1</integer>\n\t\t<key>Hour</key>\n\t\t<integer>9</integer>\n\t\t<key>Minute</key>\n\t\t<integer>0</integer>'
+			label="the 1st of each month at 9:00 AM"
+			;;
+		*)
+			echo "Frequenza non valida: $freq (usa daily, weekly o monthly)" >&2
+			return 1
+			;;
+	esac
+
 	local audit_path
 	audit_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/audit.sh"
-	
-	cat > "$plist_file" << EOFPLIST
+	mkdir -p "$HOME/Library/LaunchAgents"
+
+	cat > "$SCHEDULE_PLIST" << EOFPLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -373,37 +818,57 @@ schedule_weekly() {
 	<array>
 		<string>${audit_path}</string>
 		<string>--deep</string>
-		<string>--json</string>
 		<string>--alert</string>
+		<string>--notify</string>
 	</array>
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StartCalendarInterval</key>
-	<array>
-		<dict>
-			<key>Weekday</key>
-			<integer>0</integer>
-			<key>Hour</key>
-			<integer>9</integer>
-			<key>Minute</key>
-			<integer>0</integer>
-		</dict>
-	</array>
+	<dict>
+${interval}
+	</dict>
 </dict>
 </plist>
 EOFPLIST
 
-	launchctl load "$plist_file" 2>/dev/null || true
-	echo "  Weekly audit scheduled (Sundays at 9:00 AM)"
+	launchctl unload "$SCHEDULE_PLIST" 2>/dev/null || true
+	launchctl load "$SCHEDULE_PLIST" 2>/dev/null || true
+	echo "  Audit scheduled — $label"
+}
+
+schedule_status() {
+	if [[ -f "$SCHEDULE_PLIST" ]] && launchctl list com.raccoon.audit >/dev/null 2>&1; then
+		local freq="daily"
+		grep -q "<key>Weekday</key>" "$SCHEDULE_PLIST" && freq="weekly"
+		grep -q "<key>Day</key>" "$SCHEDULE_PLIST" && freq="monthly"
+		echo "Attivo — $freq"
+	else
+		echo "Nessuno schedule attivo."
+	fi
+}
+
+schedule_remove() {
+	launchctl unload "$SCHEDULE_PLIST" 2>/dev/null || true
+	rm -f "$SCHEDULE_PLIST"
+	echo "Schedule rimosso."
 }
 
 send_notification() {
-	if [[ $FAIL_count -gt 0 || $WARN_count -gt 0 ]]; then
-		local title="Security Audit: Issues Found"
-		local body="$FAIL_count failures, $WARN_count warnings"
-		
-		osascript -e "display notification \"$body\" with title \"$title\"" 2>/dev/null || true
+	local title body subtitle
+	if [[ $FAIL_count -gt 0 ]]; then
+		title="🦝 Raccoon — Problemi critici"
+		subtitle="$FAIL_count problemi, $WARN_count avvisi"
+		body="Esegui 'rcc audit --explain' per i dettagli"
+	elif [[ $WARN_count -gt 0 ]]; then
+		title="🦝 Raccoon — Attenzione"
+		subtitle="$WARN_count avvisi"
+		body="Esegui 'rcc audit' per i dettagli"
+	else
+		title="🦝 Raccoon — Tutto OK"
+		subtitle="Tutti i check passati"
+		body=""
 	fi
+	osascript -e "display notification \"$body\" with title \"$title\" subtitle \"$subtitle\"" 2>/dev/null || true
 }
 
 print_output_html() {
@@ -453,7 +918,10 @@ print_output_json() {
 	echo "  \"audit_type\": \"$([ "$DEEP_SCAN" == "true" ] && echo "deep" || echo "basic")\","
 	echo "  \"pass\": $PASS_count,"
 	echo "  \"warning\": $WARN_count,"
-	echo "  \"fail\": $FAIL_count"
+	echo "  \"fail\": $FAIL_count,"
+	local rj
+	rj="$(_results_json)"
+	echo "  \"results\": [$rj]"
 	echo "}"
 }
 
@@ -517,8 +985,108 @@ fix_issue() {
 
 
 
+# Client-facing remediation report: what was found, what got fixed since the
+# last run, and what still needs doing. Plain text to stdout; for --md/--rtf the
+# caller uses the full report renderers instead. Reads the current AUDIT_RESULTS
+# and the previous history file (resolved = was fail/warn, now pass). Works with
+# no history (the "resolved" section is just empty).
+print_remediation() {
+	local host date_str version prev_file=""
+	host="$(hostname 2>/dev/null || echo unknown)"
+	date_str="$(date '+%Y-%m-%d %H:%M')"
+	version="$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo '?')"
+	local latest_link="$HISTORY_DIR/latest.json"
+	[[ -L "$latest_link" ]] && prev_file="$(readlink "$latest_link" 2>/dev/null || echo '')"
+
+	echo "Raccoon — Rapporto intervento"
+	echo "Data: $date_str · Host: $host"
+	echo ""
+
+	local entry st nm tail_ rest prev
+
+	echo "Problemi trovati:"
+	local found=0
+	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+		st="${entry%%$'\t'*}"; tail_="${entry#*$'\t'}"; rest="${tail_#*$'\t'}"
+		if [[ "$rest" == *": "* ]]; then nm="${rest%%: *}"; else nm="$rest"; fi
+		if [[ "$st" == "fail" || "$st" == "warn" ]]; then
+			echo "  - $nm"
+			found=$((found + 1))
+		fi
+	done
+	[[ $found -eq 0 ]] && echo "  (nessuno)"
+	echo ""
+
+	echo "Problemi risolti:"
+	local resolved=0
+	if [[ -n "$prev_file" && -f "$prev_file" ]] && grep -q '"name":' "$prev_file" 2>/dev/null; then
+		for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+			st="${entry%%$'\t'*}"; tail_="${entry#*$'\t'}"; rest="${tail_#*$'\t'}"
+			if [[ "$rest" == *": "* ]]; then nm="${rest%%: *}"; else nm="$rest"; fi
+			if [[ "$st" == "pass" ]]; then
+				prev="$(_json_check_status "$prev_file" "$nm")"
+				if [[ "$prev" == "fail" || "$prev" == "warn" ]]; then
+					echo "  - $nm"
+					resolved=$((resolved + 1))
+				fi
+			fi
+		done
+	fi
+	[[ $resolved -eq 0 ]] && echo "  (nessuno, o nessuna run precedente)"
+	echo ""
+
+	echo "Da completare:"
+	local todo=0
+	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+		st="${entry%%$'\t'*}"; tail_="${entry#*$'\t'}"; rest="${tail_#*$'\t'}"
+		if [[ "$rest" == *": "* ]]; then nm="${rest%%: *}"; else nm="$rest"; fi
+		if [[ "$st" == "fail" || "$st" == "warn" ]]; then
+			echo "  - $nm"
+			todo=$((todo + 1))
+		fi
+	done
+	[[ $todo -eq 0 ]] && echo "  (nessuno)"
+	echo ""
+	echo "Generato da Raccoon v$version"
+}
+
+# Populate system context for client-ready reports. The commercial model name
+# (e.g. "MacBook Pro") via system_profiler costs ~0.3s, so this only runs for
+# md/rtf output; the hw.model identifier (e.g. "MacBookPro18,3") is kept as a
+# secondary field.
+# Run every check group with box output suppressed (populates AUDIT_RESULTS and
+# the counters). Used by diff/baseline-diff/remediation/sheet/profile-save.
+_run_checks_quiet() {
+	{
+		run_core_checks
+		run_network_checks
+		run_auth_checks
+		run_persistence_checks
+		run_privacy_checks
+		run_additional_checks
+	} > /dev/null 2>&1
+}
+
+_set_report_context() {
+	REPORT_DATE="$(date '+%Y-%m-%d %H:%M')"
+	REPORT_VERSION="$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo '?')"
+	REPORT_OS="$(sw_vers -productVersion 2>/dev/null || true)"
+	REPORT_MODEL_ID="$(sysctl -n hw.model 2>/dev/null || true)"
+	REPORT_MODEL="$(system_profiler SPHardwareDataType 2>/dev/null | awk -F': ' '/Model Name/{print $2; exit}')"
+	if [[ -z "$REPORT_MODEL" ]]; then
+		REPORT_MODEL="$REPORT_MODEL_ID"
+	fi
+}
+
 main() {
 	load_fix_skips
+	load_profile
+
+	# --share has nothing to publish in --quiet (no report is built); skip it.
+	if [[ "$SHARE" == "true" && "$QUIET_MODE" == "true" ]]; then
+		echo "⚠ --share ignorato con --quiet" >&2
+		SHARE=false
+	fi
 
 	# Touch ID (pam_tid) works even when launched headless from the TUI, so try
 	# it unconditionally rather than gating on a tty. Only mark sudo unavailable
@@ -536,24 +1104,112 @@ main() {
 		show_audit_history
 		return
 	fi
-	
+
+	if [[ "$PROFILE_LIST" == "true" ]]; then
+		profile_list
+		return
+	fi
+
+	if [[ -n "$PROFILE_DELETE" ]]; then
+		profile_delete "$PROFILE_DELETE"
+		return
+	fi
+
+	if [[ -n "$PROFILE_SAVE" ]]; then
+		# Quiet run so the saved profile baseline reflects the current state.
+		_run_checks_quiet
+		profile_save "$PROFILE_SAVE"
+		return
+	fi
+
+	if [[ "$BASELINE_RESET" == "true" ]]; then
+		baseline_reset
+		return
+	fi
+
 	if [[ "$SHOW_DIFF" == "true" ]]; then
+		# Run the checks quietly so the per-check diff has current data; the box
+		# output is suppressed and only the diff summary is printed.
+		_run_checks_quiet
 		show_diff
 		return
 	fi
-	
-	if [[ "$SCHEDULE_WEEKLY" == "true" ]]; then
-		print_section_header "Schedule Weekly Audit"
-		schedule_weekly
-		echo ""
-		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+
+	if [[ "$BASELINE_DIFF" == "true" ]]; then
+		# Quiet run so AUDIT_RESULTS holds the current state to compare against
+		# the saved baseline.
+		_run_checks_quiet
+		show_baseline_diff
 		return
 	fi
-	
-	if [[ "$QUIET_MODE" == "true" ]]; then
+
+	if [[ "$REMEDIATION_MODE" == "true" ]]; then
+		# Quiet run so AUDIT_RESULTS is populated without dumping the audit boxes.
+		_run_checks_quiet
+		if [[ "$OUTPUT_FORMAT" == "md" || "$OUTPUT_FORMAT" == "rtf" ]]; then
+			_set_report_context
+		fi
+		if [[ -n "$REPORT_FILE" ]]; then
+			case "$OUTPUT_FORMAT" in
+				md) render_report_md > "$REPORT_FILE" ;;
+				rtf) render_report_rtf > "$REPORT_FILE" ;;
+				*) print_remediation > "$REPORT_FILE" ;;
+			esac
+			echo "  Report saved to: $REPORT_FILE"
+		else
+			case "$OUTPUT_FORMAT" in
+				md) render_report_md ;;
+				rtf) render_report_rtf ;;
+				*) print_remediation ;;
+			esac
+		fi
+		return 0
+	fi
+
+	if [[ "$SHEET" == "true" ]]; then
+		# Quiet run so the sheet reflects the current state (and baseline diff).
+		_run_checks_quiet
+		_set_report_context
+		if [[ -n "$REPORT_FILE" ]]; then
+			if [[ "$OUTPUT_FORMAT" == "rtf" ]]; then
+				render_intervention_sheet_rtf > "$REPORT_FILE"
+			else
+				render_intervention_sheet > "$REPORT_FILE"
+			fi
+			echo "  Report saved to: $REPORT_FILE"
+		elif [[ "$OUTPUT_FORMAT" == "rtf" ]]; then
+			render_intervention_sheet_rtf
+		else
+			render_intervention_sheet
+		fi
+		return 0
+	fi
+
+	if [[ -n "$SCHEDULE_ACTION" ]]; then
+		case "$SCHEDULE_ACTION" in
+			status) schedule_status ;;
+			remove) schedule_remove ;;
+			daily | weekly | monthly)
+				print_section_header "Schedule Audit"
+				schedule_audit "$SCHEDULE_ACTION"
+				echo ""
+				echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+				;;
+			*)
+				echo "Uso: rcc audit --schedule daily|weekly|monthly|status|remove" >&2
+				;;
+		esac
+		return
+	fi
+
+	# Bare --quiet means "deep, quiet" for the human one-line summary. But a
+	# machine format (--json/--csv) must stay usable without sudo — fleet runs
+	# `audit --json --quiet` over SSH in BatchMode where no sudo is available —
+	# so only force deep for text output.
+	if [[ "$QUIET_MODE" == "true" && "$OUTPUT_FORMAT" == "text" ]]; then
 		DEEP_SCAN=true
 	fi
-	
+
 	if [[ "$DEEP_SCAN" == "true" ]]; then
 		if [[ "$SUDO_AVAILABLE" != "true" ]]; then
 			echo "${RED}✗ Deep scan requires sudo — skipped${NC}" >&2
@@ -561,17 +1217,14 @@ main() {
 			exit 0
 		fi
 	fi
-	
+
 	if [[ "$QUIET_MODE" == "true" ]]; then
-		{
-			run_core_checks
-			run_network_checks
-			run_auth_checks
-			run_persistence_checks
-			run_privacy_checks
-			run_additional_checks
-		} > /dev/null 2>&1
-		echo "pass:${PASS_count} warn:${WARN_count} fail:${FAIL_count}"
+		_run_checks_quiet
+		case "$OUTPUT_FORMAT" in
+			json) print_output_json ;;
+			csv) print_output_csv ;;
+			*) echo "pass:${PASS_count} warn:${WARN_count} fail:${FAIL_count}" ;;
+		esac
 		return 0
 	fi
 
@@ -581,7 +1234,11 @@ main() {
 	run_persistence_checks
 	run_privacy_checks
 	run_additional_checks
-	
+
+	if [[ "$BASELINE_SAVE" == "true" ]]; then
+		save_baseline
+	fi
+
 	print_summary
 
 	if [[ ${#FIX_QUEUE[@]} -gt 0 && "$AUTO_FIX" != "true" && "$OUTPUT_FORMAT" == "text" && "$QUIET_MODE" != "true" ]]; then
@@ -612,22 +1269,41 @@ main() {
 	if [[ "$NOTIFY" == "true" ]]; then
 		send_notification
 	fi
-	
+
+	# --alert: notify only when there is something to act on.
+	if [[ "$ALERT_ON_ISSUES" == "true" && ( $FAIL_count -gt 0 || $WARN_count -gt 0 ) ]]; then
+		send_notification
+	fi
+
+	if [[ "$OUTPUT_FORMAT" == "md" || "$OUTPUT_FORMAT" == "rtf" || "$SHARE" == "true" ]]; then
+		_set_report_context
+	fi
+
 	if [[ -n "$REPORT_FILE" ]]; then
 		case "$OUTPUT_FORMAT" in
 			html) print_output_html > "$REPORT_FILE" ;;
 			csv) print_output_csv > "$REPORT_FILE" ;;
 			json) print_output_json > "$REPORT_FILE" ;;
+			md) render_report_md > "$REPORT_FILE" ;;
+			rtf) render_report_rtf > "$REPORT_FILE" ;;
 			*) print_summary > "$REPORT_FILE" ;;
 		esac
 		echo "  Report saved to: $REPORT_FILE"
 	fi
-	
+
+	# --share publishes the Markdown report regardless of output format, so it
+	# runs before the non-text early-return (--md --share both work).
+	if [[ "$SHARE" == "true" ]]; then
+		share_report
+	fi
+
 	if [[ "$OUTPUT_FORMAT" != "text" ]]; then
 		case "$OUTPUT_FORMAT" in
 			html) print_output_html ;;
 			csv) print_output_csv ;;
 			json) print_output_json ;;
+			md) render_report_md ;;
+			rtf) render_report_rtf ;;
 		esac
 		return 0
 	fi
@@ -638,6 +1314,8 @@ main() {
 	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
 }
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+# Run main when executed directly or piped to `bash -s` (fleet mode over SSH,
+# where BASH_SOURCE is unset); skip only when sourced into another script.
+if [[ "${BASH_SOURCE[0]:-$0}" == "${0}" ]]; then
 	main "$@"
 fi

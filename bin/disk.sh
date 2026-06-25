@@ -14,27 +14,83 @@ show_disk_help() {
 	echo "Show disk status — internal, external, and network volumes"
 	echo ""
 	echo "Options:"
-	echo "  --json          Output in JSON format"
-	echo "  --help, -h      Show this help"
+	echo "  --json              Output in JSON format"
+	echo "  --large [PATH]      Find the biggest files (default PATH: \$HOME)"
+	echo "    --min SIZE        Minimum file size (default: 100M)"
+	echo "    --top N           How many to show (default: 20)"
+	echo "  --help, -h          Show this help"
+	echo ""
+	echo "Examples:"
+	echo "  rcc disk --large"
+	echo "  rcc disk --large ~/Downloads"
+	echo "  rcc disk --large --min 500M --top 10"
 }
 
 # shellcheck disable=SC2034
-	JSON_OUTPUT=false
+JSON_OUTPUT=false
+LARGE_MODE=false
+SEARCH_PATH="$HOME"
+MIN_SIZE="100M"
+TOP_N=20
 
-for arg in "$@"; do
-	case "$arg" in
+while [[ $# -gt 0 ]]; do
+	case "$1" in
 	--help | -h)
 		show_disk_help
 		exit 0
 		;;
 	--json)
+		shift
+		;;
+	--large)
+		LARGE_MODE=true
+		shift
+		# Optional positional PATH (anything that is not another flag).
+		if [[ $# -gt 0 && "$1" != -* ]]; then
+			SEARCH_PATH="$1"
+			shift
+		fi
+		;;
+	--min)
+		if [[ $# -ge 2 ]]; then MIN_SIZE="$2"; shift 2; else shift; fi
+		;;
+	--top)
+		if [[ $# -ge 2 ]]; then TOP_N="$2"; shift 2; else shift; fi
 		;;
 	*)
+		shift
 		;;
 	esac
 done
 
+# Find the biggest files under SEARCH_PATH. Uses find -exec du so du never runs
+# on an empty input (which would report the cwd), and skips dotfiles and caches.
+show_large_files() {
+	print_section_header "Large Files"
+	echo "${GRAY}Searching $SEARCH_PATH for files larger than $MIN_SIZE...${NC}"
+	print_table_header "Size|Path" 10 64
+	local found size path
+	found="$(find "$SEARCH_PATH" -maxdepth 6 -type f -size +"$MIN_SIZE" \
+		-not -path "*/.*" \
+		-not -path "*/Library/Caches/*" \
+		-exec du -sh {} + 2>/dev/null | sort -rh | head -n "$TOP_N" || true)"
+	if [[ -n "$found" ]]; then
+		while IFS=$'\t' read -r size path; do
+			[[ -z "$size" ]] && continue
+			print_table_row "$size|$path" 10 64
+		done <<< "$found"
+	else
+		print_table_row "${GRAY}No files over $MIN_SIZE found${NC}" 10 64
+	fi
+	echo "${GRAY}Cerca con: find $SEARCH_PATH -size +$MIN_SIZE${NC}"
+}
+
 main() {
+	if [[ "$LARGE_MODE" == "true" ]]; then
+		show_large_files
+		return 0
+	fi
+
 	print_section_header "Disk Status"
 
 	echo "${GRAY}[1/5] Physical Disks...${NC}"

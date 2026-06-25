@@ -15,6 +15,22 @@ _rcc_audit_opts() {
     '--json:JSON format'
     '--csv:CSV format'
     '--html:HTML report'
+    '--md:client-ready Markdown report'
+    '--rtf:client-ready RTF report'
+    '--explain:plain-language notes on issues'
+    '--remediation:client-facing intervention report'
+    '--baseline:save current state as reference baseline'
+    '--baseline-diff:compare current state against baseline'
+    '--baseline-reset:remove the saved baseline'
+    '--schedule:schedule a deep audit (daily|weekly|monthly|status|remove)'
+    '--profile:load a client profile'
+    '--profile-save:save current state as a client profile'
+    '--profile-list:list saved profiles'
+    '--profile-delete:remove a client profile'
+    '--share:publish report as an anonymous GitHub Gist'
+    '--sheet:generate an intervention sheet'
+    '--hours:hours worked (intervention sheet)'
+    '--notes:extra notes (intervention sheet)'
     '--history:show previous audit runs'
     '--diff:compare with previous run'
     '--watch:schedule weekly auto-audit'
@@ -45,6 +61,8 @@ _rcc() {
         'apps:update GUI apps (App Store + casks)'
         'audit:security audit'
         'network:network interfaces and info'
+        'wifi:Wi-Fi networks and saved passwords'
+        'fleet:audit multiple Macs over SSH'
         'disk:disk space and health'
         'memory:process memory usage'
         'ports:open ports and listeners'
@@ -69,6 +87,9 @@ _rcc() {
       case "$line[1]" in
         audit)  _rcc_audit_opts ;;
         upgrade|apps) _arguments '--dry-run[show what would be upgraded]' '-n[show what would be upgraded]' ;;
+        wifi)   _arguments '--active[active connection]' '--known[saved networks]' '--passwords[reveal Keychain passwords]' '--json[JSON format]' ;;
+        disk)   _arguments '--large[find biggest files]' '--min[minimum file size]' '--top[how many to show]' '--json[JSON format]' ;;
+        fleet)  _values 'fleet command' audit status add remove list '--hosts[hosts file]' '--parallel[max connections]' '--report[aggregate report]' '--json[JSON format]' '--explain[plain-language notes]' ;;
       esac
       ;;
   esac

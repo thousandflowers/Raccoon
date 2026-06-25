@@ -384,3 +384,40 @@ run_additional_checks() {
 	
 	print_category "Additional" "${additional_results[@]}"
 }
+
+# _check_explain NAME -> plain-language explanation for a check, or "" if none.
+# Used by `audit --explain` to print a friendly note under each fail/warn. Keyed
+# by the check name (the part before ": " in a result). Bash 3.2-safe: a plain
+# case, no associative arrays. A check with no entry returns "" and is simply
+# left undescribed — adding a check never requires touching this table.
+# Each entry: what it does · risk if it fails · how to fix, in plain words.
+_check_explain() {
+	case "$1" in
+		FileVault)
+			printf '%s' "Encrypts the whole disk with your login password. Without it, anyone with the Mac can read your files. Turn it on in System Settings -> Privacy & Security -> FileVault." ;;
+		SIP)
+			printf '%s' "System Integrity Protection locks core macOS files against tampering. Disabled, malware and bad installers can corrupt the system. Re-enable by running 'csrutil enable' from Recovery mode." ;;
+		Firewall)
+			printf '%s' "The firewall blocks unexpected incoming network connections. Off, other devices on the network can reach services on this Mac. Turn it on in System Settings -> Network -> Firewall." ;;
+		Gatekeeper)
+			printf '%s' "Gatekeeper allows only signed, Apple-checked apps to open. Disabled, a malicious app can run unnoticed. Re-enable by running 'sudo spctl --master-enable'." ;;
+		"Stealth Mode")
+			printf '%s' "Stealth mode makes the Mac ignore ping and port scans. Off, attackers can more easily discover it on a network. Enable it under the Firewall options in System Settings." ;;
+		"Software Updates")
+			printf '%s' "Security updates patch known holes attackers exploit. Out of date, the Mac is exposed to public vulnerabilities. Install pending updates in System Settings -> General -> Software Update." ;;
+		Sharing)
+			printf '%s' "Sharing services (screen, file, remote login) open the Mac to the network. Left on by accident, they are an entry point for intruders. Turn off unused ones in System Settings -> General -> Sharing." ;;
+		"Screen Lock")
+			printf '%s' "A screen lock asks for the password after sleep or the screensaver. Without it, anyone nearby can use an unattended Mac. Set it in System Settings -> Lock Screen." ;;
+		".ssh Permissions")
+			printf '%s' "Your ~/.ssh folder holds private keys and must stay private. Loose permissions let other accounts read your keys. Fix with 'chmod 700 ~/.ssh' and 'chmod 600 ~/.ssh/*'." ;;
+		"DNS-over-HTTPS")
+			printf '%s' "DNS-over-HTTPS encrypts the website lookups your Mac makes. Without it, the network can see and tamper with which sites you visit. Enable it in System Settings -> Network -> DNS." ;;
+		"Auto-Login")
+			printf '%s' "Auto-login skips the password at startup. Enabled, a stolen or rebooted Mac unlocks itself straight to your desktop. Turn it off in System Settings -> Users & Groups -> Login Options." ;;
+		"SSH Daemon")
+			printf '%s' "The SSH daemon lets people log into this Mac remotely over the network. On but unneeded, it is a remote-attack target. Disable Remote Login in System Settings -> General -> Sharing." ;;
+		*)
+			printf '%s' "" ;;
+	esac
+}

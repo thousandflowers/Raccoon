@@ -86,8 +86,22 @@ update_casks() {
 
 	increment_global_progress
 	update_global_progress_info "casks: upgrading..."
-	# ponytail: --greedy may prompt sudo for some casks; same as `rcc upgrade`
-	brew upgrade --cask --greedy 2>&1 </dev/null | progress_pipe _parse_cask || true
+	# brew --cask --greedy can re-invoke sudo for casks that need root. We cache
+	# sudo before calling this (see run()), but if a cache miss still triggers a
+	# prompt it must reach a real terminal. The old `</dev/null` handed sudo an
+	# instant EOF -> empty password -> rejection for users WITHOUT Touch ID, which
+	# was the real cause of issue #23 (Touch ID reads the GUI, not stdin, so it
+	# masked the bug). Read from the controlling TTY when there is one, falling
+	# back to /dev/null only when headless (where no prompt could be answered).
+	# No 2>&1: keep sudo's prompt on the terminal instead of swallowing it into
+	# the progress pipe.
+	# ponytail: pre-auth makes a prompt rare; if the 200ms progress redraw garbles
+	# it, suspend the bar around this call.
+	local brew_stdin=/dev/null
+	if { true >/dev/tty; } 2>/dev/null; then
+		brew_stdin=/dev/tty
+	fi
+	brew upgrade --cask --greedy <"$brew_stdin" | progress_pipe _parse_cask || true
 	increment_global_progress
 }
 

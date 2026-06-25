@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # rcc bash completion — source this file or add to bash_completion.d
 
-_rcc_audit_opts='--deep --fix --dry-run --force --quiet --report --json --csv --html --history --diff --watch --alert --notify --help -h'
+_rcc_audit_opts='--deep --fix --dry-run --force --quiet --report --json --csv --html --md --rtf --explain --remediation --baseline --baseline-diff --baseline-reset --history --diff --watch --schedule --profile --profile-save --profile-list --profile-delete --share --sheet --hours --notes --alert --notify --help -h'
 
 _rcc() {
 	# shellcheck disable=SC2034
@@ -10,7 +10,7 @@ _rcc() {
 
 	if [[ $cword -eq 1 ]]; then
 		# shellcheck disable=SC2207
-		COMPREPLY=($(compgen -W 'upgrade audit network disk memory ports battery backup env startup trash fonts history certs docker xcode ssh git help --version -V' -- "$cur"))
+		COMPREPLY=($(compgen -W 'upgrade audit network wifi fleet disk memory ports battery backup env startup trash fonts history certs docker xcode ssh git help --version -V' -- "$cur"))
 		return
 	fi
 
@@ -22,6 +22,18 @@ _rcc() {
 		upgrade|apps)
 			# shellcheck disable=SC2207
 			COMPREPLY=($(compgen -W '--dry-run -n --help -h' -- "$cur"))
+			;;
+		wifi)
+			# shellcheck disable=SC2207
+			COMPREPLY=($(compgen -W '--active --known --passwords --json --help -h' -- "$cur"))
+			;;
+		fleet)
+			# shellcheck disable=SC2207
+			COMPREPLY=($(compgen -W 'audit status add remove list --hosts --parallel --report --json --explain --help -h' -- "$cur"))
+			;;
+		disk)
+			# shellcheck disable=SC2207
+			COMPREPLY=($(compgen -W '--large --min --top --json --help -h' -- "$cur"))
 			;;
 		help|--version|-V)
 			COMPREPLY=()

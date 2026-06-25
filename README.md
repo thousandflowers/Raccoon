@@ -9,6 +9,8 @@
 [![CI](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go_TUI-Bubble_Tea-00ADD8?logo=go)](ui/)
+![ShellCheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-bats-blue)
 
 Zero dependencies beyond macOS + git. 1500+ lines of shellcheck-clean Bash.
 
@@ -72,14 +74,30 @@ So I took it further. I had a second script I'd run on my sisters' Macs whenever
 rcc audit                 # quick scan
 rcc audit deep            # full scan (requires sudo)
 rcc audit --fix           # auto-fix common issues
+rcc audit --explain       # add plain-language notes to issues
+rcc audit --remediation   # client-facing intervention report
 rcc audit --json          # machine-readable output
 rcc audit --csv           # spreadsheet-ready
 rcc audit --html          # save as HTML report
-rcc audit --report out    # save report to file
+rcc audit --md            # client-ready Markdown report
+rcc audit --rtf           # client-ready RTF (opens in TextEdit/Word)
+rcc audit --report out    # save report to file (format inferred from extension)
 rcc audit history         # view past audits
 rcc audit --diff          # changes since last audit
 rcc audit watch           # schedule weekly scan via LaunchAgent
 ```
+
+**Client-ready reports.** `--md` and `--rtf` produce a branded document a
+technician can hand to a client. Add `--client`, `--shop`, and `--tech` for the
+header/footer (all optional — without them you get a default Raccoon report):
+
+```bash
+rcc audit --md --report client.md \
+  --client "Jane Doe" --shop "MacFix Pro" --tech "Mario Rossi"
+```
+
+The reporter is data-driven: it renders whatever checks the audit produces, so
+new checks show up automatically with no change to the report code.
 
 **Safe by default.** `--fix` never imposes a one-size-fits-all setting — a config
 that looks odd on one Mac is often legitimate on another:
@@ -98,11 +116,29 @@ Cron Jobs
 User LaunchAgents
 ```
 
+### 🛰️ Fleet mode
+
+Audit every Mac you manage from one command, over SSH, in parallel:
+
+```bash
+rcc fleet add mario@192.168.1.10   # build the host list
+rcc fleet status                   # quick reachability check
+rcc fleet audit                    # audit all hosts, aggregate report
+rcc fleet audit --report fleet.md  # save an aggregate Markdown report
+```
+
+Hosts live in `~/.raccoon/fleet.conf` (one `user@host[:port]` per line, key auth
+only). **Remote Macs don't need Raccoon installed** — the script is streamed over
+stdin to `bash`, so they need only bash, macOS, and an SSH server. sudo checks
+are skipped automatically (SSH BatchMode has no sudo).
+
 ### 🖥️ System information
 
 ```bash
 rcc disk                  # internal, external & network drives, SMART
+rcc disk large            # biggest files (--min SIZE, --top N)
 rcc network               # interfaces, Wi‑Fi, DNS, routing
+rcc wifi                  # active network, known SSIDs, Keychain passwords
 rcc memory                # system stats + processes sorted by RAM
 rcc ports                 # open ports & listening services
 rcc battery               # health %, cycles, temperature
@@ -127,6 +163,7 @@ rcc xcode                 # simulators, derived data, SPM caches
 ```bash
 rcc env                   # shell environment & PATH breakdown
 rcc startup               # launch agents & login items
+rcc startup clean         # remove orphaned launch agents (interactive)
 rcc trash                 # trash size & empty
 rcc fonts                 # find duplicates & corrupted fonts
 rcc history               # shell history analysis
@@ -177,10 +214,18 @@ rcc certs                 # SSL certificate expiry report
 | `audit` | Security audit (30+ checks) |
 | `audit deep` | Full audit with sudo |
 | `audit fix` | Auto-fix security issues |
+| `audit --explain` | Audit with plain-language notes on issues |
+| `audit --remediation` | Client-facing before/after intervention report |
+| `audit --baseline` | Save a reference baseline; `--baseline-diff` shows regressions since |
+| `audit --schedule FREQ` | Schedule a deep audit (daily/weekly/monthly); `status`/`remove` |
+| `audit profile` | Per-client profiles (config, branding, baseline); `profile-list` |
+| `audit share` | Publish the report as an anonymous GitHub Gist |
+| `audit --sheet` | Intervention sheet (`--hours`, `--notes`); MD or RTF |
 | `battery` | Health, cycles, temperature |
 | `backup` | Time Machine status |
 | `certs` | SSL certificate expiry |
 | `disk` | Internal, external & network drives, SMART |
+| `disk large` | Biggest files (`--min SIZE`, `--top N`) |
 | `docker` | Images, containers, volumes |
 | `env` | Shell environment & PATH |
 | `fonts` | Font duplicates & issues |
@@ -188,9 +233,12 @@ rcc certs                 # SSL certificate expiry report
 | `history` | Shell history analysis |
 | `memory` | System memory + process RSS |
 | `network` | Interfaces, Wi‑Fi, DNS |
+| `wifi` | Active network, known SSIDs, Keychain passwords |
+| `fleet` | Security audit across multiple Macs via SSH |
 | `ports` | Open ports & listeners |
 | `ssh` | Key inspection, `--export`, `--export-gpg` |
 | `startup` | Launch agents & login items |
+| `startup clean` | Remove orphaned launch agents (interactive, with backup) |
 | `trash` | Trash contents & size |
 | `upgrade` | Multi‑package update |
 | `xcode` | Simulators, caches, SPM |

@@ -33,14 +33,30 @@ case "${1:-""}" in
 				"quiet") exec "${SCRIPT_DIR}/bin/audit.sh" --deep --quiet "${@:3}" ;;
 				"json")  exec "${SCRIPT_DIR}/bin/audit.sh" --deep --json "${@:3}" ;;
 				"history") exec "${SCRIPT_DIR}/bin/audit.sh" --history "${@:3}" ;;
-				"watch") exec "${SCRIPT_DIR}/bin/audit.sh" --watch "${@:3}" ;;
+				"watch") exec "${SCRIPT_DIR}/bin/audit.sh" --schedule weekly "${@:3}" ;;
+				"schedule") exec "${SCRIPT_DIR}/bin/audit.sh" --schedule "${@:3}" ;;
+				"profile") exec "${SCRIPT_DIR}/bin/audit.sh" --profile "${@:3}" ;;
+				"profile-list") exec "${SCRIPT_DIR}/bin/audit.sh" --profile-list "${@:3}" ;;
+				"share") exec "${SCRIPT_DIR}/bin/audit.sh" --share "${@:3}" ;;
 				*)       exec "${SCRIPT_DIR}/bin/audit.sh" "${@:2}" ;;
 			esac
 			;;
 		"network") exec "${SCRIPT_DIR}/bin/network.sh" "${@:2}" ;;
-		"disk")    exec "${SCRIPT_DIR}/bin/disk.sh" "${@:2}" ;;
+		"wifi")    exec "${SCRIPT_DIR}/bin/wifi.sh" "${@:2}" ;;
+		"fleet")   exec "${SCRIPT_DIR}/bin/fleet.sh" "${@:2}" ;;
+		"disk")
+			case "${2:-}" in
+				"large") exec "${SCRIPT_DIR}/bin/disk.sh" --large "${@:3}" ;;
+				*)       exec "${SCRIPT_DIR}/bin/disk.sh" "${@:2}" ;;
+			esac
+			;;
 		"memory")  exec "${SCRIPT_DIR}/bin/memory.sh" "${@:2}" ;;
-		"startup") exec "${SCRIPT_DIR}/bin/startup.sh" "${@:2}" ;;
+		"startup")
+			case "${2:-}" in
+				"clean") exec "${SCRIPT_DIR}/bin/startup.sh" --clean "${@:3}" ;;
+				*)       exec "${SCRIPT_DIR}/bin/startup.sh" "${@:2}" ;;
+			esac
+			;;
 		"trash")   exec "${SCRIPT_DIR}/bin/trash.sh" "${@:2}" ;;
 		"fonts")   exec "${SCRIPT_DIR}/bin/fonts.sh" "${@:2}" ;;
 		"history") exec "${SCRIPT_DIR}/bin/history.sh" "${@:2}" ;;
