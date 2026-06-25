@@ -4,15 +4,16 @@
   <img src="docs/gifs/hero.gif" alt="Raccoon Hero" width="800">
 </p>
 
-> macOS companion toolkit — system info, security audits, dev tools, all from one terminal.
+> Security audits, system info, and SSH fleet management for macOS — for the people who maintain Macs they don't sit in front of, and need to show their work.
 
 [![CI](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go_TUI-Bubble_Tea-00ADD8?logo=go)](ui/)
 ![ShellCheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)
 ![Tests](https://img.shields.io/badge/tests-bats-blue)
+[![Stars](https://img.shields.io/github/stars/thousandflowers/Raccoon?style=flat)](https://github.com/thousandflowers/Raccoon/stargazers)
 
-Zero dependencies beyond macOS + git. 1500+ lines of shellcheck-clean Bash.
+Zero dependencies beyond macOS + git. 1500+ lines of shellcheck-clean Bash. 322 tests. Bash 3.2 compatible.
 
 ---
 
@@ -58,9 +59,9 @@ rm -rf ~/.raccoon && rm "$(which rcc)"
 
 ## Why I built this
 
-It started as a PR to [Mole](https://github.com/tw93/Mole) — a `mo update` command that updated brew, pip, npm, and gem in one shot because i always forgot to update something. The maintainer liked the code but declined it as out of scope for Mole.
+It started as a PR to [Mole](https://github.com/tw93/Mole) — a `mo update` command that updated brew, pip, npm, and gem in one shot, because I always forgot to update something. The maintainer liked the code but declined it as out of scope.
 
-So I took it further. I had a second script I'd run on my sisters' Macs whenever they asked me to check something: disk space, open ports, what was running at startup. I merged the two, kept adding commands, and Raccoon became the tool I reach for whenever I need to know what's going on with a Mac.
+So I took it further. I had a second script I ran on my sisters' Macs whenever they asked me to check something — disk space, open ports, what was running at startup. I merged the two and kept adding commands. Now it produces client reports and audits a room full of Macs over SSH, but it's still the same tool — I just kept adding the things I needed.
 
 ---
 
@@ -85,6 +86,16 @@ rcc audit --report out    # save report to file (format inferred from extension)
 rcc audit history         # view past audits
 rcc audit --diff          # changes since last audit
 rcc audit watch           # schedule weekly scan via LaunchAgent
+```
+
+**Per-client profiles.** `--profile <name>` loads a client's config, branding, and
+baseline. Combine it with `--remediation` and `--sheet` to produce a complete
+intervention report in one command:
+
+```bash
+rcc audit --deep --profile mario-bianchi \
+  --remediation --sheet --hours 2 \
+  --report intervento.md
 ```
 
 **Client-ready reports.** `--md` and `--rtf` produce a branded document a
@@ -145,6 +156,18 @@ rcc battery               # health %, cycles, temperature
 rcc backup                # Time Machine status
 ```
 
+### 🧹 Maintenance
+
+```bash
+rcc env                   # shell environment & PATH breakdown
+rcc startup               # launch agents & login items
+rcc startup clean         # remove orphaned launch agents (interactive)
+rcc trash                 # trash size & empty
+rcc fonts                 # find duplicates & corrupted fonts
+rcc history               # shell history analysis
+rcc certs                 # SSL certificate expiry report
+```
+
 ### 🛠️ Developer tools
 
 ```bash
@@ -156,18 +179,6 @@ rcc ssh                   # inspect keys, --export, --export-gpg
 rcc git                   # status, branches, stash, cleanup
 rcc docker                # images, containers, volumes
 rcc xcode                 # simulators, derived data, SPM caches
-```
-
-### 🧹 Maintenance
-
-```bash
-rcc env                   # shell environment & PATH breakdown
-rcc startup               # launch agents & login items
-rcc startup clean         # remove orphaned launch agents (interactive)
-rcc trash                 # trash size & empty
-rcc fonts                 # find duplicates & corrupted fonts
-rcc history               # shell history analysis
-rcc certs                 # SSL certificate expiry report
 ```
 
 <details>
@@ -242,6 +253,31 @@ rcc certs                 # SSL certificate expiry report
 | `trash` | Trash contents & size |
 | `upgrade` | Multi‑package update |
 | `xcode` | Simulators, caches, SPM |
+
+---
+
+## Why Raccoon is different
+
+**Safe by default, not silent by default.** `--fix` backs up every destructive
+change to `~/.raccoon/fix-backups/<timestamp>/` before touching anything. A wrong
+fix is always recoverable.
+
+**No install on the remote Macs.** Fleet mode streams the audit script over SSH
+stdin — remote machines need only bash, macOS, and an open SSH server.
+
+**Auditable, not opinionated.** Raccoon never sets a public DNS resolver or strips
+Gatekeeper quarantine flags. Both would silently weaken a working setup on some
+machines.
+
+**One data model.** Every output format — text, JSON, CSV, Markdown, RTF, and the
+fleet aggregate — renders from the same `AUDIT_RESULTS` array, so a new check shows
+up everywhere automatically.
+
+**Bash 3.2 compatible.** Runs on any macOS since Snow Leopard. No Homebrew required
+to install, no runtime dependencies.
+
+**322 tests.** Every renderer, flag, and edge case (including pre-feature history
+files) has a bats test, and `shellcheck -S warning` exits 0 on every file.
 
 ---
 
