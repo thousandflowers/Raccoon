@@ -10,7 +10,7 @@ _rcc() {
 
 	if [[ $cword -eq 1 ]]; then
 		# shellcheck disable=SC2207
-		COMPREPLY=($(compgen -W 'upgrade audit network wifi disk memory ports battery backup env startup trash fonts history certs docker xcode ssh git help --version -V' -- "$cur"))
+		COMPREPLY=($(compgen -W 'upgrade audit network wifi fleet disk memory ports battery backup env startup trash fonts history certs docker xcode ssh git help --version -V' -- "$cur"))
 		return
 	fi
 
@@ -26,6 +26,10 @@ _rcc() {
 		wifi)
 			# shellcheck disable=SC2207
 			COMPREPLY=($(compgen -W '--active --known --passwords --json --help -h' -- "$cur"))
+			;;
+		fleet)
+			# shellcheck disable=SC2207
+			COMPREPLY=($(compgen -W 'audit status add remove list --hosts --parallel --report --json --explain --help -h' -- "$cur"))
 			;;
 		disk)
 			# shellcheck disable=SC2207

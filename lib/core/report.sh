@@ -343,3 +343,81 @@ render_intervention_sheet_rtf() {
 	printf '{\\i Generato da Raccoon v%s - %s}\\par\n' "$(rtf_escape "$ver")" "$(rtf_escape "$date")"
 	printf '}\n'
 }
+
+# ============================================================================
+# Fleet report — aggregate of an SSH audit across many Macs
+# ============================================================================
+# Consumes globals set by bin/fleet.sh: FLEET_ROWS (TAB records
+# "status<TAB>host<TAB>safe<TAB>pass<TAB>warn<TAB>fail"), FLEET_TOTAL_PASS/WARN/
+# FAIL, FLEET_REACHED, FLEET_COUNT, and FLEET_RESULTS_DIR (per-host
+# "<safe>.results" files of "status<TAB>name" lines, when available).
+
+_fleet_status_label() {
+	case "$1" in
+		ok) printf 'OK' ;;
+		issues) printf 'Issues' ;;
+		timeout) printf 'Timeout' ;;
+		unreachable) printf 'Unreachable' ;;
+		*) printf 'Error' ;;
+	esac
+}
+
+render_fleet_md() {
+	printf '# Fleet Audit\n'
+	printf '**Date:** %s\n\n' "${REPORT_DATE:-}"
+	printf '## Summary\n\n'
+	printf '%s/%s host raggiunti · ✓ %s pass · ⚠ %s warn · ✗ %s fail\n\n' \
+		"${FLEET_REACHED:-0}" "${FLEET_COUNT:-0}" \
+		"${FLEET_TOTAL_PASS:-0}" "${FLEET_TOTAL_WARN:-0}" "${FLEET_TOTAL_FAIL:-0}"
+
+	local row status host safe pass warn fail rf st nm
+	for row in ${FLEET_ROWS[@]+"${FLEET_ROWS[@]}"}; do
+		IFS=$'\t' read -r status host safe pass warn fail <<< "$row"
+		printf '## %s\n\n' "$host"
+		printf '**Status:** %s · %s pass · %s warn · %s fail\n\n' \
+			"$(_fleet_status_label "$status")" "$pass" "$warn" "$fail"
+		rf="${FLEET_RESULTS_DIR:-/nonexistent}/${safe}.results"
+		if [[ -s "$rf" ]]; then
+			printf '| Check | Status |\n|-------|--------|\n'
+			while IFS=$'\t' read -r st nm; do
+				[[ -z "$nm" ]] && continue
+				printf '| %s | %s |\n' "$nm" "$st"
+			done < "$rf"
+			printf '\n'
+		fi
+	done
+
+	printf '\n---\n'
+	printf '_powered by Raccoon_\n'
+}
+
+render_fleet_rtf() {
+	printf '{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Helvetica;}}\n'
+	printf '\\fs28\n'
+	printf '{\\b\\fs36 Fleet Audit}\\par\n'
+	printf '{\\b Date:} %s\\par\n' "$(rtf_escape "${REPORT_DATE:-}")"
+	printf '\\par\n'
+	printf '{\\b\\fs32 Summary}\\par\n'
+	printf '%s/%s host raggiunti - %s pass, %s warn, %s fail\\par\n' \
+		"${FLEET_REACHED:-0}" "${FLEET_COUNT:-0}" \
+		"${FLEET_TOTAL_PASS:-0}" "${FLEET_TOTAL_WARN:-0}" "${FLEET_TOTAL_FAIL:-0}"
+	printf '\\par\n'
+
+	local row status host safe pass warn fail rf st nm
+	for row in ${FLEET_ROWS[@]+"${FLEET_ROWS[@]}"}; do
+		IFS=$'\t' read -r status host safe pass warn fail <<< "$row"
+		printf '{\\b\\fs32 %s}\\par\n' "$(rtf_escape "$host")"
+		printf '%s - %s pass, %s warn, %s fail\\par\n' \
+			"$(_fleet_status_label "$status")" "$pass" "$warn" "$fail"
+		rf="${FLEET_RESULTS_DIR:-/nonexistent}/${safe}.results"
+		if [[ -s "$rf" ]]; then
+			while IFS=$'\t' read -r st nm; do
+				[[ -z "$nm" ]] && continue
+				printf '%s: %s\\par\n' "$(rtf_escape "$nm")" "$(rtf_escape "$st")"
+			done < "$rf"
+		fi
+		printf '\\par\n'
+	done
+	printf '{\\i powered by Raccoon}\\par\n'
+	printf '}\n'
+}

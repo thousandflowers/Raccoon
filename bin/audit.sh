@@ -187,7 +187,6 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--quiet | -q)
 		QUIET_MODE=true
-		DEEP_SCAN=true
 		shift
 		;;
 	--report)
@@ -928,7 +927,10 @@ print_output_json() {
 	echo "  \"audit_type\": \"$([ "$DEEP_SCAN" == "true" ] && echo "deep" || echo "basic")\","
 	echo "  \"pass\": $PASS_count,"
 	echo "  \"warning\": $WARN_count,"
-	echo "  \"fail\": $FAIL_count"
+	echo "  \"fail\": $FAIL_count,"
+	local rj
+	rj="$(_results_json)"
+	echo "  \"results\": [$rj]"
 	echo "}"
 }
 
@@ -1231,10 +1233,14 @@ main() {
 		return
 	fi
 
-	if [[ "$QUIET_MODE" == "true" ]]; then
+	# Bare --quiet means "deep, quiet" for the human one-line summary. But a
+	# machine format (--json/--csv) must stay usable without sudo — fleet runs
+	# `audit --json --quiet` over SSH in BatchMode where no sudo is available —
+	# so only force deep for text output.
+	if [[ "$QUIET_MODE" == "true" && "$OUTPUT_FORMAT" == "text" ]]; then
 		DEEP_SCAN=true
 	fi
-	
+
 	if [[ "$DEEP_SCAN" == "true" ]]; then
 		if [[ "$SUDO_AVAILABLE" != "true" ]]; then
 			echo "${RED}✗ Deep scan requires sudo — skipped${NC}" >&2
@@ -1242,7 +1248,7 @@ main() {
 			exit 0
 		fi
 	fi
-	
+
 	if [[ "$QUIET_MODE" == "true" ]]; then
 		{
 			run_core_checks
@@ -1252,7 +1258,11 @@ main() {
 			run_privacy_checks
 			run_additional_checks
 		} > /dev/null 2>&1
-		echo "pass:${PASS_count} warn:${WARN_count} fail:${FAIL_count}"
+		case "$OUTPUT_FORMAT" in
+			json) print_output_json ;;
+			csv) print_output_csv ;;
+			*) echo "pass:${PASS_count} warn:${WARN_count} fail:${FAIL_count}" ;;
+		esac
 		return 0
 	fi
 
@@ -1342,6 +1352,8 @@ main() {
 	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
 }
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+# Run main when executed directly or piped to `bash -s` (fleet mode over SSH,
+# where BASH_SOURCE is unset); skip only when sourced into another script.
+if [[ "${BASH_SOURCE[0]:-$0}" == "${0}" ]]; then
 	main "$@"
 fi

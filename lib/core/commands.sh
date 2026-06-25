@@ -38,6 +38,7 @@ MENU_ITEMS=(
     "audit json:audit --json"
     "audit history:audit --history"
     "audit watch:audit --watch"
+    "fleet:Audit flotta Mac via SSH"
     "---"
     "ssh:SSH keys"
     "git:Git repos"

@@ -62,6 +62,7 @@ _rcc() {
         'audit:security audit'
         'network:network interfaces and info'
         'wifi:Wi-Fi networks and saved passwords'
+        'fleet:audit multiple Macs over SSH'
         'disk:disk space and health'
         'memory:process memory usage'
         'ports:open ports and listeners'
@@ -88,6 +89,7 @@ _rcc() {
         upgrade|apps) _arguments '--dry-run[show what would be upgraded]' '-n[show what would be upgraded]' ;;
         wifi)   _arguments '--active[active connection]' '--known[saved networks]' '--passwords[reveal Keychain passwords]' '--json[JSON format]' ;;
         disk)   _arguments '--large[find biggest files]' '--min[minimum file size]' '--top[how many to show]' '--json[JSON format]' ;;
+        fleet)  _values 'fleet command' audit status add remove list '--hosts[hosts file]' '--parallel[max connections]' '--report[aggregate report]' '--json[JSON format]' '--explain[plain-language notes]' ;;
       esac
       ;;
   esac

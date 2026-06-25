@@ -116,6 +116,22 @@ Cron Jobs
 User LaunchAgents
 ```
 
+### 🛰️ Fleet mode
+
+Audit every Mac you manage from one command, over SSH, in parallel:
+
+```bash
+rcc fleet add mario@192.168.1.10   # build the host list
+rcc fleet status                   # quick reachability check
+rcc fleet audit                    # audit all hosts, aggregate report
+rcc fleet audit --report fleet.md  # save an aggregate Markdown report
+```
+
+Hosts live in `~/.raccoon/fleet.conf` (one `user@host[:port]` per line, key auth
+only). **Remote Macs don't need Raccoon installed** — the script is streamed over
+stdin to `bash`, so they need only bash, macOS, and an SSH server. sudo checks
+are skipped automatically (SSH BatchMode has no sudo).
+
 ### 🖥️ System information
 
 ```bash
@@ -218,6 +234,7 @@ rcc certs                 # SSL certificate expiry report
 | `memory` | System memory + process RSS |
 | `network` | Interfaces, Wi‑Fi, DNS |
 | `wifi` | Active network, known SSIDs, Keychain passwords |
+| `fleet` | Security audit across multiple Macs via SSH |
 | `ports` | Open ports & listeners |
 | `ssh` | Key inspection, `--export`, `--export-gpg` |
 | `startup` | Launch agents & login items |
