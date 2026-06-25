@@ -67,7 +67,7 @@ setup() {
 # --- report rendering (regression: ragged boxes) ---
 
 @test "audit.sh: report box rows all align to one width" {
-	run bash -c "bash '$SCRIPT_DIR/bin/audit.sh' 2>/dev/null | python3 '$SCRIPT_DIR/tests/check_box_width.py'"
+	run bash -c "bash '$SCRIPT_DIR/bin/audit.sh' 2>/dev/null | bash '$SCRIPT_DIR/tests/check_box_width.sh'"
 	assert_output_contains "OK"
 }
 
