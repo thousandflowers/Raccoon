@@ -3,6 +3,25 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [0.12.0] - 2026-06-25
+### Added
+- `audit --explain` — plain-language notes for each check.
+- `audit --remediation` — before/after report for MSP technicians.
+- `startup --clean` — interactively remove orphaned LaunchAgents (with backup).
+- First-run onboarding wizard.
+- `wifi` — active network, known SSIDs, opt-in Keychain passwords.
+- `audit --baseline` / `--baseline-diff` / `--baseline-reset` — reference-state monitoring.
+- `audit --schedule daily|weekly|monthly` (+ `status`/`remove`); native macOS alerts via `--alert`.
+- Audit health-history sparkline in the menu banner.
+- `disk --large` (`--min`, `--top`) — biggest files.
+- `audit --profile` — per-client config, branding, and baseline.
+- `audit --share` — publish the report as an anonymous GitHub Gist.
+- `audit --sheet` (`--hours`, `--notes`) — fill-in intervention sheet (Markdown/RTF).
+- `fleet` — SSH audit across multiple Macs (`audit`/`status`/`add`/`remove`/`list`); the remote runs a self-contained bundle, so no install is needed on the remote Macs.
+### Changed
+- `audit --json --quiet` now emits clean JSON (powers fleet mode); `print_output_json` includes the per-check `results` array.
+- The bash fallback menu is data-driven; assorted internal de-duplication.
+
 ## [0.11.1] - 2026-06-23
 ### Fixed
 - `apps`: pre-cache sudo so cask upgrades don't garble the password prompt.
