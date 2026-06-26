@@ -37,7 +37,7 @@ teardown() {
 	echo '{"fail": 2}' > "$d/audit_2026-01-03_09:00:00.json"
 	run show_health_history
 	assert_success
-	assert_output_contains "Ultimi audit"
+	assert_output_contains "Last audits"
 	assert_output_contains "●"
 	assert_output_contains "○"
 	assert_output_contains "2/3"

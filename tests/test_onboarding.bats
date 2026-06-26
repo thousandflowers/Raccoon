@@ -18,7 +18,7 @@ teardown() {
 @test "onboarding box renders the welcome and the three commands" {
 	run _render_onboarding
 	assert_success
-	assert_output_contains "Benvenuto in Raccoon"
+	assert_output_contains "Welcome to Raccoon"
 	assert_output_contains "rcc audit"
 	assert_output_contains "rcc wifi"
 }

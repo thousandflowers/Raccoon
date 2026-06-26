@@ -15,7 +15,7 @@ teardown() {
 	run bash "$SCRIPT_DIR/bin/audit.sh" --profile mario-bianchi
 	assert_success
 	[[ -d "$HOME/.raccoon/profiles/mario-bianchi" ]]
-	assert_output_contains "Nuovo profilo 'mario-bianchi' creato"
+	assert_output_contains "New profile 'mario-bianchi' created"
 }
 
 @test "audit --profile-save then --profile-list shows the saved profile" {
