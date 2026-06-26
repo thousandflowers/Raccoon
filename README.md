@@ -1,19 +1,39 @@
 # 🦝 Raccoon
 
 <p align="center">
-  <img src="docs/gifs/hero.gif" alt="Raccoon Hero" width="800">
+  <img src="docs/gifs/hero.gif" alt="Raccoon — rcc audit running" width="800">
 </p>
 
-> Security audits, system info, and SSH fleet management for macOS — for the people who maintain Macs they don't sit in front of, and need to show their work.
+> **Security audits, system info & SSH fleet management for macOS.**
+> *For the people who maintain Macs they don't sit in front of — and need to show their work.*
 
 [![CI](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/Go_TUI-Bubble_Tea-00ADD8?logo=go)](ui/)
 ![ShellCheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)
-![Tests](https://img.shields.io/badge/tests-bats-blue)
-[![Stars](https://img.shields.io/github/stars/thousandflowers/Raccoon?style=flat)](https://github.com/thousandflowers/Raccoon/stargazers)
+![Tests](https://img.shields.io/badge/tests-353%20bats-blue)
 
-Zero dependencies beyond macOS + git. 1500+ lines of shellcheck-clean Bash. 322 tests. Bash 3.2 compatible.
+Zero dependencies beyond macOS + git. 1500+ lines of shellcheck-clean Bash. 353 tests. Runs on the system Bash (3.2 → 5.x), no Homebrew required.
+
+---
+
+## Why I built this
+
+It started as a PR to [Mole](https://github.com/tw93/Mole) — a `mo update` command that updated brew, pip, npm, and gem in one shot, because I always forgot to update something. The maintainer liked the code but declined it as out of scope.
+
+So I took it further. I had a second script I ran on my sisters' Macs whenever they asked me to check something — disk space, open ports, what was running at startup. I merged the two and kept adding commands. Now it produces client reports and audits a room full of Macs over SSH, but it's still the same tool — I just kept adding the things I needed.
+
+---
+
+## Contents
+
+- [Install](#install)
+- [What you can do](#what-you-can-do)
+- [Fleet management](#️-fleet-management)
+- [All commands](#all-commands)
+- [Why Raccoon is different](#why-raccoon-is-different)
+- [Is it safe to pipe to `bash`?](#is-it-safe-to-pipe-to-bash)
+- [Go TUI](#go-tui)
+- [Shell completion](#shell-completion) · [Man page](#man-page) · [Project structure](#project-structure) · [Contributing](#contributing)
 
 ---
 
@@ -29,39 +49,25 @@ Or via Homebrew:
 brew install thousandflowers/raccoon/rcc
 ```
 
-Run `rcc` to launch the interactive menu, or `rcc <command>` for direct access.
+Run `rcc` to launch the interactive [menu](#go-tui), or `rcc <command>` for direct access.
 
 <details>
-<summary>Update & uninstall</summary>
+<summary>Update &amp; uninstall</summary>
 
 **Update:**
 
 ```bash
-# Homebrew
-brew upgrade rcc
-
-# curl install — re-run the installer
-curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
+brew upgrade rcc                                                                   # Homebrew
+curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash   # curl install
 ```
 
 **Uninstall:**
 
 ```bash
-# Homebrew
-brew uninstall rcc
-
-# curl install
-rm -rf ~/.raccoon && rm "$(which rcc)"
+brew uninstall rcc                          # Homebrew
+rm -rf ~/.raccoon && rm "$(which rcc)"      # curl install
 ```
 </details>
-
----
-
-## Why I built this
-
-It started as a PR to [Mole](https://github.com/tw93/Mole) — a `mo update` command that updated brew, pip, npm, and gem in one shot, because I always forgot to update something. The maintainer liked the code but declined it as out of scope.
-
-So I took it further. I had a second script I ran on my sisters' Macs whenever they asked me to check something — disk space, open ports, what was running at startup. I merged the two and kept adding commands. Now it produces client reports and audits a room full of Macs over SSH, but it's still the same tool — I just kept adding the things I needed.
 
 ---
 
@@ -69,86 +75,49 @@ So I took it further. I had a second script I ran on my sisters' Macs whenever t
 
 ### 🔒 Security audit
 
-30+ checks across Core Security, Network, Auth, Persistence, Privacy, and more.
-
 ```bash
-rcc audit                 # quick scan
-rcc audit deep            # full scan (requires sudo)
-rcc audit --fix           # auto-fix common issues
-rcc audit --explain       # add plain-language notes to issues
-rcc audit --remediation   # client-facing intervention report
-rcc audit --json          # machine-readable output
-rcc audit --csv           # spreadsheet-ready
-rcc audit --html          # save as HTML report
-rcc audit --md            # client-ready Markdown report
-rcc audit --rtf           # client-ready RTF (opens in TextEdit/Word)
-rcc audit --report out    # save report to file (format inferred from extension)
-rcc audit history         # view past audits
-rcc audit --diff          # changes since last audit
-rcc audit watch           # schedule weekly scan via LaunchAgent
+rcc audit                 # 30+ security checks (Gatekeeper, firewall, SIP, sharing…)
+rcc audit --fix           # apply safe fixes — every change is backed up first
+rcc audit --deep          # add slower, deeper checks
+rcc audit --json          # machine-readable output (also: --csv, --report file.md)
+rcc audit --baseline      # snapshot now; later runs diff against it
 ```
 
-**Per-client profiles.** `--profile <name>` loads a client's config, branding, and
-baseline. Combine it with `--remediation` and `--sheet` to produce a complete
-intervention report in one command:
+Per-client reports with `--client`, `--shop`, `--tech` and reusable profiles
+(`rcc audit --profile mario-bianchi`). `--fix` backs every change up to
+`~/.raccoon/fix-backups/<timestamp>/` first, and schedules itself with
+`rcc audit schedule weekly` (LaunchAgent).
+
+![audit](docs/gifs/rcc-audit.gif)
+
+### 🛰️ Fleet management
+
+Discover, group, run commands on, and audit every Mac you manage — from one
+machine, over SSH, in parallel:
 
 ```bash
-rcc audit --deep --profile mario-bianchi \
-  --remediation --sheet --hours 2 \
-  --report intervento.md
+rcc fleet scan                         # discover Macs on the LAN (Bonjour + ping-sweep)
+rcc fleet add mario@192.168.1.10       # ...or add hosts by hand
+rcc fleet group add office mario@192.168.1.10 luca@192.168.1.11   # organize into groups
+rcc fleet run --group office -- softwareupdate -l                 # run a command in bulk
+rcc fleet audit                        # security-audit every host, one aggregate report
+rcc fleet audit --group office --report office.md
+rcc fleet status                       # quick reachability check
 ```
 
-**Client-ready reports.** `--md` and `--rtf` produce a branded document a
-technician can hand to a client. Add `--client`, `--shop`, and `--tech` for the
-header/footer (all optional — without them you get a default Raccoon report):
-
-```bash
-rcc audit --md --report client.md \
-  --client "Jane Doe" --shop "MacFix Pro" --tech "Mario Rossi"
-```
-
-The reporter is data-driven: it renders whatever checks the audit produces, so
-new checks show up automatically with no change to the report code.
-
-**Safe by default.** `--fix` never imposes a one-size-fits-all setting — a config
-that looks odd on one Mac is often legitimate on another:
-
-- Destructive fixes (cron, SSH `authorized_keys`, LaunchAgents, login items)
-  snapshot the originals to `~/.raccoon/fix-backups/<timestamp>/` before changing
-  anything, so a wrong fix is recoverable.
-- Raccoon never sets a public DNS resolver for you or strips the Gatekeeper
-  quarantine flag — both would silently weaken a working setup.
-- Opt a machine out of any fix: list its check names in `~/.raccoon/audit.conf`,
-  one per line (`#` for comments). Those checks are reported but never auto-fixed.
-
-```bash
-# ~/.raccoon/audit.conf — never auto-fix these on this Mac
-Cron Jobs
-User LaunchAgents
-```
-
-### 🛰️ Fleet mode
-
-Audit every Mac you manage from one command, over SSH, in parallel:
-
-```bash
-rcc fleet add mario@192.168.1.10   # build the host list
-rcc fleet status                   # quick reachability check
-rcc fleet audit                    # audit all hosts, aggregate report
-rcc fleet audit --report fleet.md  # save an aggregate Markdown report
-```
-
-Hosts live in `~/.raccoon/fleet.conf` (one `user@host[:port]` per line, key auth
-only). **Remote Macs don't need Raccoon installed** — the script is streamed over
-stdin to `bash`, so they need only bash, macOS, and an SSH server. sudo checks
-are skipped automatically (SSH BatchMode has no sudo).
+`rcc fleet scan` classifies each host it finds as **ready** (key auth works),
+**setup-needed** (SSH up, needs `ssh-copy-id`), or **non-Mac**, and can append the
+ready ones to your host list. Hosts live in `~/.raccoon/fleet.conf` (one
+`user@host[:port]` per line, key auth only). **Remote Macs don't need Raccoon
+installed** — the audit script is streamed over SSH stdin to `bash`, so they need
+only bash, macOS, and an SSH server.
 
 ### 🖥️ System information
 
 ```bash
 rcc disk                  # internal, external & network drives, SMART
 rcc disk large            # biggest files (--min SIZE, --top N)
-rcc network               # interfaces, Wi‑Fi, DNS, routing
+rcc network               # interfaces, Wi-Fi, DNS, routing
 rcc wifi                  # active network, known SSIDs, Keychain passwords
 rcc memory                # system stats + processes sorted by RAM
 rcc ports                 # open ports & listening services
@@ -171,10 +140,8 @@ rcc certs                 # SSL certificate expiry report
 ### 🛠️ Developer tools
 
 ```bash
-rcc upgrade               # update brew, pip, npm, gem at once
-rcc upgrade --dry-run     # preview upgrades without running them
-rcc apps                  # update apps in 4 layers (see below)
-rcc apps --dry-run        # preview app updates without running them
+rcc upgrade               # update brew, pip, npm, gem… at once (--dry-run to preview)
+rcc apps                  # update GUI apps in 4 layers (see below)
 rcc ssh                   # inspect keys, --export, --export-gpg
 rcc git                   # status, branches, stash, cleanup
 rcc docker                # images, containers, volumes
@@ -189,11 +156,7 @@ auto-updaters are detected and skipped by default; `--auto-launch` opens them
 to trigger their own updater. Skip a layer with `--no-catalog` / `--no-sparkle`.
 
 <details>
-<summary>📸 Command demos</summary>
-
-**Security**
-
-![audit](docs/gifs/rcc-audit.gif)
+<summary>📸 More command demos</summary>
 
 **System info**
 
@@ -226,65 +189,55 @@ to trigger their own updater. Skip a layer with `--no-catalog` / `--no-sparkle`.
 
 ## All commands
 
-| Command | Description |
-|---------|-------------|
-| `apps` | Update all apps (App Store, Homebrew, catalog 7000+, Sparkle) |
-| `audit` | Security audit (30+ checks) |
-| `audit deep` | Full audit with sudo |
-| `audit fix` | Auto-fix security issues |
-| `audit --explain` | Audit with plain-language notes on issues |
-| `audit --remediation` | Client-facing before/after intervention report |
-| `audit --baseline` | Save a reference baseline; `--baseline-diff` shows regressions since |
-| `audit --schedule FREQ` | Schedule a deep audit (daily/weekly/monthly); `status`/`remove` |
-| `audit profile` | Per-client profiles (config, branding, baseline); `profile-list` |
-| `audit share` | Publish the report as an anonymous GitHub Gist |
-| `audit --sheet` | Intervention sheet (`--hours`, `--notes`); MD or RTF |
-| `battery` | Health, cycles, temperature |
-| `backup` | Time Machine status |
-| `certs` | SSL certificate expiry |
-| `disk` | Internal, external & network drives, SMART |
-| `disk large` | Biggest files (`--min SIZE`, `--top N`) |
-| `docker` | Images, containers, volumes |
-| `env` | Shell environment & PATH |
-| `fonts` | Font duplicates & issues |
-| `git` | Status, branches, stash |
-| `history` | Shell history analysis |
-| `memory` | System memory + process RSS |
-| `network` | Interfaces, Wi‑Fi, DNS |
+<details>
+<summary>Full command reference</summary>
+
+| Command | What it does |
+|---------|--------------|
+| `audit` | 30+ security checks; `--fix`, `--deep`, `--json`/`--csv`, `--report`, `--baseline`, `--profile`, `schedule` |
+| `fleet` | `scan`, `add`/`remove`/`list`, `group`, `run`, `audit`, `status` across many Macs over SSH |
+| `disk` | Internal/external/network drives, SMART; `disk large` for biggest files |
+| `network` | Interfaces, Wi-Fi, DNS, routing |
 | `wifi` | Active network, known SSIDs, Keychain passwords |
-| `fleet` | Security audit across multiple Macs via SSH |
-| `ports` | Open ports & listeners |
-| `ssh` | Key inspection, `--export`, `--export-gpg` |
-| `startup` | Launch agents & login items |
-| `startup clean` | Remove orphaned launch agents (interactive, with backup) |
-| `trash` | Trash contents & size |
-| `upgrade` | Multi‑package update |
-| `xcode` | Simulators, caches, SPM |
+| `memory` | System memory + processes by RAM |
+| `ports` | Open ports & listening services |
+| `battery` | Health %, cycles, temperature |
+| `backup` | Time Machine status |
+| `env` | Shell environment & PATH breakdown |
+| `startup` | Launch agents & login items; `startup clean` |
+| `trash` | Trash size & empty |
+| `fonts` | Duplicate & corrupted fonts |
+| `history` | Shell history analysis |
+| `certs` | SSL certificate expiry report |
+| `upgrade` | Update brew/pip/npm/gem…; `--dry-run` |
+| `apps` | Update GUI apps in 4 layers |
+| `ssh` | Inspect/export keys |
+| `git` | Status, branches, stash, cleanup |
+| `docker` | Images, containers, volumes |
+| `xcode` | Simulators, derived data, SPM caches |
+
+</details>
 
 ---
 
 ## Why Raccoon is different
 
-**Safe by default, not silent by default.** `--fix` backs up every destructive
-change to `~/.raccoon/fix-backups/<timestamp>/` before touching anything. A wrong
-fix is always recoverable.
+- **Safe by default, not silent by default.** `--fix` backs up every destructive change to `~/.raccoon/fix-backups/<timestamp>/` before touching anything — a wrong fix is always recoverable.
+- **No install on the remote Macs.** Fleet mode streams the audit over SSH stdin; remote machines need only bash, macOS, and an open SSH server.
+- **Auditable, not opinionated.** It never sets a public DNS resolver or strips Gatekeeper quarantine flags — both would silently weaken a working setup.
+- **One data model.** Text, JSON, CSV, Markdown, RTF, and the fleet aggregate all render from the same `AUDIT_RESULTS` array, so a new check shows up everywhere automatically.
 
-**No install on the remote Macs.** Fleet mode streams the audit script over SSH
-stdin — remote machines need only bash, macOS, and an open SSH server.
+---
 
-**Auditable, not opinionated.** Raccoon never sets a public DNS resolver or strips
-Gatekeeper quarantine flags. Both would silently weaken a working setup on some
-machines.
+## Is it safe to pipe to `bash`?
 
-**One data model.** Every output format — text, JSON, CSV, Markdown, RTF, and the
-fleet aggregate — renders from the same `AUDIT_RESULTS` array, so a new check shows
-up everywhere automatically.
+Fair question for a tool that audits security and runs `sudo`. The honest answer:
 
-**Bash 3.2 compatible.** Runs on any macOS since Snow Leopard. No Homebrew required
-to install, no runtime dependencies.
-
-**322 tests.** Every renderer, flag, and edge case (including pre-feature history
-files) has a bats test, and `shellcheck -S warning` exits 0 on every file.
+- **Read it first.** The installer is one file — [`install.sh`](install.sh). It clones the repo to `~/.raccoon` and symlinks `rcc`; nothing else. Prefer Homebrew (`brew install thousandflowers/raccoon/rcc`) if you'd rather not pipe to a shell.
+- **No telemetry.** Raccoon makes no analytics or "phone-home" calls. Ever.
+- **Network calls are only the obvious ones:** `apps` fetches the Homebrew cask catalog and Sparkle appcasts to update apps; `audit --share` (opt-in only) uploads a report to GitHub; `fleet` connects over SSH to *your* hosts and uses Bonjour/ping on *your* LAN for `scan`; `upgrade` talks to the package managers you already use. Nothing leaves your machine unless you run one of those.
+- **`sudo` only when it's doing the work** — applying `audit --fix` changes or installing a cask — never just to look around.
+- **Auditable.** ~1500 lines of plain Bash, `shellcheck -S warning` clean, 353 bats tests. Read any command in [`bin/`](bin/).
 
 ---
 
@@ -293,49 +246,39 @@ files) has a bats test, and `shellcheck -S warning` exits 0 on every file.
 Raccoon ships an optional terminal UI built with [Bubble Tea](https://github.com/charmbracelet/bubbletea):
 
 ```
-┌──────────────────────────────────────────────┐
-│ Raccoon                                      │
-│ macOS companion toolkit                      │
-│                                              │
-│ upgrade    audit      network    disk        │
-│ memory     ssh        git        ports       │
-│ battery    backup     env        startup     │
-│ trash      fonts      history    certs       │
-│ docker     xcode                             │
-│                                              │
-│ ←→ Navigate · ↑↓ Rows · Enter Run · Q Quit   │
-└──────────────────────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│ Raccoon                                          │
+│ macOS companion toolkit                          │
+│                                                  │
+│ upgrade       audit        network               │
+│ fleet scan    fleet audit  fleet status          │
+│ fleet list    fleet groups                       │
+│ disk          memory       ssh         git       │
+│ ports         battery      backup      env       │
+│ startup       trash        fonts       history   │
+│ certs         docker       xcode                 │
+│                                                  │
+│ ←→ Navigate · ↑↓ Rows · / Search · Enter Run     │
+└────────────────────────────────────────────────┘
 ```
 
-Compile with `cd ui && ./build.sh`. The binary lands in `bin/rcc-ui` and is auto-detected by `rcc`.
+Compile with `cd ui && ./build.sh`. The binary lands in `bin/rcc-ui` and is
+auto-detected by `rcc`. Argument-heavy fleet subcommands (`run`, `group add`,
+`audit --group`) stay on the CLI, where you can pass them.
 
 ---
 
 ## Shell completion
 
 ```bash
-rcc completion bash    # print bash completions
-rcc completion zsh     # print zsh completions
+rcc completion bash >> ~/.bashrc      # or: rcc completion zsh >> ~/.zshrc
 ```
-
-Pipe into your shell rc file to make it permanent:
-
-```bash
-rcc completion bash >> ~/.bashrc
-rcc completion zsh  >> ~/.zshrc
-```
-
----
 
 ## Man page
 
 ```bash
-man rcc
+man rcc      # every command, flag, and example
 ```
-
-Covers every command, flag, and example.
-
----
 
 ## Project structure
 
@@ -343,18 +286,14 @@ Covers every command, flag, and example.
 Raccoon/
 ├── rcc                  # Entry point + dispatcher
 ├── install.sh           # curl | bash installer
-├── lib/core/            # Shared shell library
-│   ├── common.sh
-│   └── commands.sh
-├── bin/                 # Command scripts (audit, disk, …)
+├── lib/core/            # Shared shell library (common.sh, commands.sh)
+├── bin/                 # Command scripts (audit, fleet, disk, …)
 ├── ui/                  # Go Bubble Tea TUI
 ├── completions/         # bash + zsh autocompletions
-├── man/man1/rcc.1      # Man page
+├── man/man1/rcc.1       # Man page
 ├── tests/               # Bats test suite
 └── docs/                # Images, GIFs, guides
 ```
-
----
 
 ## Contributing
 
@@ -362,8 +301,8 @@ Bug reports and PRs welcome — use the templates.
 
 ```bash
 brew install bats-core shellcheck
-bats tests/              # run tests
-shellcheck rcc bin/*.sh lib/core/*.sh   # lint
+bats tests/                              # run tests
+shellcheck rcc bin/*.sh lib/core/*.sh    # lint
 ```
 
 ---
