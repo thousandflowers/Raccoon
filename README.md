@@ -8,9 +8,15 @@
 > *For the people who maintain Macs they don't sit in front of — and need to show their work.*
 
 [![CI](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/thousandflowers/Raccoon?sort=semver&color=blue)](https://github.com/thousandflowers/Raccoon/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![macOS](https://img.shields.io/badge/platform-macOS-000000?logo=apple&logoColor=white)
+![Bash](https://img.shields.io/badge/shell-bash%203.2%2B-4EAA25?logo=gnubash&logoColor=white)
 ![ShellCheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)
 ![Tests](https://img.shields.io/badge/tests-bats-blue)
+[![Last commit](https://img.shields.io/github/last-commit/thousandflowers/Raccoon)](https://github.com/thousandflowers/Raccoon/commits/main)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/thousandflowers/Raccoon/pulls)
+[![Install: brew](https://img.shields.io/badge/install-brew%20%7C%20curl-FBB040?logo=homebrew&logoColor=white)](#install)
 
 Zero dependencies beyond macOS + git. ~1500 lines of shellcheck-clean Bash, covered by a comprehensive bats suite. Runs on the system Bash (3.2 → 5.x) — no Homebrew required.
 
