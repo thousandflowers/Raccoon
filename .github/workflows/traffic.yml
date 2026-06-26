@@ -1,0 +1,51 @@
+name: Traffic badge
+
+# GitHub only keeps 14 days of clone traffic, so accumulate it daily into
+# .github/traffic/clones-history.json and render a shields endpoint badge.
+on:
+  schedule:
+    - cron: "23 4 * * *"   # daily
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  clones:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Accumulate clone traffic
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p .github/traffic
+          hist=.github/traffic/clones-history.json
+          [ -f "$hist" ] || echo '{}' > "$hist"
+
+          gh api "repos/${GITHUB_REPOSITORY}/traffic/clones" > /tmp/clones.json
+
+          # Merge new 14-day window into history, keeping the max seen per day
+          # (windows overlap, so max avoids both double-counting and undercounting).
+          jq -s '
+            .[0] as $hist | .[1].clones as $new
+            | reduce $new[] as $c ($hist;
+                ($c.timestamp[0:10]) as $d
+                | .[$d] = { count:   ([.[$d].count   // 0, $c.count]   | max),
+                            uniques: ([.[$d].uniques // 0, $c.uniques] | max) })
+          ' "$hist" /tmp/clones.json > "$hist.new"
+          mv "$hist.new" "$hist"
+
+          tc=$(jq '[.[].count]   | add // 0' "$hist")
+          tu=$(jq '[.[].uniques] | add // 0' "$hist")
+          jq -n --argjson c "$tc" --argjson u "$tu" \
+            '{schemaVersion:1, label:"git clones", message:"\($c) (\($u) unique)", color:"blue"}' \
+            > .github/traffic/clones.json
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/traffic/clones.json "$hist"
+          git diff --cached --quiet || git commit -m "chore: update clone traffic badge [skip ci]"
+          git push
