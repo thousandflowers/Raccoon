@@ -750,6 +750,7 @@ var (
 type item struct {
 	title       string
 	script      string
+	args        []string // extra argv passed to the script (e.g. fleet subcommand)
 	description string
 }
 
@@ -825,6 +826,11 @@ func items() []item {
 		{title: "apps", script: "apps.sh", description: "Update GUI apps (App Store + casks)"},
 		{title: "audit", script: "audit.sh", description: "Security audit + fix"},
 		{title: "network", script: "network.sh", description: "Interfaces, Wi-Fi, DNS, routing"},
+		{title: "fleet scan", script: "fleet.sh", args: []string{"scan"}, description: "Discover Macs on the LAN (Bonjour + ping)"},
+		{title: "fleet audit", script: "fleet.sh", args: []string{"audit"}, description: "Security audit across Macs over SSH"},
+		{title: "fleet status", script: "fleet.sh", args: []string{"status"}, description: "SSH reachability of configured hosts"},
+		{title: "fleet list", script: "fleet.sh", args: []string{"list"}, description: "List configured fleet hosts"},
+		{title: "fleet groups", script: "fleet.sh", args: []string{"group", "list"}, description: "List fleet host groups"},
 		{title: "disk", script: "disk.sh", description: "Disk space, APFS, SMART status"},
 		{title: "memory", script: "memory.sh", description: "Processes sorted by RAM usage"},
 		{title: "ports", script: "ports.sh", description: "Open ports and listeners"},
@@ -907,9 +913,9 @@ func tick() tea.Cmd {
 // startScript starts a bash script and returns the first line of output.
 // It is a standalone function (not a model method) so scanner+cmd are
 // captured by closure, not lost to value-copy semantics.
-func startScript(binPath, script string) tea.Cmd {
+func startScript(binPath, script string, args []string) tea.Cmd {
 	fullPath := filepath.Join(binPath, script)
-	cmd := exec.Command("bash", fullPath)
+	cmd := exec.Command("bash", append([]string{fullPath}, args...)...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -1259,7 +1265,7 @@ func (m *model) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.progressTotal = 0
 			m.progressLabel = ""
 			m.spinnerFrame = 0
-			return m, tea.Batch(startScript(m.binPath, f[m.selected].script), tick())
+			return m, tea.Batch(startScript(m.binPath, f[m.selected].script, f[m.selected].args), tick())
 		}
 	case "g":
 		m.selected = 0
@@ -1294,7 +1300,7 @@ func (m *model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.progressTotal = 0
 			m.progressLabel = ""
 			m.spinnerFrame = 0
-			return m, tea.Batch(startScript(m.binPath, f[m.selected].script), tick())
+			return m, tea.Batch(startScript(m.binPath, f[m.selected].script, f[m.selected].args), tick())
 		}
 	case tea.KeyUp:
 		if m.selected > 0 {
