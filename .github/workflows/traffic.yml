@@ -51,10 +51,9 @@ jobs:
             ' "$hist" /tmp/c.json > "$hist.new" && mv "$hist.new" "$hist"
           done
 
-          tc=$(jq '[.[].count]   | add // 0' "$hist")
           tu=$(jq '[.[].uniques] | add // 0' "$hist")
-          jq -n --argjson c "$tc" --argjson u "$tu" \
-            '{schemaVersion:1, label:"git clones", message:"\($c) (\($u) unique)", color:"blue"}' \
+          jq -n --argjson u "$tu" \
+            '{schemaVersion:1, label:"unique cloners", message:"\($u)", color:"blue"}' \
             > .github/traffic/clones.json
 
           git config user.name  "github-actions[bot]"

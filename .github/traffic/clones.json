@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "label": "git clones",
-  "message": "1143 (621 unique)",
+  "label": "unique cloners",
+  "message": "621",
   "color": "blue"
 }
