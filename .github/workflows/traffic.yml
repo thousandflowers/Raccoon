@@ -15,10 +15,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # PAT with `repo` scope: the traffic API needs admin/push access that
+          # the default GITHUB_TOKEN can't be granted. Reuses the tap-push token.
+          token: ${{ secrets.RACCOONTAPPUSH }}
 
       - name: Accumulate clone traffic
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RACCOONTAPPUSH }}
         run: |
           set -euo pipefail
           mkdir -p .github/traffic
