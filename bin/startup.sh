@@ -100,14 +100,14 @@ remove_orphan_agents() {
 	backup_dir="$HOME/.raccoon/fix-backups/$(date +%Y%m%d-%H%M%S)"
 	for plist in ${ORPHAN_PLISTS[@]+"${ORPHAN_PLISTS[@]}"}; do
 		label="${plist##*/}"
-		printf '  -> Rimuovere %s? [y/N] ' "$label"
+		printf '  -> Remove %s? [y/N] ' "$label"
 		read -r answer || answer="n"
 		if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
 			mkdir -p "$backup_dir"
 			cp "$plist" "$backup_dir/" 2>/dev/null || true
 			launchctl unload "$plist" 2>/dev/null || true
 			rm -f "$plist"
-			echo "    ${GREEN}✓ Rimosso${NC} ${GRAY}(backup: $backup_dir)${NC}"
+			echo "    ${GREEN}✓ Removed${NC} ${GRAY}(backup: $backup_dir)${NC}"
 		else
 			echo "    ${GRAY}skip${NC}"
 		fi
@@ -119,18 +119,18 @@ main() {
 		print_section_header "Clean Orphaned Launch Agents"
 		find_orphan_agents
 		if [[ ${#ORPHAN_PLISTS[@]} -eq 0 ]]; then
-			echo "${GREEN}Nessun launch agent orfano trovato.${NC}"
+			echo "${GREEN}No orphaned launch agents found.${NC}"
 			return 0
 		fi
 		show_orphan_agents
 		echo ""
 		local answer
-		printf 'Procedere con la rimozione interattiva? [y/N] '
+		printf 'Proceed with interactive removal? [y/N] '
 		read -r answer || answer="n"
 		if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
 			remove_orphan_agents
 		else
-			echo "${GRAY}Annullato.${NC}"
+			echo "${GRAY}Cancelled.${NC}"
 		fi
 		return 0
 	fi

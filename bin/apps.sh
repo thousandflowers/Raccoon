@@ -399,12 +399,47 @@ update_homebrew_catalog() {
 # Layer 4 — Sparkle (SUFeedURL appcasts)
 # ============================================================
 
+# Decide a Sparkle update from an appcast piped on stdin. Args: local short
+# version (CFBundleShortVersionString), local build (CFBundleVersion). Prints
+# "<remote_ver>\t<dl_url>" when an update is available, nothing otherwise.
+# Compares like-for-like — marketing version vs shortVersionString, or build vs
+# sparkle:version — never a build number against a marketing string, which is
+# what made the old "head -1 of the whole feed" logic misfire (e.g. comparing
+# AppCleaner build 3804 against local 3.6.8, or grabbing a beta entry).
+# ponytail: reads the FIRST <item> only; appcasts are newest-first by Sparkle
+# convention. Switch to a max-version scan if a real feed ever violates that.
+_sparkle_decide() {
+	local l_short="$1" l_build="$2"
+	local xml item r_short r_build dl_url local_ver remote_ver
+	xml="$(cat)"
+	# No `exit` after the first record: awk must drain stdin, otherwise printf
+	# gets SIGPIPE and (under set -o pipefail) aborts this function on big feeds.
+	item="$(printf '%s' "$xml" | awk 'BEGIN{RS="</item>"} NR==1{print}' || true)"
+
+	r_short="$(printf '%s\n' "$item" | grep -o 'sparkle:shortVersionString="[^"]*"' | head -1 | sed 's/.*="//; s/"//' || true)"
+	[[ -z "$r_short" ]] && r_short="$(printf '%s\n' "$item" | grep -o '<sparkle:shortVersionString>[^<]*' | head -1 | sed 's/.*>//' || true)"
+	r_build="$(printf '%s\n' "$item" | grep -o 'sparkle:version="[^"]*"' | head -1 | sed 's/.*="//; s/"//' || true)"
+	[[ -z "$r_build" ]] && r_build="$(printf '%s\n' "$item" | grep -o '<sparkle:version>[^<]*' | head -1 | sed 's/.*>//' || true)"
+	dl_url="$(printf '%s\n' "$item" | grep -oE 'url="https://[^"]*\.(dmg|zip|pkg|tbz|tar\.[a-z]+)' | head -1 | sed 's/url="//' || true)"
+
+	if [[ -n "$r_short" && -n "$l_short" ]]; then
+		local_ver="$l_short"; remote_ver="$r_short"
+	elif [[ -n "$r_build" && -n "$l_build" ]]; then
+		local_ver="$l_build"; remote_ver="$r_build"
+	else
+		return 0
+	fi
+	[[ -z "$dl_url" ]] && return 0
+	_version_outdated "$local_ver" "$remote_ver" || return 0
+	printf '%s\t%s\n' "$remote_ver" "$dl_url"
+}
+
 update_sparkle_apps() {
 	update_global_progress_info "sparkle: scanning..."
 	increment_global_progress
 
 	local updated=0 skipped=0
-	local app_dir app_path app_name feed xml remote_ver local_ver dl_url
+	local app_dir app_path app_name feed xml remote_ver local_ver local_build dl_url decision
 
 	# shellcheck disable=SC2046  # intentional word-split of the dir list
 	for app_dir in $(_app_dirs); do
@@ -423,29 +458,23 @@ update_sparkle_apps() {
 			xml="$(curl -fsSL --max-time 10 "$feed" 2>/dev/null || true)"
 			[[ -z "$xml" ]] && continue
 
-			remote_ver="$(echo "$xml" | grep -o '<sparkle:shortVersionString>[^<]*' | head -1 | sed 's/<sparkle:shortVersionString>//' || true)"
-			if [[ -z "$remote_ver" ]]; then
-				remote_ver="$(echo "$xml" | grep -o 'sparkle:version="[^"]*"' | head -1 | sed 's/sparkle:version="//;s/"//' || true)"
-			fi
-			[[ -z "$remote_ver" ]] && continue
+			local_ver="$(defaults read "$app_path/Contents/Info" CFBundleShortVersionString 2>/dev/null || true)"
+			local_build="$(defaults read "$app_path/Contents/Info" CFBundleVersion 2>/dev/null || true)"
 
-			local_ver="$(_local_version "$app_path")"
-			[[ -z "$local_ver" ]] && continue
-
-			if ! _version_outdated "$local_ver" "$remote_ver"; then
+			decision="$(printf '%s' "$xml" | _sparkle_decide "$local_ver" "$local_build")"
+			if [[ -z "$decision" ]]; then
 				((skipped++)) || true
 				continue
 			fi
-
-			dl_url="$(echo "$xml" | grep -o 'url="https://[^"]*\.\(dmg\|zip\|pkg\)' | head -1 | sed 's/url="//' || true)"
-			[[ -z "$dl_url" ]] && continue
+			remote_ver="${decision%%$'\t'*}"
+			dl_url="${decision#*$'\t'}"
 
 			if [[ "$RCC_DRY_RUN" == "true" ]]; then
-				append_progress_output "sparkle: $app_name $local_ver → $remote_ver"
+				append_progress_output "sparkle: $app_name ${local_ver:-?} → $remote_ver"
 				continue
 			fi
 
-			_install_from_url "$app_name" "$local_ver" "$remote_ver" "$dl_url"
+			_install_from_url "$app_name" "${local_ver:-?}" "$remote_ver" "$dl_url"
 			echo "$app_name" >>"${PROCESSED_APPS_FILE:-/dev/null}"
 			((updated++)) || true
 		done

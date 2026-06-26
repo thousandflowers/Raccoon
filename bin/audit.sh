@@ -506,30 +506,30 @@ save_to_history() {
 save_baseline() {
 	mkdir -p "$HOME/.raccoon"
 	_write_audit_json "$BASELINE_FILE"
-	echo "${GREEN}✓ Baseline salvato — $(date)${NC}"
+	echo "${GREEN}✓ Baseline saved — $(date)${NC}"
 }
 
 show_baseline_diff() {
 	if [[ ! -f "$BASELINE_FILE" ]]; then
-		echo "Nessun baseline trovato. Esegui prima rcc audit --baseline."
+		echo "No baseline found. Run rcc audit --baseline first."
 		return 0
 	fi
 	local bdate
 	bdate="$(grep -o '"timestamp": "[^"]*"' "$BASELINE_FILE" | head -1 | sed 's/.*"timestamp": "\([^"]*\)".*/\1/')"
-	show_diff "$BASELINE_FILE" "-- Confronto con baseline del ${bdate} --"
+	show_diff "$BASELINE_FILE" "-- Comparison with baseline from ${bdate} --"
 }
 
 baseline_reset() {
 	if [[ ! -f "$BASELINE_FILE" ]]; then
-		echo "Nessun baseline da rimuovere."
+		echo "No baseline to remove."
 		return 0
 	fi
 	local answer
-	printf 'Rimuovere il baseline? [y/N] '
+	printf 'Remove the baseline? [y/N] '
 	read -r answer || answer="n"
 	if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
 		rm -f "$BASELINE_FILE"
-		echo "Baseline rimosso."
+		echo "Baseline removed."
 	fi
 }
 
@@ -543,7 +543,7 @@ load_profile() {
 	PROFILE_DIR="$PROFILES_DIR/$PROFILE_NAME"
 	if [[ ! -d "$PROFILE_DIR" ]]; then
 		mkdir -p "$PROFILE_DIR"
-		echo "Nuovo profilo '$PROFILE_NAME' creato."
+		echo "New profile '$PROFILE_NAME' created."
 	fi
 	# Append the profile's skip list to FIX_SKIP (same format as audit.conf).
 	if [[ -f "$PROFILE_DIR/config" ]]; then
@@ -576,9 +576,9 @@ profile_save() {
 	mkdir -p "$dir"
 	local client="$REPORT_CLIENT" shop="$REPORT_SHOP" tech="$REPORT_TECH"
 	if [[ -t 0 ]]; then
-		[[ -z "$client" ]] && { printf 'Cliente: '; read -r client || client=""; }
+		[[ -z "$client" ]] && { printf 'Client: '; read -r client || client=""; }
 		[[ -z "$shop" ]] && { printf 'Shop/Studio: '; read -r shop || shop=""; }
-		[[ -z "$tech" ]] && { printf 'Tecnico: '; read -r tech || tech=""; }
+		[[ -z "$tech" ]] && { printf 'Technician: '; read -r tech || tech=""; }
 	fi
 	{
 		echo "CLIENT=$client"
@@ -590,12 +590,12 @@ profile_save() {
 	if [[ ${#AUDIT_RESULTS[@]} -gt 0 ]]; then
 		_write_audit_json "$dir/baseline.json"
 	fi
-	echo "Profilo '$name' salvato."
+	echo "Profile '$name' saved."
 }
 
 profile_list() {
 	if [[ ! -d "$PROFILES_DIR" ]] || [[ -z "$(ls -A "$PROFILES_DIR" 2>/dev/null || true)" ]]; then
-		echo "Nessun profilo salvato."
+		echo "No profiles saved."
 		return 0
 	fi
 	local d name client shop saved
@@ -615,15 +615,15 @@ profile_list() {
 profile_delete() {
 	local dir="$PROFILES_DIR/$1"
 	if [[ ! -d "$dir" ]]; then
-		echo "Profilo '$1' non trovato."
+		echo "Profile '$1' not found."
 		return 0
 	fi
 	local answer
-	printf "Rimuovere profilo '%s'? [y/N] " "$1"
+	printf "Remove profile '%s'? [y/N] " "$1"
 	read -r answer || answer="n"
 	if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
 		rm -rf "$dir"
-		echo "Rimosso."
+		echo "Removed."
 	fi
 }
 
@@ -654,12 +654,12 @@ share_report() {
 		-d "$payload" 2>/dev/null |
 		grep -o '"html_url": "[^"]*"' | head -1 | grep -o 'https://[^"]*' || true)"
 	if [[ -z "$url" ]]; then
-		echo "Condivisione non disponibile (nessuna connessione o API GitHub non raggiungibile)."
+		echo "Sharing unavailable (no connection or GitHub API unreachable)."
 		return 0
 	fi
-	echo "${GREEN}✓ Report condiviso:${NC} $url"
+	echo "${GREEN}✓ Report shared:${NC} $url"
 	if printf '%s' "$url" | pbcopy 2>/dev/null; then
-		echo "  (copiato negli appunti)"
+		echo "  (copied to clipboard)"
 	fi
 }
 
@@ -798,7 +798,7 @@ schedule_audit() {
 			label="the 1st of each month at 9:00 AM"
 			;;
 		*)
-			echo "Frequenza non valida: $freq (usa daily, weekly o monthly)" >&2
+			echo "Invalid frequency: $freq (use daily, weekly or monthly)" >&2
 			return 1
 			;;
 	esac
@@ -841,31 +841,31 @@ schedule_status() {
 		local freq="daily"
 		grep -q "<key>Weekday</key>" "$SCHEDULE_PLIST" && freq="weekly"
 		grep -q "<key>Day</key>" "$SCHEDULE_PLIST" && freq="monthly"
-		echo "Attivo — $freq"
+		echo "Active — $freq"
 	else
-		echo "Nessuno schedule attivo."
+		echo "No active schedule."
 	fi
 }
 
 schedule_remove() {
 	launchctl unload "$SCHEDULE_PLIST" 2>/dev/null || true
 	rm -f "$SCHEDULE_PLIST"
-	echo "Schedule rimosso."
+	echo "Schedule removed."
 }
 
 send_notification() {
 	local title body subtitle
 	if [[ $FAIL_count -gt 0 ]]; then
-		title="🦝 Raccoon — Problemi critici"
-		subtitle="$FAIL_count problemi, $WARN_count avvisi"
-		body="Esegui 'rcc audit --explain' per i dettagli"
+		title="🦝 Raccoon — Critical issues"
+		subtitle="$FAIL_count issues, $WARN_count warnings"
+		body="Run 'rcc audit --explain' for details"
 	elif [[ $WARN_count -gt 0 ]]; then
-		title="🦝 Raccoon — Attenzione"
-		subtitle="$WARN_count avvisi"
-		body="Esegui 'rcc audit' per i dettagli"
+		title="🦝 Raccoon — Attention"
+		subtitle="$WARN_count warnings"
+		body="Run 'rcc audit' for details"
 	else
-		title="🦝 Raccoon — Tutto OK"
-		subtitle="Tutti i check passati"
+		title="🦝 Raccoon — All OK"
+		subtitle="All checks passed"
 		body=""
 	fi
 	osascript -e "display notification \"$body\" with title \"$title\" subtitle \"$subtitle\"" 2>/dev/null || true
@@ -998,13 +998,13 @@ print_remediation() {
 	local latest_link="$HISTORY_DIR/latest.json"
 	[[ -L "$latest_link" ]] && prev_file="$(readlink "$latest_link" 2>/dev/null || echo '')"
 
-	echo "Raccoon — Rapporto intervento"
-	echo "Data: $date_str · Host: $host"
+	echo "Raccoon — Intervention report"
+	echo "Date: $date_str · Host: $host"
 	echo ""
 
 	local entry st nm tail_ rest prev
 
-	echo "Problemi trovati:"
+	echo "Issues found:"
 	local found=0
 	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
 		st="${entry%%$'\t'*}"; tail_="${entry#*$'\t'}"; rest="${tail_#*$'\t'}"
@@ -1014,10 +1014,10 @@ print_remediation() {
 			found=$((found + 1))
 		fi
 	done
-	[[ $found -eq 0 ]] && echo "  (nessuno)"
+	[[ $found -eq 0 ]] && echo "  (none)"
 	echo ""
 
-	echo "Problemi risolti:"
+	echo "Issues resolved:"
 	local resolved=0
 	if [[ -n "$prev_file" && -f "$prev_file" ]] && grep -q '"name":' "$prev_file" 2>/dev/null; then
 		for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
@@ -1032,10 +1032,10 @@ print_remediation() {
 			fi
 		done
 	fi
-	[[ $resolved -eq 0 ]] && echo "  (nessuno, o nessuna run precedente)"
+	[[ $resolved -eq 0 ]] && echo "  (none, or no previous run)"
 	echo ""
 
-	echo "Da completare:"
+	echo "To do:"
 	local todo=0
 	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
 		st="${entry%%$'\t'*}"; tail_="${entry#*$'\t'}"; rest="${tail_#*$'\t'}"
@@ -1045,9 +1045,9 @@ print_remediation() {
 			todo=$((todo + 1))
 		fi
 	done
-	[[ $todo -eq 0 ]] && echo "  (nessuno)"
+	[[ $todo -eq 0 ]] && echo "  (none)"
 	echo ""
-	echo "Generato da Raccoon v$version"
+	echo "Generated by Raccoon v$version"
 }
 
 # Populate system context for client-ready reports. The commercial model name
@@ -1084,7 +1084,7 @@ main() {
 
 	# --share has nothing to publish in --quiet (no report is built); skip it.
 	if [[ "$SHARE" == "true" && "$QUIET_MODE" == "true" ]]; then
-		echo "⚠ --share ignorato con --quiet" >&2
+		echo "⚠ --share ignored with --quiet" >&2
 		SHARE=false
 	fi
 
@@ -1196,7 +1196,7 @@ main() {
 				echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
 				;;
 			*)
-				echo "Uso: rcc audit --schedule daily|weekly|monthly|status|remove" >&2
+				echo "Usage: rcc audit --schedule daily|weekly|monthly|status|remove" >&2
 				;;
 		esac
 		return

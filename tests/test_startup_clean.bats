@@ -35,7 +35,7 @@ PLIST
 @test "startup --clean with no launch agents reports none and exits 0" {
 	run bash "$SCRIPT_DIR/bin/startup.sh" --clean
 	assert_success
-	assert_output_contains "Nessun launch agent orfano"
+	assert_output_contains "No orphaned launch agents"
 }
 
 @test "startup --clean detects an agent pointing at a missing binary" {
@@ -53,7 +53,7 @@ PLIST
 	_make_agent "com.test.live" "/usr/bin/true"
 	run bash "$SCRIPT_DIR/bin/startup.sh" --clean
 	assert_success
-	assert_output_contains "Nessun launch agent orfano"
+	assert_output_contains "No orphaned launch agents"
 }
 
 @test "startup --clean dry run (decline each) removes nothing" {

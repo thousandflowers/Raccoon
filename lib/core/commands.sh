@@ -29,7 +29,7 @@ MENU_ITEMS=(
     "audit:Security audit (quick)"
     "audit deep:Security audit (full)"
     "network:Network info"
-    "wifi:Wi-Fi e password"
+    "wifi:Wi-Fi and passwords"
     "disk:Disk space"
     "memory:Memory usage"
     "---"
@@ -38,7 +38,7 @@ MENU_ITEMS=(
     "audit json:audit --json"
     "audit history:audit --history"
     "audit watch:audit --watch"
-    "fleet:Audit flotta Mac via SSH"
+    "fleet:Audit Mac fleet via SSH"
     "---"
     "ssh:SSH keys"
     "git:Git repos"
@@ -141,14 +141,14 @@ show_health_history() {
     today="$(date +%Y-%m-%d)"
     yday="$(date -v-1d +%Y-%m-%d 2>/dev/null || echo "")"
     if [[ "$lastdate" == "$today" ]]; then
-        rel="oggi"
+        rel="today"
     elif [[ -n "$yday" && "$lastdate" == "$yday" ]]; then
-        rel="ieri"
+        rel="yesterday"
     else
         rel="$(printf '%s' "$lastdate" | awk -F- '{print $3"/"$2}')"
     fi
 
-    echo "  Ultimi audit: ${dots} (${passed}/${count} · ultimo: ${rel})"
+    echo "  Last audits: ${dots} (${passed}/${count} · last: ${rel})"
 }
 
 show_brand_banner() {
@@ -164,7 +164,7 @@ show_brand_banner() {
 # Used by the bash fallback menu (when Go UI is not available)
 # SCRIPT_DIR is inherited from rcc which sources this file
 run_cmd() {
-    # Reset completo del terminale prima di ogni comando
+    # Full terminal reset before each command
     printf '\r'
     printf '\033[2J\033[H'
     printf '\033[0m'
@@ -354,16 +354,16 @@ _render_onboarding() {
 
     echo ""
     echo "┌${border}┐"
-    _ob_row "  🦝 Benvenuto in Raccoon" -1
+    _ob_row "  🦝 Welcome to Raccoon" -1
     _ob_row ""
-    _ob_row "  Tre cose che puoi fare adesso:"
+    _ob_row "  Three things you can do now:"
     _ob_row ""
-    _ob_row "  rcc audit    — 30+ check di sicurezza"
-    _ob_row "  rcc upgrade  — aggiorna tutto in una volta"
-    _ob_row "  rcc wifi     — reti Wi-Fi e password"
+    _ob_row "  rcc audit    — 30+ security checks"
+    _ob_row "  rcc upgrade  — upgrade everything at once"
+    _ob_row "  rcc wifi     — Wi-Fi networks and passwords"
     _ob_row ""
-    _ob_row "  Naviga con le frecce, Invio per eseguire."
-    _ob_row "  Premi un tasto per continuare..."
+    _ob_row "  Navigate with arrows, Enter to run."
+    _ob_row "  Press any key to continue..."
     echo "└${border}┘"
 }
 

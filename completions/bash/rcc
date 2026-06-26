@@ -33,7 +33,7 @@ _rcc() {
 			;;
 		fleet)
 			# shellcheck disable=SC2207
-			COMPREPLY=($(compgen -W 'audit status add remove list --hosts --parallel --report --json --explain --help -h' -- "$cur"))
+			COMPREPLY=($(compgen -W 'audit status scan group run add remove list --hosts --group --parallel --report --json --explain --user --subnet --timeout --add --help -h' -- "$cur"))
 			;;
 		disk)
 			# shellcheck disable=SC2207

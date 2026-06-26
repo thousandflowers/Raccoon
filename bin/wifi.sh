@@ -90,7 +90,7 @@ section_known() {
 		done <<< "$nets"
 		print_table_row "${GRAY}Total: $count saved${NC}"
 	else
-		print_table_row "${GRAY}Nessuna rete salvata.${NC}"
+		print_table_row "${GRAY}No saved networks.${NC}"
 	fi
 }
 
@@ -100,7 +100,7 @@ section_passwords() {
 	local iface="$1" reveal="$2" nets line pw answer
 	if [[ "$reveal" != "true" ]]; then
 		if [[ -t 0 ]]; then
-			printf '%s' "⚠ Mostrare le password salvate? [y/N] "
+			printf '%s' "⚠ Reveal saved passwords? [y/N] "
 			read -r -n 1 -t 10 answer || answer="n"
 			echo ""
 			[[ "$answer" == "y" || "$answer" == "Y" ]] || return 0
@@ -110,11 +110,11 @@ section_passwords() {
 	fi
 	print_section_header "Saved Passwords"
 	nets="$(_known_networks "$iface")"
-	[[ -z "$nets" ]] && { print_table_row "${GRAY}Nessuna rete salvata.${NC}"; return 0; }
+	[[ -z "$nets" ]] && { print_table_row "${GRAY}No saved networks.${NC}"; return 0; }
 	while IFS= read -r line; do
 		[[ -z "$line" ]] && continue
 		pw="$(_password_for "$line")"
-		[[ -z "$pw" ]] && pw="(non trovata)"
+		[[ -z "$pw" ]] && pw="(not found)"
 		print_table_row "$line: $pw"
 	done <<< "$nets"
 }

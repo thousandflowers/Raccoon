@@ -123,7 +123,8 @@ Wi\-Fi interface, active network, known SSIDs, and saved Keychain passwords
 (\fB\-\-active\fR, \fB\-\-known\fR, \fB\-\-passwords\fR, \fB\-\-json\fR).
 .TP
 .B fleet
-Security audit across multiple Macs via SSH. See the FLEET section.
+Audit, scan for, group, and run commands across multiple Macs via SSH. See the
+FLEET section.
 .TP
 .B disk
 Disk space, APFS container, SMART status. \fBdisk large\fR (or
@@ -201,11 +202,23 @@ rcc audit \-\-md
 .SH FLEET
 Run audits across many Macs over SSH and aggregate the results.
 .TP
-.B rcc fleet audit \fR[\fB\-\-hosts\fR \fIFILE\fR] [\fB\-\-parallel\fR \fIN\fR] [\fB\-\-report\fR \fIFILE\fR] [\fB\-\-json\fR] [\fB\-\-explain\fR]
-Audit every configured host (default 5 parallel connections).
+.B rcc fleet audit \fR[\fB\-\-hosts\fR \fIFILE\fR] [\fB\-\-group\fR \fINAME\fR] [\fB\-\-parallel\fR \fIN\fR] [\fB\-\-report\fR \fIFILE\fR] [\fB\-\-json\fR] [\fB\-\-explain\fR]
+Audit every configured host, or only a group with \fB\-\-group\fR (default 5
+parallel connections).
 .TP
 .B rcc fleet status
 Quick SSH reachability check for every host.
+.TP
+.B rcc fleet scan \fR[\fB\-\-user\fR \fIU\fR] [\fB\-\-subnet\fR \fIBASE\fR] [\fB\-\-timeout\fR \fIN\fR] [\fB\-\-add\fR] [\fB\-\-json\fR]
+Discover Macs on the local network (Bonjour + ping-sweep) and classify each as
+ready, setup-needed, or non-Mac. With \fB\-\-add\fR (or interactively on a
+terminal) append the fleet-ready hosts to the hosts file.
+.TP
+.B rcc fleet group \fR{\fBadd\fR \fINAME HOST...\fR | \fBremove\fR \fINAME\fR [\fIHOST...\fR] | \fBlist\fR [\fINAME\fR]}
+Manage named groups of already-added hosts.
+.TP
+.B rcc fleet run \fR[\fB\-\-group\fR \fINAME\fR] [\fB\-\-parallel\fR \fIN\fR] \fB\-\-\fR \fICOMMAND\fR
+Run a command over SSH on every host, or just one group, in parallel.
 .TP
 .B rcc fleet add \fIHOST\fR, rcc fleet remove \fIHOST\fR, rcc fleet list
 Manage the hosts file.

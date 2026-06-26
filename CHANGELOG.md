@@ -3,6 +3,17 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [0.13.0] - 2026-06-26
+### Added
+- `fleet scan` — discover Macs on the LAN (Bonjour + ping-sweep) and classify each host as ready / setup-needed / non-Mac; `--add` (or an interactive prompt) appends the fleet-ready hosts to `fleet.conf`. Options: `--user`, `--subnet`, `--timeout`, `--json`.
+- `fleet group add|remove|list` — named groups of already-added hosts (`~/.raccoon/fleet-groups.conf`).
+- `fleet run [--group NAME] [--parallel N] -- COMMAND` — run a command over SSH on every host, or just one group, in parallel.
+- `fleet audit --group NAME` — audit only the hosts in a group.
+### Fixed
+- `apps`: Sparkle update detection now reads the latest appcast `<item>` and compares like-for-like (marketing version vs `shortVersionString`, or build vs `sparkle:version`). Apps that auto-update and are installed outside Homebrew (e.g. Arc, IINA) are detected correctly instead of being mis-compared against build numbers or skipped.
+### Changed
+- All user-facing output is now in English.
+
 ## [0.12.0] - 2026-06-25
 ### Added
 - `audit --explain` — plain-language notes for each check.
