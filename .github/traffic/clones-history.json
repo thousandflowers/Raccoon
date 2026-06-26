@@ -1,58 +1,114 @@
 {
-  "2026-06-12": {
+  "Raccoon|2026-06-12": {
     "count": 76,
     "uniques": 28
   },
-  "2026-06-13": {
+  "Raccoon|2026-06-13": {
     "count": 57,
     "uniques": 18
   },
-  "2026-06-14": {
+  "Raccoon|2026-06-14": {
     "count": 1,
     "uniques": 1
   },
-  "2026-06-15": {
+  "Raccoon|2026-06-15": {
     "count": 4,
     "uniques": 2
   },
-  "2026-06-16": {
+  "Raccoon|2026-06-16": {
     "count": 28,
     "uniques": 13
   },
-  "2026-06-17": {
+  "Raccoon|2026-06-17": {
     "count": 69,
     "uniques": 32
   },
-  "2026-06-18": {
+  "Raccoon|2026-06-18": {
     "count": 112,
     "uniques": 48
   },
-  "2026-06-19": {
+  "Raccoon|2026-06-19": {
     "count": 157,
     "uniques": 60
   },
-  "2026-06-20": {
+  "Raccoon|2026-06-20": {
     "count": 6,
     "uniques": 6
   },
-  "2026-06-21": {
+  "Raccoon|2026-06-21": {
     "count": 51,
     "uniques": 27
   },
-  "2026-06-22": {
+  "Raccoon|2026-06-22": {
     "count": 176,
     "uniques": 83
   },
-  "2026-06-23": {
+  "Raccoon|2026-06-23": {
     "count": 46,
     "uniques": 23
   },
-  "2026-06-24": {
+  "Raccoon|2026-06-24": {
     "count": 11,
     "uniques": 11
   },
-  "2026-06-25": {
+  "Raccoon|2026-06-25": {
     "count": 80,
     "uniques": 21
+  },
+  "homebrew-raccoon|2026-06-12": {
+    "count": 0,
+    "uniques": 0
+  },
+  "homebrew-raccoon|2026-06-13": {
+    "count": 0,
+    "uniques": 0
+  },
+  "homebrew-raccoon|2026-06-14": {
+    "count": 0,
+    "uniques": 0
+  },
+  "homebrew-raccoon|2026-06-15": {
+    "count": 0,
+    "uniques": 0
+  },
+  "homebrew-raccoon|2026-06-16": {
+    "count": 0,
+    "uniques": 0
+  },
+  "homebrew-raccoon|2026-06-17": {
+    "count": 13,
+    "uniques": 13
+  },
+  "homebrew-raccoon|2026-06-18": {
+    "count": 12,
+    "uniques": 12
+  },
+  "homebrew-raccoon|2026-06-19": {
+    "count": 44,
+    "uniques": 35
+  },
+  "homebrew-raccoon|2026-06-20": {
+    "count": 12,
+    "uniques": 12
+  },
+  "homebrew-raccoon|2026-06-21": {
+    "count": 40,
+    "uniques": 39
+  },
+  "homebrew-raccoon|2026-06-22": {
+    "count": 92,
+    "uniques": 88
+  },
+  "homebrew-raccoon|2026-06-23": {
+    "count": 24,
+    "uniques": 21
+  },
+  "homebrew-raccoon|2026-06-24": {
+    "count": 12,
+    "uniques": 12
+  },
+  "homebrew-raccoon|2026-06-25": {
+    "count": 20,
+    "uniques": 16
   }
 }

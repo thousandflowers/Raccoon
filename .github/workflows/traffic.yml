@@ -1,7 +1,12 @@
 name: Traffic badge
 
-# GitHub only keeps 14 days of clone traffic, so accumulate it daily into
+# GitHub keeps only 14 days of clone traffic, so accumulate it daily into
 # .github/traffic/clones-history.json and render a shields endpoint badge.
+# Counts both the code repo and the Homebrew tap (brew install clones the tap).
+#
+# Needs a PAT in the TRAFFIC_TOKEN secret: the traffic API requires admin/push
+# access the default GITHUB_TOKEN can't be granted. Without it the job no-ops
+# (the badge stays at its last value) instead of failing.
 on:
   schedule:
     - cron: "23 4 * * *"   # daily
@@ -16,31 +21,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # PAT with `repo` scope: the traffic API needs admin/push access that
-          # the default GITHUB_TOKEN can't be granted. Reuses the tap-push token.
-          token: ${{ secrets.RACCOONTAPPUSH }}
+          token: ${{ secrets.TRAFFIC_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Accumulate clone traffic
+      - name: Accumulate clone traffic (code repo + Homebrew tap)
         env:
-          GH_TOKEN: ${{ secrets.RACCOONTAPPUSH }}
+          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::TRAFFIC_TOKEN not set — skipping. Add a PAT (repo scope) as TRAFFIC_TOKEN to auto-update the clones badge."
+            exit 0
+          fi
           mkdir -p .github/traffic
           hist=.github/traffic/clones-history.json
           [ -f "$hist" ] || echo '{}' > "$hist"
 
-          gh api "repos/${GITHUB_REPOSITORY}/traffic/clones" > /tmp/clones.json
-
-          # Merge new 14-day window into history, keeping the max seen per day
-          # (windows overlap, so max avoids both double-counting and undercounting).
-          jq -s '
-            .[0] as $hist | .[1].clones as $new
-            | reduce $new[] as $c ($hist;
-                ($c.timestamp[0:10]) as $d
-                | .[$d] = { count:   ([.[$d].count   // 0, $c.count]   | max),
-                            uniques: ([.[$d].uniques // 0, $c.uniques] | max) })
-          ' "$hist" /tmp/clones.json > "$hist.new"
-          mv "$hist.new" "$hist"
+          for r in Raccoon homebrew-raccoon; do
+            if ! gh api "repos/${GITHUB_REPOSITORY_OWNER}/$r/traffic/clones" > /tmp/c.json 2>/tmp/err; then
+              echo "::warning::traffic API failed for $r: $(cat /tmp/err) — skipping"; exit 0
+            fi
+            # Merge the 14-day window per repo+day, keeping the max seen (windows
+            # overlap, so max avoids double-counting and undercounting).
+            jq --arg r "$r" -s '
+              .[0] as $h | .[1].clones as $n
+              | reduce $n[] as $c ($h;
+                  ($r + "|" + ($c.timestamp[0:10])) as $k
+                  | .[$k] = { count:   ([.[$k].count   // 0, $c.count]   | max),
+                              uniques: ([.[$k].uniques // 0, $c.uniques] | max) })
+            ' "$hist" /tmp/c.json > "$hist.new" && mv "$hist.new" "$hist"
+          done
 
           tc=$(jq '[.[].count]   | add // 0' "$hist")
           tu=$(jq '[.[].uniques] | add // 0' "$hist")
