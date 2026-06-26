@@ -3,7 +3,7 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
-## [0.13.0] - 2026-06-26
+## [0.13.1] - 2026-06-26
 ### Added
 - `fleet scan` — discover Macs on the LAN (Bonjour + ping-sweep) and classify each host as ready / setup-needed / non-Mac; `--add` (or an interactive prompt) appends the fleet-ready hosts to `fleet.conf`. Options: `--user`, `--subnet`, `--timeout`, `--json`.
 - `fleet group add|remove|list` — named groups of already-added hosts (`~/.raccoon/fleet-groups.conf`).
