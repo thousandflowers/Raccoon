@@ -15,7 +15,6 @@
 ![ShellCheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)
 ![Tests](https://img.shields.io/badge/tests-bats-blue)
 [![Last commit](https://img.shields.io/github/last-commit/thousandflowers/Raccoon)](https://github.com/thousandflowers/Raccoon/commits/main)
-[![Downloads](https://img.shields.io/github/downloads/thousandflowers/Raccoon/total?color=success&logo=github)](https://github.com/thousandflowers/Raccoon/releases)
 [![Homebrew tap](https://img.shields.io/badge/brew%20tap-thousandflowers%2Fraccoon-FBB040?logo=homebrew&logoColor=white)](https://github.com/thousandflowers/homebrew-raccoon)
 
 Zero dependencies beyond macOS + git. ~1500 lines of shellcheck-clean Bash, covered by a comprehensive bats suite. Runs on the system Bash (3.2 → 5.x) — no Homebrew required.
