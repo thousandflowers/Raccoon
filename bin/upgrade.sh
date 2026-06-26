@@ -16,7 +16,9 @@ show_upgrade_help() {
 	echo ""
 }
 
-RCC_DRY_RUN=false
+# RACCOON_TEST is set by the bats harness: never run real upgrades under it
+# (the suite invokes this with bad/empty args to test parsing, not to upgrade).
+if [[ -n "${RACCOON_TEST:-}" ]]; then RCC_DRY_RUN=true; else RCC_DRY_RUN=false; fi
 RCC_DEFERRED_TAPS=()
 
 for arg in "$@"; do

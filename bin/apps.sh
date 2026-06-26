@@ -29,7 +29,9 @@ show_apps_help() {
 	echo ""
 }
 
-RCC_DRY_RUN=false
+# RACCOON_TEST is set by the bats harness: never perform real updates under it
+# (the suite invokes this with bad/empty args to test parsing, not to update).
+if [[ -n "${RACCOON_TEST:-}" ]]; then RCC_DRY_RUN=true; else RCC_DRY_RUN=false; fi
 RCC_NO_CATALOG=false
 RCC_NO_SPARKLE=false
 RCC_AUTO_LAUNCH=false
