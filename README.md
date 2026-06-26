@@ -1,8 +1,9 @@
-# 🦝 Raccoon
 
 <p align="center">
   <img src="docs/gifs/hero.gif" alt="Raccoon — rcc audit running" width="800">
 </p>
+
+# 🦝 Raccoon
 
 > **Security audits, system info & SSH fleet management for macOS.**
 > *For the people who maintain Macs they don't sit in front of — and need to show their work.*
