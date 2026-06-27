@@ -16,15 +16,15 @@ show_apps_help() {
 	echo "    3. Homebrew catalog   (7000+ apps matched by name, no install needed)"
 	echo "    4. Sparkle feed       (apps with SUFeedURL in their plist)"
 	echo ""
-	echo "  Apps with built-in auto-updaters (Slack, Chrome, Zoom...) are detected"
-	echo "  and skipped by default. Use --auto-launch to open them so their internal"
-	echo "  updater triggers."
+	echo "  Apps with a built-in auto-updater (Slack, Chrome, Zoom...) are updated"
+	echo "  via Homebrew like everything else, since their internal updater often"
+	echo "  lags. Use --auto-launch to instead open them so their own updater runs."
 	echo ""
 	echo "  Options:"
 	echo "    --dry-run, -n    Show what would be updated, without updating"
 	echo "    --no-catalog     Skip the Homebrew catalog lookup (layer 3)"
 	echo "    --no-sparkle     Skip the Sparkle feed check (layer 4)"
-	echo "    --auto-launch    Open auto-updater apps to trigger their update"
+	echo "    --auto-launch    Open auto-updater apps instead of updating via brew"
 	echo "    --help, -h       This help"
 	echo ""
 }
@@ -176,17 +176,43 @@ update_mas() {
 # Build a token<TAB>app_name<TAB>version<TAB>auto_updates lookup from the
 # Homebrew cask catalog JSON (one cask per line). Skips deprecated/disabled.
 _build_cask_lookup() {
-	grep '"app":\[' "$CASK_CATALOG_FILE" 2>/dev/null |
-		grep -v '"deprecated":true' |
+	grep -v '"deprecated":true' "$CASK_CATALOG_FILE" 2>/dev/null |
 		grep -v '"disabled":true' |
 		awk '
+			# Value of the FIRST  "key":"<value>"  on the line. Greedy ".*key" would
+			# grab the LAST occurrence — and casks carry per-OS "variations" blocks
+			# with their own (older) "version", so the last one is a stale fallback
+			# (e.g. vscode 1.97.2 instead of 1.126.0). match() is leftmost, so the
+			# top-level current value wins.
+			function firstval(line, pat,   m) {
+				if (match(line, pat "\"[^\"]*\"")) {
+					m = substr(line, RSTART, RLENGTH)
+					sub(pat "\"", "", m); sub(/"$/, "", m)
+					return m
+				}
+				return ""
+			}
 			{
 				line = $0
-				token = line; sub(/.*"token":"/, "", token); sub(/".*/, "", token)
-				ver = line; sub(/.*"version":"/, "", ver); sub(/".*/, "", ver)
+				token = firstval(line, "\"token\":")
+				if (token == "") next
+				ver = firstval(line, "\"version\":")
 				auto = "0"; if (line ~ /"auto_updates":true/) auto = "1"
-				app = line; sub(/.*"app":\["/, "", app); sub(/\.app.*/, "", app)
-				if (app != line) print token "\t" app ".app\t" ver "\t" auto
+				key = ""
+				if (match(line, /"app":\["[^"]*"/)) {
+					key = substr(line, RSTART, RLENGTH)
+					sub(/"app":\["/, "", key); sub(/"$/, "", key)   # e.g. "Foo.app"
+				} else if (match(line, /"name":\["[^"]*"/)) {
+					# pkg/installer casks ship no ".app" artifact; fall back to the
+					# display name so a bundle named "<name>.app" still matches and
+					# updates via brew (recovers Teams / Multipass-class apps).
+					# ponytail: best-effort — a generic cask name could collide; the
+					# version gate + no-downgrade keep a wrong match from doing harm.
+					key = substr(line, RSTART, RLENGTH)
+					sub(/"name":\["/, "", key); sub(/"$/, "", key)
+					key = key ".app"
+				}
+				if (key != "") print token "\t" key "\t" ver "\t" auto
 			}
 		' >"$CASK_LOOKUP_FILE" 2>/dev/null || true
 }
@@ -349,6 +375,10 @@ update_homebrew_catalog() {
 
 			token="$(echo "$match" | cut -f1)"
 			remote_ver="$(echo "$match" | cut -f3)"
+			# Homebrew cask versions carry a ",revision" / ":checksum" suffix
+			# (e.g. "4.79.0,230596"); drop it for a clean display and compare.
+			remote_ver="${remote_ver%%,*}"
+			remote_ver="${remote_ver%%:*}"
 			auto="$(echo "$match" | cut -f4)"
 
 			if echo "$brew_casks" | grep -qx "$token" 2>/dev/null; then
@@ -364,24 +394,27 @@ update_homebrew_catalog() {
 				continue
 			fi
 
+			# Apps with a built-in auto-updater are still updated via brew cask by
+			# default — their internal updater often lags badly (stale Claude /
+			# Docker / Figma was the bug report). --auto-launch opts into opening
+			# the app so its own updater runs instead, matching `brew --greedy`.
+			local use_autolaunch=false
+			[[ "$auto" == "1" && "${RCC_AUTO_LAUNCH:-false}" == "true" ]] && use_autolaunch=true
+
 			if [[ "$RCC_DRY_RUN" == "true" ]]; then
-				if [[ "$auto" == "1" ]]; then
-					append_progress_output "catalog: $app_name $local_ver — has auto-updater (use --auto-launch to trigger)"
+				if [[ "$use_autolaunch" == "true" ]]; then
+					append_progress_output "catalog: $app_name $local_ver — will open to trigger its auto-updater"
 				else
 					append_progress_output "catalog: $app_name $local_ver → $remote_ver"
 				fi
 				continue
 			fi
 
-			if [[ "$auto" == "1" ]]; then
-				if [[ "${RCC_AUTO_LAUNCH:-false}" == "true" ]]; then
-					update_global_progress_info "catalog: opening $app_name for auto-update..."
-					open -a "$app_name" --hide 2>/dev/null || true
-					sleep 3
-					((launched++)) || true
-				else
-					((skipped++)) || true
-				fi
+			if [[ "$use_autolaunch" == "true" ]]; then
+				update_global_progress_info "catalog: opening $app_name for auto-update..."
+				open -a "$app_name" --hide 2>/dev/null || true
+				sleep 3
+				((launched++)) || true
 			else
 				update_global_progress_info "catalog: updating $app_name via brew cask..."
 				local brew_stdin=/dev/null

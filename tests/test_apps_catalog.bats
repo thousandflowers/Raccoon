@@ -20,6 +20,8 @@ setup() {
 {"token":"raccoon-test-app","version":"2.0.0","auto_updates":false,"app":["RaccoonTestApp.app"]}
 {"token":"raccoon-auto","version":"2.0.0","auto_updates":true,"app":["RaccoonAuto.app"]}
 {"token":"oldcask","version":"1.0","deprecated":true,"app":["Old.app"]}
+{"token":"multiver","version":"5.0.0","auto_updates":false,"app":["MultiVer.app"],"variations":{"sequoia":{"version":"4.0.0"}}}
+{"token":"pkgapp","version":"3.0.0","auto_updates":false,"name":["PkgApp"],"pkg":["PkgApp.pkg"]}
 JSON
 
 	CASK_CATALOG_FILE="$CATALOG"
@@ -50,10 +52,29 @@ _make_app() {
 	grep -q "$(printf 'iterm2\tiTerm.app\t3.6.0\t0')" "$CASK_LOOKUP_FILE"
 }
 
+@test "_build_cask_lookup picks the top-level version, not a variations fallback" {
+	_build_cask_lookup
+	grep -q "$(printf 'multiver\tMultiVer.app\t5.0.0\t0')" "$CASK_LOOKUP_FILE"
+}
+
 @test "_lookup_app finds an app by name" {
 	_build_cask_lookup
 	run _lookup_app "iTerm.app"
 	assert_output_contains "iterm2"
+}
+
+@test "pkg/installer cask (no app artifact) is matched via its display name" {
+	_build_cask_lookup
+	run _lookup_app "PkgApp.app"
+	assert_output_contains "pkgapp"
+}
+
+@test "pkg-cask app is reported outdated in catalog dry-run" {
+	_make_app "PkgApp" "1.0.0"
+	RCC_DRY_RUN=true
+	run update_homebrew_catalog
+	assert_success
+	assert_output_contains "PkgApp 1.0.0 → 3.0.0"
 }
 
 @test "_lookup_app returns empty for an unknown app" {
@@ -95,15 +116,16 @@ _make_app() {
 	assert_output_contains "2.0.0"
 }
 
-@test "catalog dry-run flags an auto-updater app" {
+@test "catalog dry-run updates an auto-updater app via brew by default" {
 	_make_app "RaccoonAuto" "1.0.0"
 	RCC_DRY_RUN=true
 	run update_homebrew_catalog
 	assert_success
-	assert_output_contains "auto-updater"
+	assert_output_contains "RaccoonAuto 1.0.0 → 2.0.0"
+	[[ "$output" != *"auto-updater"* ]]
 }
 
-@test "catalog dry-run with --auto-launch still notes the auto-updater" {
+@test "catalog dry-run with --auto-launch opens the auto-updater app instead" {
 	_make_app "RaccoonAuto" "1.0.0"
 	RCC_DRY_RUN=true RCC_AUTO_LAUNCH=true
 	run update_homebrew_catalog
