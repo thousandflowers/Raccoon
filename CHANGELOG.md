@@ -3,6 +3,16 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [0.13.3] - 2026-06-27
+
+### Fixed
+
+- `apps`: outdated GUI apps were detected but often not updated. Three causes in the Homebrew-catalog layer:
+  - Casks with a built-in auto-updater (`auto_updates`) were skipped, deferring to the app's own — frequently stale — updater. They are now updated via `brew install --cask --force` by default, matching `brew --greedy`. `--auto-launch` becomes opt-in to instead open the app so its internal updater runs.
+  - The catalog version was parsed with a greedy regex that grabbed the last `version` on the line — an older fallback inside per-OS `variations` blocks (e.g. VS Code read as 1.97.2 instead of 1.126.0), so the installed copy looked newer and was skipped as up to date. Now reads the top-level version. Never downgrades.
+  - `pkg`/installer casks ship no `app` artifact and were dropped from the lookup entirely; they are now matched by the cask display name, recovering Microsoft Teams / Multipass-class apps. Pure awk, no new dependency.
+- `apps`: trim the `,revision` suffix from cask versions in the displayed output.
+
 ## [0.13.2] - 2026-06-26
 ### Added
 - TUI: fleet entries in the interactive menu (scan, audit, status, list, groups).
