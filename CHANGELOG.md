@@ -3,6 +3,19 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [0.13.4] - 2026-06-28
+
+### Fixed
+
+- `fleet remove`: matched hosts by substring, so `remove user@192.168.1.1` also deleted `user@192.168.1.10` (and any line containing that text). Now matches whole lines.
+- `fleet scan`: hosts that need `ssh-copy-id` were silently dropped — under `set -e` a failed probe `ssh` aborted before it could report "setup needed". Those hosts are reported again.
+- `fleet scan`: could run for minutes with no output on a busy network. Probes now run fully in parallel under a per-host timeout and an overall `SCAN_MAX` budget (default 45s, env-overridable), and it prints how many hosts it is probing.
+- `fleet scan` / `run` / `audit`: a background timeout killing `ssh` leaked a shell "Terminated" job message into stdout/JSON; suppressed without losing `ssh`'s own output.
+- `fleet run`: quoted multi-word arguments were flattened (`grep "a b"` → `grep a b`); arguments are now preserved with `printf %q`. Added a per-command timeout and a temp-dir cleanup trap.
+- `fleet audit`: a truncated remote JSON response could abort the whole aggregation; the parse now falls back to zero.
+- `fleet audit` / `run`: a non-numeric or zero `--parallel` value crashed or spun; it is now validated.
+- `fleet`: an unknown subcommand now exits non-zero; `fleet add` / `remove` no longer print Italian strings; `fleet group list` pluralizes "host(s)".
+
 ## [0.13.3] - 2026-06-27
 
 ### Fixed

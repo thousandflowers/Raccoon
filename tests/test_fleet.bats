@@ -53,6 +53,16 @@ teardown() {
 	assert_output_contains "No hosts"
 }
 
+@test "fleet remove matches the whole line not a substring" {
+	# Substring removal would also drop 192.168.1.10 (192.168.1.1 is a prefix).
+	printf '%s\n' "host@192.168.1.1" "host@192.168.1.10" > "$HOME/.raccoon/fleet.conf"
+	run bash "$SCRIPT_DIR/bin/fleet.sh" remove host@192.168.1.1
+	assert_success
+	run bash "$SCRIPT_DIR/bin/fleet.sh" list
+	assert_success
+	assert_output_contains "host@192.168.1.10"
+}
+
 @test "fleet status shows reachable hosts with a check mark" {
 	printf '%s\n' "mario@192.168.1.10" > "$HOME/.raccoon/fleet.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" status
@@ -134,11 +144,13 @@ teardown() {
 	[[ "$output" != *"unreachable"* ]]
 }
 
-@test "fleet scan interactive add appends ready host on y" {
+@test "fleet scan non-interactive input does not consume stdin or add" {
+	# Not a tty: the prompt/read is skipped, answer stays "n", nothing is added.
 	export RACCOON_SCAN_HOSTS="192.168.1.10"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" scan --user mario <<< "y"
 	assert_success
-	grep -q "mario@192.168.1.10" "$HOME/.raccoon/fleet.conf"
+	assert_output_contains "Not added"
+	[[ ! -f "$HOME/.raccoon/fleet.conf" ]] || ! grep -q "mario@192.168.1.10" "$HOME/.raccoon/fleet.conf"
 }
 
 @test "fleet scan with no candidates exits 0 with a message" {
@@ -198,4 +210,10 @@ teardown() {
 	run bash "$SCRIPT_DIR/bin/fleet.sh" run --group office
 	assert_failure
 	assert_output_contains "Usage: rcc fleet run"
+}
+
+@test "fleet unknown subcommand prints help and returns non-zero" {
+	run bash "$SCRIPT_DIR/bin/fleet.sh" bogus
+	assert_failure
+	assert_output_contains "Usage: rcc fleet"
 }

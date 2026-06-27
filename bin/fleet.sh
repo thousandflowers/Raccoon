@@ -56,9 +56,10 @@ show_fleet_help() {
 	echo "Options (scan):"
 	echo "  --user U         SSH user to probe with (default: \$USER)"
 	echo "  --subnet BASE    Override subnet base, e.g. 192.168.1 (default: auto)"
-	echo "  --timeout N      Per-host SSH timeout in seconds (default: 8)"
+	echo "  --timeout N      Per-host SSH timeout in seconds (default: 5)"
 	echo "  --add            Add every ready host to fleet.conf (no prompt)"
 	echo "  --json           Output structured JSON"
+	echo "  (env) SCAN_MAX   Hard wall-clock budget for the whole scan (default: 45s)"
 	echo ""
 	echo "Groups:"
 	echo "  rcc fleet group add office mario@192.168.1.10 luca@192.168.1.11"
@@ -153,9 +154,12 @@ run_host_audit() {
 		local ssh_pid=$!
 		( sleep "$FLEET_TIMEOUT"; : > "$out.timeout"; kill "$ssh_pid" 2>/dev/null ) &
 		local timer_pid=$!
-		wait "$ssh_pid"
-		local st=$?
-		kill "$timer_pid" 2>/dev/null || true
+		# Reap ssh and cancel the timer with fd2 redirected only around the `wait`
+		# builtins, so the shell's "Terminated: 15" job message is swallowed while
+		# ssh's own stdout/stderr (already flowing to the caller) is preserved.
+		local st=0
+		{ wait "$ssh_pid"; st=$?; } 2>/dev/null
+		{ kill "$timer_pid" 2>/dev/null; wait "$timer_pid"; } 2>/dev/null || true
 		exit "$st"
 	) 2>/dev/null || true
 }
@@ -174,9 +178,9 @@ _aggregate() {
 		if [[ -f "$out.timeout" ]]; then
 			status="timeout"
 		elif [[ -s "$out" ]] && grep -q '"pass"' "$out"; then
-			pass="$(grep -o '"pass": [0-9]*' "$out" | grep -o '[0-9]*' | head -1)"; pass="${pass:-0}"
-			warn="$(grep -o '"warning": [0-9]*' "$out" | grep -o '[0-9]*' | head -1)"; warn="${warn:-0}"
-			fail="$(grep -o '"fail": [0-9]*' "$out" | grep -o '[0-9]*' | head -1)"; fail="${fail:-0}"
+			pass="$(grep -o '"pass": [0-9]*' "$out" | grep -o '[0-9]*' | head -1 || true)"; pass="${pass:-0}"
+			warn="$(grep -o '"warning": [0-9]*' "$out" | grep -o '[0-9]*' | head -1 || true)"; warn="${warn:-0}"
+			fail="$(grep -o '"fail": [0-9]*' "$out" | grep -o '[0-9]*' | head -1 || true)"; fail="${fail:-0}"
 			if [[ "$fail" -gt 0 || "$warn" -gt 0 ]]; then status="issues"; else status="ok"; fi
 			FLEET_REACHED=$((FLEET_REACHED + 1))
 			FLEET_TOTAL_PASS=$((FLEET_TOTAL_PASS + pass))
@@ -309,6 +313,10 @@ cmd_audit() {
 		esac
 	done
 
+	if ! [[ "$PARALLEL" =~ ^[0-9]+$ ]] || [[ "$PARALLEL" -eq 0 ]]; then
+		PARALLEL=5
+	fi
+
 	if [[ -n "$single" ]]; then
 		_parse_host_line "$single" || true
 		HOSTS=("$HL_HOST"); PORTS=("$HL_PORT"); PROFILES=("$HL_PROFILE")
@@ -391,7 +399,7 @@ cmd_status() {
 cmd_add() {
 	local host="${1:-}"
 	if [[ -z "$host" ]]; then
-		echo "Uso: rcc fleet add <host>"
+		echo "Usage: rcc fleet add <host>"
 		return 0
 	fi
 	mkdir -p "$(dirname "$FLEET_CONF")"
@@ -401,27 +409,27 @@ cmd_add() {
 		return 0
 	fi
 	echo "$host" >> "$FLEET_CONF"
-	echo "Aggiunto: $host"
-	echo "Verifica connessione con: rcc fleet status"
+	echo "Added: $host"
+	echo "Verify the connection with: rcc fleet status"
 }
 
 cmd_remove() {
 	local host="${1:-}"
 	if [[ -z "$host" ]]; then
-		echo "Uso: rcc fleet remove <host>"
+		echo "Usage: rcc fleet remove <host>"
 		return 0
 	fi
-	if [[ ! -f "$FLEET_CONF" ]] || ! grep -qF "$host" "$FLEET_CONF"; then
+	if [[ ! -f "$FLEET_CONF" ]] || ! grep -qxF "$host" "$FLEET_CONF"; then
 		echo "Host not found: $host"
 		return 0
 	fi
 	if [[ -t 0 ]]; then
 		local answer
-		printf "Rimuovere '%s'? [y/N] " "$host"
+		printf "Remove '%s'? [y/N] " "$host"
 		read -r answer || answer="n"
-		[[ "$answer" == "y" || "$answer" == "Y" ]] || { echo "Annullato."; return 0; }
+		[[ "$answer" == "y" || "$answer" == "Y" ]] || { echo "Cancelled."; return 0; }
 	fi
-	grep -vF "$host" "$FLEET_CONF" > "$FLEET_CONF.tmp" 2>/dev/null || true
+	grep -vxF "$host" "$FLEET_CONF" > "$FLEET_CONF.tmp" 2>/dev/null || true
 	mv "$FLEET_CONF.tmp" "$FLEET_CONF"
 	echo "Removed: $host"
 }
@@ -526,7 +534,7 @@ cmd_group() {
 				while IFS= read -r g; do
 					[[ -z "$g" ]] && continue
 					count="$(_group_members "$g" | awk 'NF' | wc -l | tr -d ' ')"
-					printf '  %-20s %s host\n' "$g" "$count"
+					printf '  %-20s %s %s\n' "$g" "$count" "$([[ "$count" -eq 1 ]] && echo host || echo hosts)"
 				done <<< "$names"
 			fi
 			;;
@@ -541,7 +549,21 @@ _run_one() {
 	local host="$1" port="$2" cmd="$3"
 	local -a opts=(-o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=accept-new)
 	[[ -n "$port" ]] && opts+=(-p "$port")
-	"${RACCOON_SSH:-ssh}" "${opts[@]}" "$host" "$cmd"
+	# Overall wall-clock bound (mirrors run_host_audit): a timer kills ssh if it
+	# runs past FLEET_TIMEOUT so a hung remote command can't block wait forever.
+	(
+		"${RACCOON_SSH:-ssh}" "${opts[@]}" "$host" "$cmd" &
+		local ssh_pid=$!
+		( sleep "$FLEET_TIMEOUT"; kill "$ssh_pid" 2>/dev/null ) &
+		local timer_pid=$!
+		# Reap ssh and cancel the timer with fd2 redirected only around the `wait`
+		# builtins, so the shell's "Terminated: 15" job message is swallowed while
+		# ssh's own stdout/stderr (already flowing to the caller) is preserved.
+		local st=0
+		{ wait "$ssh_pid"; st=$?; } 2>/dev/null
+		{ kill "$timer_pid" 2>/dev/null; wait "$timer_pid"; } 2>/dev/null || true
+		exit "$st"
+	) || true
 }
 
 # run [--group N] [--parallel N] -- <command>   (no group = every host)
@@ -556,8 +578,11 @@ cmd_run() {
 			*) rest+=("$1"); shift ;;
 		esac
 	done
+	if ! [[ "$parallel" =~ ^[0-9]+$ ]] || [[ "$parallel" -eq 0 ]]; then
+		parallel="$PARALLEL"
+	fi
 	local cmd=""
-	[[ ${#rest[@]} -gt 0 ]] && cmd="${rest[*]}"
+	[[ ${#rest[@]} -gt 0 ]] && cmd="$(printf '%q ' "${rest[@]}")"
 	if [[ -z "$cmd" ]]; then
 		echo "Usage: rcc fleet run [--group <name>] -- <command>"; return 1
 	fi
@@ -569,6 +594,8 @@ cmd_run() {
 	fi
 
 	local tmp; tmp="$(mktemp -d)"
+	# shellcheck disable=SC2064
+	trap "rm -rf '$tmp'" EXIT
 	local i host port safe
 	for i in $(seq 0 $((${#HOSTS[@]} - 1))); do
 		host="${HOSTS[$i]}"; port="${PORTS[$i]}"; safe="$(_safe_name "$host")"
@@ -616,15 +643,28 @@ _scan_pingsweep() {
 # ponytail: ping-sweep is the backbone; this only adds mDNS-only / nice-named hosts.
 _scan_bonjour() {
 	command -v dns-sd >/dev/null 2>&1 || return 0
-	local browse inst lookup target
-	browse="$( { dns-sd -B _ssh._tcp local. & local p=$!; sleep 2; kill "$p"; } 2>/dev/null )"
-	printf '%s\n' "$browse" | awk '/Add/ { for (i=7;i<=NF;i++) printf "%s%s", $i, (i<NF?" ":"\n") }' |
-		sort -u | while IFS= read -r inst; do
-			[[ -z "$inst" ]] && continue
-			lookup="$( { dns-sd -L "$inst" _ssh._tcp local. & local p=$!; sleep 2; kill "$p"; } 2>/dev/null )"
+	local browse insts inst n=0 btmp
+	browse="$( { dns-sd -B _ssh._tcp local. & local p=$!; sleep 2; kill "$p" 2>/dev/null || true; } 2>/dev/null )"
+	# Cap advertisers so the resolve step can't blow past the budget on a busy LAN.
+	insts="$(printf '%s\n' "$browse" |
+		awk '/Add/ { for (i=7;i<=NF;i++) printf "%s%s", $i, (i<NF?" ":"\n") }' |
+		awk 'NF' | sort -u | head -n "${SCAN_BONJOUR_MAX:-32}")"
+	[[ -z "$insts" ]] && return 0
+	# Resolve every advertiser in parallel (was sequential N×sleep) into a temp
+	# dir, then a single wait — the whole resolve step is ~one sleep, not N.
+	btmp="$(mktemp -d)"
+	while IFS= read -r inst; do
+		[[ -z "$inst" ]] && continue
+		n=$((n + 1))
+		(
+			lookup="$( { dns-sd -L "$inst" _ssh._tcp local. & lp=$!; sleep 1; kill "$lp" 2>/dev/null || true; } 2>/dev/null )"
 			target="$(printf '%s\n' "$lookup" | sed -n 's/.* \([^ ]*\.local\)\.\{0,1\}:[0-9].*/\1/p' | head -1)"
-			[[ -n "$target" ]] && printf '%s\n' "$target"
-		done
+			[[ -n "$target" ]] && printf '%s\n' "$target" > "$btmp/$n"
+		) &
+	done <<< "$insts"
+	wait
+	cat "$btmp"/* 2>/dev/null | awk 'NF' | sort -u
+	rm -rf "$btmp"
 }
 
 # Classify one host: ready | setup | non-mac | down.
@@ -635,9 +675,26 @@ _scan_probe() {
 	if [[ -z "${RACCOON_SCAN_HOSTS:-}" ]]; then
 		nc -z -G 2 -w 2 "$host" 22 >/dev/null 2>&1 || { echo down; return; }
 	fi
-	out="$("${RACCOON_SSH:-ssh}" -o BatchMode=yes -o ConnectTimeout="$timeout" \
-		-o StrictHostKeyChecking=accept-new "$user@$host" "uname -s" 2>/dev/null)"
-	rc=$?
+	# Guard the substitution: under `set -e`, a failed ssh in `out="$(...)"` aborts
+	# the function before `echo setup`, silently dropping every host that needs
+	# `ssh-copy-id` — which is exactly scan's whole point.
+	# ConnectTimeout only bounds the TCP connect; a server that accepts the socket
+	# then stalls the handshake (e.g. a multi-homed .local self-probe) would hang
+	# forever. A timer kills ssh past $timeout so every probe is wall-clock bound.
+	if out="$(
+		"${RACCOON_SSH:-ssh}" -o BatchMode=yes -o ConnectTimeout="$timeout" \
+			-o StrictHostKeyChecking=accept-new "$user@$host" "uname -s" 2>/dev/null &
+		_sp=$!
+		( sleep "$timeout"; kill "$_sp" 2>/dev/null ) >/dev/null 2>&1 &
+		_wp=$!
+		wait "$_sp"; _st=$?
+		kill "$_wp" 2>/dev/null || true
+		exit "$_st"
+	)"; then
+		rc=0
+	else
+		rc=$?
+	fi
 	if [[ $rc -eq 0 ]]; then
 		[[ "$out" == "Darwin" ]] && echo ready || echo non-mac
 	else
@@ -646,7 +703,7 @@ _scan_probe() {
 }
 
 cmd_scan() {
-	local user="${USER:-root}" subnet="" timeout=8 add_mode="" fmt="text"
+	local user="${USER:-root}" subnet="" timeout=5 add_mode="" fmt="text"
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 			--user) if [[ $# -ge 2 ]]; then user="$2"; shift 2; else shift; fi ;;
@@ -673,15 +730,32 @@ cmd_scan() {
 	fi
 
 	local tmp; tmp="$(mktemp -d)"
-	local host i=0 safe
+	local host safe count guard _p
+	count="$(printf '%s\n' "$candidates" | grep -c . || true)"
+	[[ "$fmt" == "text" ]] && echo "Probing ${count} host(s) (budget ${SCAN_MAX:-45}s)..." >&2
+	# Launch every probe concurrently — each _scan_probe is self-bounded by nc -w
+	# and the ssh timer, so the whole phase is ~one host's timeout. Each writes
+	# its result file as it finishes, so a watchdog deadline still yields output.
+	local -a ppids=()
 	while IFS= read -r host; do
 		[[ -z "$host" ]] && continue
 		safe="$(_safe_name "$host")"
 		( printf '%s\t%s\n' "$(_scan_probe "$host" "$user" "$timeout")" "$host" > "$tmp/$safe" ) &
-		i=$((i + 1))
-		(( i % PARALLEL == 0 )) && wait
+		ppids+=($!)
 	done <<< "$candidates"
-	wait
+	# Hard overall backstop: kill any probe still alive past SCAN_MAX so the scan
+	# can never hang regardless of network pathologies (e.g. ssh that connects
+	# then stalls the handshake). Whatever finished is still collected below.
+	( sleep "${SCAN_MAX:-45}"
+	  for _p in ${ppids[@]+"${ppids[@]}"}; do kill "$_p" 2>/dev/null; pkill -P "$_p" 2>/dev/null; done
+	) >/dev/null 2>&1 &
+	guard=$!
+	for _p in ${ppids[@]+"${ppids[@]}"}; do wait "$_p" 2>/dev/null || true; done
+	# Cancel the backstop (and its sleep child) WITHOUT leaking a job-control
+	# "Terminated: 15" line onto stderr — that line would corrupt --json output
+	# and prepend to bats' merged $output. `wait` inside the stderr-redirected
+	# block swallows the shell's async-job termination report.
+	{ pkill -P "$guard" 2>/dev/null; kill "$guard" 2>/dev/null; wait "$guard"; } 2>/dev/null || true
 
 	# Collect rows; build the list of ready user@host targets.
 	local rows="" ready_list="" state rhost f
@@ -711,8 +785,10 @@ cmd_scan() {
 	fi
 
 	local answer="n"
-	[[ -t 0 ]] && printf "Add %s ready host(s) to fleet.conf? [y/N] " "$ready_count"
-	read -r answer || answer="n"
+	if [[ -t 0 ]]; then
+		printf "Add %s ready host(s) to fleet.conf? [y/N] " "$ready_count"
+		read -r answer || answer="n"
+	fi
 	if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
 		printf '%s\n' "$ready_list" | awk 'NF' | while IFS= read -r h; do cmd_add "$h"; done
 	else
@@ -770,7 +846,7 @@ main() {
 		remove) cmd_remove "$@" ;;
 		list) cmd_list "$@" ;;
 		help | --help | -h) show_fleet_help ;;
-		*) show_fleet_help ;;
+		*) show_fleet_help; return 1 ;;
 	esac
 }
 
