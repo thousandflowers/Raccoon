@@ -68,6 +68,12 @@ jobs:
             git log --oneline --no-decorate >> /tmp/release-notes.md
           fi
 
+      - name: Build standalone single-file rcc
+        run: |
+          ./tools/build-standalone.sh dist/rcc
+          # Smoke-test the artifact runs with no repo on disk.
+          RCC_BUNDLE_CACHE="$(mktemp -d)" dist/rcc audit --list-checks >/dev/null
+
       - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -77,7 +83,8 @@ jobs:
             --title "$TAG" \
             --notes-file /tmp/release-notes.md \
             bin/rcc-ui \
-          || gh release upload "$TAG" bin/rcc-ui --clobber
+            dist/rcc \
+          || gh release upload "$TAG" bin/rcc-ui dist/rcc --clobber
 
       - name: Compute tarball SHA256
         id: sha

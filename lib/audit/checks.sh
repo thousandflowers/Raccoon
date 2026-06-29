@@ -421,3 +421,77 @@ _check_explain() {
 			printf '%s' "" ;;
 	esac
 }
+
+# _check_cis NAME -> CIS Apple macOS Benchmark recommendation for a check, or ""
+# if the check has no per-machine CIS equivalent. Used by `audit --cis` to map
+# Raccoon's technical checks onto the only compliance framework that audits a
+# single Mac (SOC 2 / ISO 27001 / NIST CSF audit the organisation, not the
+# machine, so they are intentionally out of scope). Same Bash 3.2-safe case
+# pattern as _check_explain — a check with no entry returns "" and is uncounted.
+#
+# ponytail: section numbers track the CIS Apple macOS Benchmark (v3.x, the
+# Sonoma/Sequoia line). They drift between benchmark releases; on a new release
+# bump the numbers in this one table — nothing else references them.
+_check_cis() {
+	case "$1" in
+		FileVault)        printf '%s' "2.5.1.1 — Enable FileVault" ;;
+		Firewall)         printf '%s' "2.5.2.2 — Enable Firewall" ;;
+		"Stealth Mode")   printf '%s' "2.5.2.3 — Enable Firewall Stealth Mode" ;;
+		Gatekeeper)       printf '%s' "2.5.5 — Enable Gatekeeper" ;;
+		SIP)              printf '%s' "Ensure System Integrity Protection (SIP) is enabled" ;;
+		"Software Updates") printf '%s' "1.1–1.6 — Install current Apple software updates" ;;
+		Bluetooth)        printf '%s' "2.1.1 — Disable Bluetooth when no devices are paired" ;;
+		"Screen Lock")    printf '%s' "2.3.1 / 5.x — Require password after screensaver/sleep" ;;
+		Sharing)          printf '%s' "2.4 — Disable unused sharing services" ;;
+		"SSH Daemon")     printf '%s' "2.4.5 — Ensure Remote Login (SSH) is disabled" ;;
+		"Auto-Login")     printf '%s' "5.6 — Ensure automatic login is disabled" ;;
+		"Location Services") printf '%s' "2.6.1 — Restrict Location Services" ;;
+		".ssh Permissions") printf '%s' "5.1 — Secure user file & folder permissions" ;;
+		*)                printf '%s' "" ;;
+	esac
+}
+
+# _check_command NAME -> the exact shell command an auditor can run to verify a
+# check by hand, or "" if the check has no single reproducible command. Powers
+# `audit --verbose` ("verify, don't trust"): the documented command is the
+# single source of truth, shown verbatim and — under --verbose — re-run live so
+# the auditor sees the raw output for themselves. Same Bash 3.2-safe case shape
+# as _check_explain / _check_cis. These mirror the commands the checks actually
+# run in this file; keep them in sync when a check's probe changes.
+_check_command() {
+	case "$1" in
+		FileVault)            printf '%s' "sudo fdesetup status" ;;
+		SIP)                  printf '%s' "csrutil status" ;;
+		Gatekeeper)           printf '%s' "spctl --status" ;;
+		Firewall)             printf '%s' "sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate" ;;
+		"Stealth Mode")       printf '%s' "sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getstealthmode" ;;
+		"Software Updates")   printf '%s' "softwareupdate -l" ;;
+		"Open Ports")         printf '%s' "sudo lsof -i -P -n | grep LISTEN" ;;
+		"DNS Servers")        printf '%s' "scutil --dns | grep nameserver" ;;
+		VPN)                  printf '%s' "networksetup -listallnetworkservices | grep VPN" ;;
+		Bluetooth)            printf '%s' "blueutil status" ;;
+		Sharing)              printf '%s' "sharing -l" ;;
+		"SSH Daemon")         printf '%s' "sudo launchctl list com.openssh.sshd" ;;
+		"Auto-Login")         printf '%s' "sudo defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser" ;;
+		Keychain)             printf '%s' "security list-keychains" ;;
+		"SSH Keys")           printf '%s' "ls -la ~/.ssh/*.pub" ;;
+		"Authorized Keys")    printf '%s' "cat ~/.ssh/authorized_keys" ;;
+		Sudoers)              printf '%s' "sudo visudo -c" ;;
+		"User LaunchAgents")  printf '%s' "ls -1 ~/Library/LaunchAgents/" ;;
+		"System LaunchAgents") printf '%s' "ls -1 /Library/LaunchAgents/" ;;
+		LaunchDaemons)        printf '%s' "ls -1 /Library/LaunchDaemons/" ;;
+		"Cron Jobs")          printf '%s' "crontab -l" ;;
+		"At Jobs")            printf '%s' "atq" ;;
+		"Login Items")        printf '%s' "osascript -e 'tell application \"System Events\" to get the name of every login item'" ;;
+		"Location Services")  printf '%s' "system_profiler SPPrivacyDataType | grep -i 'Location Services'" ;;
+		Analytics)            printf '%s' "defaults read /Library/Preferences/com.apple.usage.plist Analytics.blinded" ;;
+		XProtect)             printf '%s' "defaults read /Library/Preferences/com.apple.XprotectFramework XProtectData" ;;
+		"Screen Lock")        printf '%s' "defaults read /Library/Preferences/com.apple.preferencepanegeneral starttimesystem" ;;
+		".ssh Permissions")   printf '%s' "ls -la ~/.ssh" ;;
+		"Quarantined Files")  printf '%s' "xattr -lr ~/Downloads | grep com.apple.quarantine" ;;
+		"Kernel Extensions")  printf '%s' "kextstat | grep -v com.apple" ;;
+		"Sudo Access")        printf '%s' "sudo -l" ;;
+		"DNS-over-HTTPS")     printf '%s' "scutil --dns | grep DOT" ;;
+		*)                    printf '%s' "" ;;
+	esac
+}

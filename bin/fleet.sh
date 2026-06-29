@@ -368,6 +368,16 @@ cmd_audit() {
 	fi
 
 	_save_fleet_history
+
+	# Semantic exit code mirrors `rcc audit`: 1 if any host has a failure, 2 if
+	# only warnings (or unreachable hosts), 0 if every reached host is clean. Lets
+	# CI gate on a whole-fleet sweep.
+	if [[ "${FLEET_TOTAL_FAIL:-0}" -gt 0 ]]; then
+		return 1
+	elif [[ "${FLEET_TOTAL_WARN:-0}" -gt 0 || "${FLEET_UNREACHABLE:-0}" -gt 0 ]]; then
+		return 2
+	fi
+	return 0
 }
 
 cmd_status() {

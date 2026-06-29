@@ -3,6 +3,7 @@ bin/rcc-ui
 ui/rcc-ui
 ui/ui
 ui/rcc-ui-*
+dist/
 
 # Audit output and history
 audit_*.json
