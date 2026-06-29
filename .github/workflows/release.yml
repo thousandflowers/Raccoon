@@ -18,7 +18,7 @@ jobs:
       - name: Run shellcheck
         run: |
           shellcheck -S warning -x \
-            rcc install.sh install \
+            rcc install.sh \
             lib/core/common.sh lib/core/commands.sh \
             lib/audit/checks.sh \
             bin/*.sh completions/bash/rcc
