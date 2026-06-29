@@ -109,26 +109,6 @@ print_step() {
     echo "${GRAY}[${n}/${total}]${NC} ${label}..."
 }
 
-# Confirm action with y/N prompt (auto-no with 10s timeout)
-confirm_action() {
-    local prompt="${1:-Proceed?}"
-    local timeout="${2:-10}"
-    local answer
-    echo -n "${YELLOW}${prompt} [y/N]${NC} "
-    read -r -n 1 -t "$timeout" answer || true
-    echo ""
-    [[ "$answer" == "y" || "$answer" == "Y" ]]
-}
-
-# Pause until user presses a key
-pause_for_user() {
-    local msg="${1:-Press any key to continue...}"
-    echo ""
-    echo -n "${GRAY}${msg}${NC}"
-    read -r -s -n 1
-    echo ""
-}
-
 # Cache sudo credentials, preferring Touch ID. Returns 0 if sudo is usable.
 # Safe to call before a progress UI / from inside the TUI: when pam_tid is
 # configured, `sudo -v` triggers a GUI Touch ID dialog that needs no tty and
@@ -184,9 +164,6 @@ print_help_header() {
 
 # Cursor control
 clear_screen() { printf '\033[2J\033[H'; }
-hide_cursor() { [[ -t 1 ]] && printf '\033[?25l' >&2 || true; }
-show_cursor() { [[ -t 1 ]] && printf '\033[?25h' >&2 || true; }
-
 # Read single keyboard input
 read_key() {
     local key rest read_status
@@ -230,26 +207,6 @@ read_key() {
         [[:print:]]) echo "CHAR:$key" ;;
         *) echo "OTHER" ;;
     esac
-}
-
-drain_pending_input() {
-    local drained=0
-    while IFS= read -r -s -n 1 -t 0.01 _ 2> /dev/null; do
-        drained=$((drained + 1))
-        [[ $drained -gt 100 ]] && break
-    done
-}
-
-show_menu_option() {
-    local number="$1"
-    local text="$2"
-    local selected="$3"
-
-    if [[ "$selected" == "true" ]]; then
-        echo -e "${CYAN}${ICON_ARROW} $number. $text${NC}"
-    else
-        echo "  $number. $text"
-    fi
 }
 
 show_progress_bar() {
@@ -583,24 +540,7 @@ progress_pipe() {
 
 # =====================================================================
 # Helper: run a command with global progress bar
-# Usage: run_step "label" "info_prefix" "command"
 # =====================================================================
-
-run_step() {
-    local label="$1"
-    local info_prefix="$2"
-    local cmd="$3"
-
-    update_global_progress_info "$info_prefix: starting..."
-
-    set +e
-    set +o pipefail
-    eval "$cmd" 2>&1 | progress_pipe
-    set -e
-    set -o pipefail
-
-    increment_global_progress
-}
 
 # =====================================================================
 # Helper: run a check function with global progress bar
@@ -625,20 +565,8 @@ run_check() {
 
 # =====================================================================
 # Helper: flush progress buffer to terminal and restore normal output
-# Usage: flush_progress_to_terminal
 # Call this after finish_global_progress() to print all buffered output.
 # =====================================================================
-
-flush_progress_to_terminal() {
-    # Already restored by finish_global_progress, just print buffer
-    if [[ ${#RCC_PROGRESS_BUFFER[@]} -gt 0 ]]; then
-        for line in "${RCC_PROGRESS_BUFFER[@]}"; do
-            echo "$line"
-        done
-    fi
-    # Clear the buffer so it doesn't get printed again
-    RCC_PROGRESS_BUFFER=()
-}
 
 # Status of a check (by name) in a JSON file's "results" array, or "" if the
 # file is missing or the check is absent. Shared by audit diff/baseline and the
