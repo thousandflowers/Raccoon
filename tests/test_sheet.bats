@@ -28,18 +28,18 @@ teardown() {
 
 @test "audit --sheet exits 0" {
 	run bash "$SCRIPT_DIR/bin/audit.sh" --sheet
-	assert_success
+	assert_audit_exit
 	assert_output_contains "Intervention Sheet"
 }
 
 @test "audit --sheet --rtf produces valid RTF" {
 	run bash "$SCRIPT_DIR/bin/audit.sh" --sheet --rtf
-	assert_success
+	assert_audit_exit
 	[[ "$output" == '{\rtf'* ]]
 }
 
 @test "audit --hours 3 --sheet includes the hours" {
 	run bash "$SCRIPT_DIR/bin/audit.sh" --hours 3 --sheet
-	assert_success
+	assert_audit_exit
 	assert_output_contains "3"
 }

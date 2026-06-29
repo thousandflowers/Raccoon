@@ -57,6 +57,15 @@ Or via Homebrew:
 brew install thousandflowers/raccoon/rcc
 ```
 
+Or grab the single self-contained file — no git, no clone (CLI only; the
+interactive TUI still needs one of the installs above):
+
+```bash
+curl -fsSL https://github.com/thousandflowers/Raccoon/releases/latest/download/rcc -o rcc
+chmod +x rcc
+./rcc audit
+```
+
 Run `rcc` to launch the interactive [menu](#go-tui), or `rcc <command>` for direct access.
 
 <details>
@@ -97,12 +106,22 @@ rcc audit --fix           # apply safe fixes — every change is backed up first
 rcc audit --deep          # add slower, deeper checks
 rcc audit --json          # machine-readable output (also: --csv, --report file.md)
 rcc audit --baseline      # snapshot now; later runs diff against it
+rcc audit --verbose       # show the exact command + raw output behind each check
+rcc audit --cis           # map checks to the CIS Apple macOS Benchmark + coverage
+rcc audit --only core,network   # run only some check groups (--list-checks to list)
+rcc audit --report out.html     # auditor-ready self-contained HTML report
 ```
 
 Per-client reports with `--client`, `--shop`, `--tech` and reusable profiles
 (`rcc audit --profile mario-bianchi`). `--fix` backs every change up to
 `~/.raccoon/fix-backups/<timestamp>/` first, and schedules itself with
 `rcc audit schedule weekly` (LaunchAgent).
+
+**Exit codes** (for CI/automation, on both `rcc audit` and `rcc fleet audit`):
+`0` all passed · `1` at least one failure · `2` warnings only (or a usage
+error). `--verbose` re-runs each check's documented command live so an auditor
+can verify findings instead of trusting the summary; the same command is shown
+in `--json` (the `command` field) and the HTML report.
 
 ```
 $ rcc audit

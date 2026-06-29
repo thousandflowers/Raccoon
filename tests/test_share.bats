@@ -20,13 +20,13 @@ teardown() {
 
 @test "audit --share with an unreachable API reports unavailable and exits 0" {
 	RACCOON_CURL="$HOME/mockcurl" run bash "$SCRIPT_DIR/bin/audit.sh" --share
-	assert_success
+	assert_audit_exit
 	assert_output_contains "Sharing unavailable"
 }
 
 @test "audit --share with --quiet is ignored with a warning" {
 	run bash "$SCRIPT_DIR/bin/audit.sh" --share --quiet
-	assert_success
+	assert_audit_exit
 	assert_output_contains "ignored"
 }
 

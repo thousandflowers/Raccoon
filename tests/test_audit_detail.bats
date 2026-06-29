@@ -145,12 +145,12 @@ teardown() { teardown_raccoon_env; }
 
 @test "audit: --help exits 0" {
     run bash "$SCRIPT_DIR/bin/audit.sh" --help
-    assert_success
+    assert_audit_exit
 }
 
 @test "audit: -h exits 0" {
     run bash "$SCRIPT_DIR/bin/audit.sh" -h
-    assert_success
+    assert_audit_exit
 }
 
 @test "audit: --nonexistent silently ignored" {

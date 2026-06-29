@@ -33,22 +33,22 @@ teardown() {
 
 @test "fleet list with no config reports none" {
 	run bash "$SCRIPT_DIR/bin/fleet.sh" list
-	assert_success
+	assert_audit_exit
 	assert_output_contains "No hosts"
 }
 
 @test "fleet add then list shows the host" {
 	run bash "$SCRIPT_DIR/bin/fleet.sh" add mario@192.168.1.10
-	assert_success
+	assert_audit_exit
 	run bash "$SCRIPT_DIR/bin/fleet.sh" list
-	assert_success
+	assert_audit_exit
 	assert_output_contains "mario@192.168.1.10"
 }
 
 @test "fleet remove confirmed deletes the host" {
 	printf '%s\n' "mario@192.168.1.10" > "$HOME/.raccoon/fleet.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" remove mario@192.168.1.10 <<< "y"
-	assert_success
+	assert_audit_exit
 	run bash "$SCRIPT_DIR/bin/fleet.sh" list
 	assert_output_contains "No hosts"
 }
@@ -57,23 +57,23 @@ teardown() {
 	# Substring removal would also drop 192.168.1.10 (192.168.1.1 is a prefix).
 	printf '%s\n' "host@192.168.1.1" "host@192.168.1.10" > "$HOME/.raccoon/fleet.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" remove host@192.168.1.1
-	assert_success
+	assert_audit_exit
 	run bash "$SCRIPT_DIR/bin/fleet.sh" list
-	assert_success
+	assert_audit_exit
 	assert_output_contains "host@192.168.1.10"
 }
 
 @test "fleet status shows reachable hosts with a check mark" {
 	printf '%s\n' "mario@192.168.1.10" > "$HOME/.raccoon/fleet.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" status
-	assert_success
+	assert_audit_exit
 	assert_output_contains "✓"
 }
 
 @test "fleet status marks unreachable hosts with a cross" {
 	printf '%s\n' "backup@unreachable.host" > "$HOME/.raccoon/fleet.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" status
-	assert_success
+	assert_audit_exit
 	assert_output_contains "✗"
 }
 
@@ -81,21 +81,21 @@ teardown() {
 	printf '%s\n' "mario@192.168.1.10" "admin@office.example.com" "backup@unreachable.host" \
 		> "$HOME/.raccoon/fleet.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" audit
-	assert_success
+	assert_audit_exit
 	assert_output_contains "2/3 hosts reached"
 }
 
 @test "fleet audit --json starts with a brace" {
 	printf '%s\n' "mario@192.168.1.10" > "$HOME/.raccoon/fleet.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" audit --json
-	assert_success
+	assert_audit_exit
 	[[ "$output" == '{'* ]]
 }
 
 @test "fleet audit --report writes a Markdown report" {
 	printf '%s\n' "mario@192.168.1.10" > "$HOME/.raccoon/fleet.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" audit --report "$HOME/fleet.md"
-	assert_success
+	assert_audit_exit
 	[[ -f "$HOME/fleet.md" ]]
 	grep -q "Fleet Audit" "$HOME/fleet.md"
 }
@@ -104,13 +104,13 @@ teardown() {
 	printf '%s\n' "a@192.168.1.1" "b@192.168.1.2" "c@192.168.1.3" \
 		> "$HOME/.raccoon/fleet.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" audit --parallel 1
-	assert_success
+	assert_audit_exit
 	assert_output_contains "3/3 hosts reached"
 }
 
 @test "fleet audit with no config exits 0 with a message" {
 	run bash "$SCRIPT_DIR/bin/fleet.sh" audit
-	assert_success
+	assert_audit_exit
 	assert_output_contains "No hosts configured"
 }
 
@@ -120,7 +120,7 @@ teardown() {
 @test "fleet scan reports every candidate with its state" {
 	export RACCOON_SCAN_HOSTS="192.168.1.10 nas-linux backup-unreachable"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" scan --user mario
-	assert_success
+	assert_audit_exit
 	assert_output_contains "192.168.1.10"
 	assert_output_contains "ready"
 	assert_output_contains "nas-linux"
@@ -130,14 +130,14 @@ teardown() {
 @test "fleet scan --json starts with a brace" {
 	export RACCOON_SCAN_HOSTS="192.168.1.10"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" scan --json --user mario
-	assert_success
+	assert_audit_exit
 	[[ "$output" == '{'* ]]
 }
 
 @test "fleet scan --add appends only ready hosts to fleet.conf" {
 	export RACCOON_SCAN_HOSTS="192.168.1.10 nas-linux backup-unreachable"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" scan --user mario --add
-	assert_success
+	assert_audit_exit
 	run cat "$HOME/.raccoon/fleet.conf"
 	assert_output_contains "mario@192.168.1.10"
 	[[ "$output" != *"nas-linux"* ]]
@@ -148,7 +148,7 @@ teardown() {
 	# Not a tty: the prompt/read is skipped, answer stays "n", nothing is added.
 	export RACCOON_SCAN_HOSTS="192.168.1.10"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" scan --user mario <<< "y"
-	assert_success
+	assert_audit_exit
 	assert_output_contains "Not added"
 	[[ ! -f "$HOME/.raccoon/fleet.conf" ]] || ! grep -q "mario@192.168.1.10" "$HOME/.raccoon/fleet.conf"
 }
@@ -156,7 +156,7 @@ teardown() {
 @test "fleet scan with no candidates exits 0 with a message" {
 	export RACCOON_SCAN_HOSTS=" "
 	run bash "$SCRIPT_DIR/bin/fleet.sh" scan
-	assert_success
+	assert_audit_exit
 	assert_output_contains "No hosts"
 }
 
@@ -164,14 +164,14 @@ teardown() {
 
 @test "fleet group list with no groups reports none" {
 	run bash "$SCRIPT_DIR/bin/fleet.sh" group list
-	assert_success
+	assert_audit_exit
 	assert_output_contains "No groups"
 }
 
 @test "fleet group add then list shows group and members" {
 	printf '%s\n' "mario@192.168.1.10" > "$HOME/.raccoon/fleet.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" group add office mario@192.168.1.10
-	assert_success
+	assert_audit_exit
 	run bash "$SCRIPT_DIR/bin/fleet.sh" group list
 	assert_output_contains "office"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" group list office
@@ -181,7 +181,7 @@ teardown() {
 @test "fleet group remove deletes the whole group" {
 	printf 'office\tmario@192.168.1.10\n' > "$HOME/.raccoon/fleet-groups.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" group remove office
-	assert_success
+	assert_audit_exit
 	run bash "$SCRIPT_DIR/bin/fleet.sh" group list
 	assert_output_contains "No groups"
 }
@@ -190,7 +190,7 @@ teardown() {
 	printf '%s\n' "a@192.168.1.1" "b@192.168.1.2" "c@192.168.1.3" > "$HOME/.raccoon/fleet.conf"
 	printf 'g\ta@192.168.1.1\ng\tb@192.168.1.2\n' > "$HOME/.raccoon/fleet-groups.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" audit --group g
-	assert_success
+	assert_audit_exit
 	assert_output_contains "a@192.168.1.1"
 	assert_output_contains "b@192.168.1.2"
 	[[ "$output" != *"c@192.168.1.3"* ]]
@@ -200,7 +200,7 @@ teardown() {
 	printf '%s\n' "mario@192.168.1.10" "luca@192.168.1.11" > "$HOME/.raccoon/fleet.conf"
 	printf 'office\tmario@192.168.1.10\noffice\tluca@192.168.1.11\n' > "$HOME/.raccoon/fleet-groups.conf"
 	run bash "$SCRIPT_DIR/bin/fleet.sh" run --group office -- whoami
-	assert_success
+	assert_audit_exit
 	assert_output_contains "=== mario@192.168.1.10 ==="
 	assert_output_contains "=== luca@192.168.1.11 ==="
 	assert_output_contains "RAN:whoami"

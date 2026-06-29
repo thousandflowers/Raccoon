@@ -87,6 +87,10 @@ show_audit_help() {
 	echo "  --csv         Output in CSV format"
 	echo "  --json        Output in JSON format"
 	echo "  --explain     Add plain-language notes under failing/warning checks"
+	echo "  --cis         Map checks to CIS Apple macOS Benchmark + coverage score"
+	echo "  --verbose, -v Show the exact command and raw output behind each check"
+	echo "  --only GROUPS  Run only these check groups (comma-separated)"
+	echo "  --list-checks List the available check groups and their checks"
 	echo "  --remediation Client-facing intervention report (found/fixed/to-do)"
 	echo "  --baseline    Save the current state as a signed reference baseline"
 	echo "  --baseline-diff   Compare the current state against the baseline"
@@ -121,6 +125,7 @@ show_audit_help() {
 	echo "  rcc audit --md                 # Markdown to stdout (pipeable)"
 	echo "  rcc audit --explain            # audit with plain-language notes"
 	echo "  rcc audit --deep --explain     # deep scan, explained"
+	echo "  rcc audit --deep --cis         # deep scan with CIS Benchmark coverage"
 	echo "  rcc audit --profile mario-bianchi"
 	echo "  rcc audit --deep --profile mario-bianchi --report intervento.md"
 	echo "  rcc audit --profile-save mario-bianchi"
@@ -134,6 +139,11 @@ show_audit_help() {
 	echo "  Destructive fixes snapshot originals to ~/.raccoon/fix-backups/ first."
 	echo "  Opt a machine out of specific fixes: list check names in"
 	echo "  ~/.raccoon/audit.conf (one per line, # for comments)."
+	echo ""
+	echo "Exit codes (for CI/automation):"
+	echo "  0  all checks passed"
+	echo "  1  at least one check failed"
+	echo "  2  warnings only (no failures), or a usage error"
 }
 
 DEEP_SCAN=false
@@ -149,6 +159,10 @@ SCHEDULE_ACTION=""
 NOTIFY=false
 ALERT_ON_ISSUES=false
 EXPLAIN_MODE=false
+CIS_MODE=false
+VERBOSE_MODE=false
+ONLY_GROUPS=""
+LIST_CHECKS=false
 REMEDIATION_MODE=false
 BASELINE_SAVE=false
 BASELINE_DIFF=false
@@ -251,6 +265,25 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--explain)
 		EXPLAIN_MODE=true
+		shift
+		;;
+	--cis)
+		CIS_MODE=true
+		shift
+		;;
+	--verbose | -v)
+		VERBOSE_MODE=true
+		shift
+		;;
+	--only)
+		if [[ $# -ge 2 && "$2" != -* ]]; then ONLY_GROUPS="$2"; shift 2; else shift; fi
+		;;
+	--only=*)
+		ONLY_GROUPS="${1#--only=}"
+		shift
+		;;
+	--list-checks)
+		LIST_CHECKS=true
 		shift
 		;;
 	--remediation)
@@ -381,6 +414,18 @@ print_result() {
 			printf '  %s-> %s%s\n' "$GRAY" "$explanation" "$NC"
 		fi
 	fi
+
+	# --cis: annotate each mapped check with its CIS macOS Benchmark reference.
+	# Text output only; unmapped checks print nothing. The coverage score is
+	# tallied separately in print_summary, so this branch is display-only.
+	if [[ "${CIS_MODE:-false}" == "true" && "$OUTPUT_FORMAT" == "text" ]]; then
+		local cis_name="${label%%: *}"
+		local cis_ref
+		cis_ref="$(_check_cis "$cis_name")"
+		if [[ -n "$cis_ref" ]]; then
+			printf '  %sCIS %s%s\n' "$GRAY" "$cis_ref" "$NC"
+		fi
+	fi
 }
 
 print_category() {
@@ -432,6 +477,25 @@ print_summary() {
 	fi
 
 	_box_border
+
+	# --cis: append a CIS Apple macOS Benchmark coverage score. Counts only
+	# checks that have a CIS mapping (_check_cis non-empty); a passing check
+	# means the control is met. AUDIT_RESULTS entries are status\tcategory\t"Name: value".
+	if [[ "${CIS_MODE:-false}" == "true" ]]; then
+		local cis_pass=0 cis_total=0 entry c_status c_name c_rest
+		for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+			c_status="${entry%%$'\t'*}"
+			c_rest="${entry##*$'\t'}"   # field 3: "Name: value"
+			c_name="${c_rest%%: *}"     # check name, before ": "
+			[[ -z "$(_check_cis "$c_name")" ]] && continue
+			cis_total=$((cis_total + 1))
+			[[ "$c_status" == "pass" ]] && cis_pass=$((cis_pass + 1))
+		done
+		if [[ $cis_total -gt 0 ]]; then
+			_summary_row "$PURPLE_BOLD" "CIS" "$cis_pass/$cis_total controls met"
+			_box_border
+		fi
+	fi
 }
 
 # Minimal JSON string escaping: backslash and double-quote. Check labels are
@@ -462,9 +526,10 @@ _results_json() {
 			val=""
 		fi
 		if [[ $first -eq 1 ]]; then first=0; else printf ','; fi
-		printf '\n    {"status": "%s", "category": "%s", "name": "%s", "value": "%s"}' \
+		printf '\n    {"status": "%s", "category": "%s", "name": "%s", "value": "%s", "cis": "%s", "command": "%s"}' \
 			"$(_json_escape "$st")" "$(_json_escape "$cat_")" \
-			"$(_json_escape "$nm")" "$(_json_escape "$val")"
+			"$(_json_escape "$nm")" "$(_json_escape "$val")" \
+			"$(_json_escape "$(_check_cis "$nm")")" "$(_json_escape "$(_check_command "$nm")")"
 	done
 	printf '\n  '
 }
@@ -872,34 +937,82 @@ send_notification() {
 }
 
 print_output_html() {
-	local pass_pct=0
 	local total=$((PASS_count + WARN_count + FAIL_count))
+	local pass_pct=0
 	[[ $total -gt 0 ]] && pass_pct=$((PASS_count * 100 / total))
-	
+
+	local host scan_type gen_date branding="" rows=""
+	host="$(scutil --get ComputerName 2>/dev/null || hostname 2>/dev/null || echo '?')"
+	scan_type="$([ "$DEEP_SCAN" == "true" ] && echo deep || echo basic)"
+	gen_date="$(date '+%Y-%m-%d %H:%M:%S %Z' 2>/dev/null || date)"
+
+	[[ -n "$REPORT_CLIENT" ]] && branding+="$(printf '\t\t<tr><td><strong>Client</strong></td><td>%s</td></tr>' "$(_html_escape "$REPORT_CLIENT")")"$'\n'
+	[[ -n "$REPORT_SHOP" ]] && branding+="$(printf '\t\t<tr><td><strong>Shop</strong></td><td>%s</td></tr>' "$(_html_escape "$REPORT_SHOP")")"$'\n'
+	[[ -n "$REPORT_TECH" ]] && branding+="$(printf '\t\t<tr><td><strong>Technician</strong></td><td>%s</td></tr>' "$(_html_escape "$REPORT_TECH")")"$'\n'
+
+	local entry st cat_ tail_ rest nm val cis cmd cmd_html
+	for entry in ${AUDIT_RESULTS[@]+"${AUDIT_RESULTS[@]}"}; do
+		st="${entry%%$'\t'*}"
+		tail_="${entry#*$'\t'}"
+		cat_="${tail_%%$'\t'*}"
+		rest="${tail_#*$'\t'}"
+		if [[ "$rest" == *": "* ]]; then nm="${rest%%: *}"; val="${rest#*: }"; else nm="$rest"; val=""; fi
+		cis="$(_check_cis "$nm")"
+		cmd="$(_check_command "$nm")"
+		cmd_html=""
+		[[ -n "$cmd" ]] && cmd_html="<code>$(_html_escape "$cmd")</code>"
+		rows+="$(printf '\t\t<tr><td><span class="badge %s">%s</span></td><td>%s</td><td>%s</td><td>%s</td><td class="cis">%s</td><td>%s</td></tr>' \
+			"$st" "$st" "$(_html_escape "$cat_")" "$(_html_escape "$nm")" "$(_html_escape "$val")" "$(_html_escape "$cis")" "$cmd_html")"$'\n'
+	done
+
 	cat << EOFHTML
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<title>Security Audit Report</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Raccoon Security Audit — ${host}</title>
 	<style>
-		body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
-		h1 { color: #1d1d1f; border-bottom: 2px solid #0066cc; padding-bottom: 10px; }
-		.summary { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-		.pass { color: #28a745; }
-		.warn { color: #ffc107; }
-		.fail { color: #dc3545; }
+		body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 960px; margin: 40px auto; padding: 0 20px; color: #1d1d1f; }
+		h1 { border-bottom: 2px solid #0066cc; padding-bottom: 10px; }
+		table.meta { color: #555; font-size: 14px; margin: 0 0 20px; border-collapse: collapse; }
+		table.meta td { padding: 2px 16px 2px 0; }
+		.summary { background: #f8f9fa; padding: 16px 20px; border-radius: 8px; margin: 20px 0; }
+		.summary span { margin-right: 24px; font-size: 15px; }
+		table.checks { border-collapse: collapse; width: 100%; font-size: 14px; }
+		table.checks th, table.checks td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+		table.checks th { background: #f0f2f5; }
+		.badge { font-weight: 600; padding: 2px 8px; border-radius: 10px; font-size: 12px; white-space: nowrap; text-transform: uppercase; }
+		.badge.pass { background: #e6f7ec; color: #1a7f37; }
+		.badge.warn { background: #fff4d6; color: #8a6d00; }
+		.badge.fail { background: #fde8ea; color: #b3121f; }
+		.pass { color: #1a7f37; } .warn { color: #8a6d00; } .fail { color: #b3121f; }
+		code { background: #f4f4f6; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+		td.cis { color: #555; font-size: 12px; }
+		footer { color: #888; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 12px; }
 	</style>
 </head>
 <body>
-	<h1>Security Audit Report</h1>
-	<p>Generated: $(date)</p>
+	<h1>Raccoon Security Audit</h1>
+	<table class="meta">
+		<tr><td><strong>Host</strong></td><td>${host}</td></tr>
+		<tr><td><strong>macOS</strong></td><td>${REPORT_OS:-?}</td></tr>
+		<tr><td><strong>Model</strong></td><td>${REPORT_MODEL:-?}</td></tr>
+		<tr><td><strong>Scan</strong></td><td>${scan_type}</td></tr>
+		<tr><td><strong>Generated</strong></td><td>${gen_date}</td></tr>
+		<tr><td><strong>Raccoon</strong></td><td>v${REPORT_VERSION:-?}</td></tr>
+${branding}	</table>
 	<div class="summary">
-		<h2>Summary</h2>
-		<p class="pass">Pass: $PASS_count ($pass_pct%)</p>
-		<p class="warn">Warning: $WARN_count</p>
-		<p class="fail">Fail: $FAIL_count</p>
+		<span class="pass"><strong>${PASS_count}</strong> passed (${pass_pct}%)</span>
+		<span class="warn"><strong>${WARN_count}</strong> warnings</span>
+		<span class="fail"><strong>${FAIL_count}</strong> failed</span>
 	</div>
+	<table class="checks">
+		<thead><tr><th>Status</th><th>Category</th><th>Check</th><th>Result</th><th>CIS Benchmark</th><th>Verify with</th></tr></thead>
+		<tbody>
+${rows}		</tbody>
+	</table>
+	<footer>Generated by Raccoon — github.com/thousandflowers/raccoon. Verify any finding by running the command shown.</footer>
 </body>
 </html>
 EOFHTML
@@ -1058,12 +1171,7 @@ print_remediation() {
 # the counters). Used by diff/baseline-diff/remediation/sheet/profile-save.
 _run_checks_quiet() {
 	{
-		run_core_checks
-		run_network_checks
-		run_auth_checks
-		run_persistence_checks
-		run_privacy_checks
-		run_additional_checks
+		_run_check_groups
 	} > /dev/null 2>&1
 }
 
@@ -1078,9 +1186,146 @@ _set_report_context() {
 	fi
 }
 
+# Check groups, in run order. --only selects a subset; default runs all.
+RCC_CHECK_GROUPS="core network auth persistence privacy additional"
+
+# _resolve_groups: fill the SELECTED_GROUPS array from $ONLY_GROUPS (comma
+# list) or, when empty, every group in order. An unknown group name is a usage
+# error (exit 2) — fail fast rather than silently auditing nothing.
+_resolve_groups() {
+	SELECTED_GROUPS=()
+	if [[ -z "$ONLY_GROUPS" ]]; then
+		# shellcheck disable=SC2206
+		SELECTED_GROUPS=($RCC_CHECK_GROUPS)
+		return 0
+	fi
+	local g oldifs="$IFS"
+	IFS=','
+	for g in $ONLY_GROUPS; do
+		IFS="$oldifs"
+		g="${g// /}"
+		[[ -z "$g" ]] && continue
+		case " $RCC_CHECK_GROUPS " in
+			*" $g "*) SELECTED_GROUPS+=("$g") ;;
+			*)
+				echo "rcc audit: unknown check group '$g'" >&2
+				echo "Valid groups: $RCC_CHECK_GROUPS" >&2
+				exit 2
+				;;
+		esac
+		IFS=','
+	done
+	IFS="$oldifs"
+	if [[ ${#SELECTED_GROUPS[@]} -eq 0 ]]; then
+		# shellcheck disable=SC2206
+		SELECTED_GROUPS=($RCC_CHECK_GROUPS)
+	fi
+}
+
+# _run_check_groups: run the resolved check groups in order.
+_run_check_groups() {
+	local g
+	for g in ${SELECTED_GROUPS[@]+"${SELECTED_GROUPS[@]}"}; do
+		case "$g" in
+			core) run_core_checks ;;
+			network) run_network_checks ;;
+			auth) run_auth_checks ;;
+			persistence) run_persistence_checks ;;
+			privacy) run_privacy_checks ;;
+			additional) run_additional_checks ;;
+		esac
+	done
+}
+
+# _list_checks: print the check groups and the checks each one runs, so a user
+# knows what to pass to --only.
+_list_checks() {
+	echo "Check groups (use with --only, e.g. --only core,network):"
+	echo ""
+	printf '  %-12s %s\n' "core" "FileVault, SIP, Gatekeeper, Firewall, Stealth Mode, Software Updates"
+	printf '  %-12s %s\n' "network" "Open Ports, DNS Servers, VPN, Bluetooth, Sharing, SSH Daemon"
+	printf '  %-12s %s\n' "auth" "Auto-Login, Keychain, SSH Keys, Authorized Keys, Sudoers"
+	printf '  %-12s %s\n' "persistence" "User/System LaunchAgents, LaunchDaemons, Cron Jobs, At Jobs, Login Items"
+	printf '  %-12s %s\n' "privacy" "Location Services, Analytics (deep scan only)"
+	printf '  %-12s %s\n' "additional" "XProtect, Screen Lock, .ssh Permissions, Quarantined Files, Kernel Extensions, Sudo Access, DNS-over-HTTPS"
+}
+
+# _audit_exit_code: 0 all passed, 1 any failure, 2 warnings only. Echoed so the
+# caller can use it as the process exit status for CI/automation.
+_audit_exit_code() {
+	if [[ "${FAIL_count:-0}" -gt 0 ]]; then
+		echo 1
+	elif [[ "${WARN_count:-0}" -gt 0 ]]; then
+		echo 2
+	else
+		echo 0
+	fi
+}
+
+# _redact: best-effort masking of secrets in raw output shown by --verbose.
+# ponytail: covers the obvious key=value / long-hex shapes; widen the patterns
+# if a check ever surfaces a real secret.
+_redact() {
+	sed -E \
+		-e 's/(([Pp]assword|[Ss]ecret|[Tt]oken|[Aa]pi[_-]?[Kk]ey|[Bb]earer)[[:space:]]*[:=][[:space:]]*)[^[:space:]]+/\1***REDACTED***/g' \
+		-e 's/[A-Fa-f0-9]{40,}/***REDACTED***/g'
+}
+
+# print_evidence: "verify, don't trust" — for every check with a documented
+# command, show the exact command and re-run it live so the auditor sees the raw
+# output. Displayed command keeps `sudo` (what a human types); execution swaps
+# it for the tool's cached `_sudo` so it stays non-interactive.
+# ponytail: re-runs each probe a second time; fine for an opt-in --verbose pass.
+print_evidence() {
+	[[ ${#AUDIT_RESULTS[@]} -eq 0 ]] && return 0
+	echo ""
+	_box_border
+	_box_row "Evidence (verify, don't trust)" "${PURPLE_BOLD}Evidence (verify, don't trust)${NC}"
+	_box_border
+	local entry rest nm cmd run_cmd out
+	for entry in "${AUDIT_RESULTS[@]}"; do
+		rest="${entry##*$'\t'}"
+		nm="${rest%%: *}"
+		cmd="$(_check_command "$nm")"
+		[[ -z "$cmd" ]] && continue
+		echo ""
+		printf '%s%s%s\n' "$CYAN" "$nm" "$NC"
+		printf '  %s$ %s%s\n' "$GRAY" "$cmd" "$NC"
+		run_cmd="${cmd//sudo /_sudo }"
+		out="$(eval "$run_cmd" 2>&1 | _redact | head -20)"
+		if [[ -z "$out" ]]; then
+			printf '    %s(no output)%s\n' "$GRAY" "$NC"
+		else
+			printf '%s\n' "$out" | sed 's/^/    /'
+		fi
+	done
+}
+
+# _html_escape: escape the five HTML-significant characters for the report.
+_html_escape() {
+	local s="$1"
+	s="${s//&/&amp;}"
+	s="${s//</&lt;}"
+	s="${s//>/&gt;}"
+	s="${s//\"/&quot;}"
+	printf '%s' "$s"
+}
+
 main() {
 	load_fix_skips
 	load_profile
+
+	if [[ "$LIST_CHECKS" == "true" ]]; then
+		_list_checks
+		return 0
+	fi
+
+	# --report foo.html implies HTML output even without an explicit --html.
+	if [[ "$OUTPUT_FORMAT" == "text" && "$REPORT_FILE" == *.html ]]; then
+		OUTPUT_FORMAT="html"
+	fi
+
+	_resolve_groups
 
 	# --share has nothing to publish in --quiet (no report is built); skip it.
 	if [[ "$SHARE" == "true" && "$QUIET_MODE" == "true" ]]; then
@@ -1225,21 +1470,20 @@ main() {
 			csv) print_output_csv ;;
 			*) echo "pass:${PASS_count} warn:${WARN_count} fail:${FAIL_count}" ;;
 		esac
-		return 0
+		return "$(_audit_exit_code)"
 	fi
 
-	run_core_checks
-	run_network_checks
-	run_auth_checks
-	run_persistence_checks
-	run_privacy_checks
-	run_additional_checks
+	_run_check_groups
 
 	if [[ "$BASELINE_SAVE" == "true" ]]; then
 		save_baseline
 	fi
 
 	print_summary
+
+	if [[ "$VERBOSE_MODE" == "true" && "$OUTPUT_FORMAT" == "text" ]]; then
+		print_evidence
+	fi
 
 	if [[ ${#FIX_QUEUE[@]} -gt 0 && "$AUTO_FIX" != "true" && "$OUTPUT_FORMAT" == "text" && "$QUIET_MODE" != "true" ]]; then
 		echo ""
@@ -1275,7 +1519,7 @@ main() {
 		send_notification
 	fi
 
-	if [[ "$OUTPUT_FORMAT" == "md" || "$OUTPUT_FORMAT" == "rtf" || "$SHARE" == "true" ]]; then
+	if [[ "$OUTPUT_FORMAT" == "md" || "$OUTPUT_FORMAT" == "rtf" || "$OUTPUT_FORMAT" == "html" || "$SHARE" == "true" ]]; then
 		_set_report_context
 	fi
 
@@ -1305,13 +1549,15 @@ main() {
 			md) render_report_md ;;
 			rtf) render_report_rtf ;;
 		esac
-		return 0
+		return "$(_audit_exit_code)"
 	fi
 	
 	save_to_history
-	
+
 	echo ""
 	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+
+	return "$(_audit_exit_code)"
 }
 
 # Run main when executed directly or piped to `bash -s` (fleet mode over SSH,
