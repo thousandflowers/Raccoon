@@ -16,7 +16,7 @@
 ![ShellCheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)
 ![Tests](https://img.shields.io/badge/tests-bats-blue)
 [![Last commit](https://img.shields.io/github/last-commit/thousandflowers/Raccoon)](https://github.com/thousandflowers/Raccoon/commits/main)
-[![git clones](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/thousandflowers/Raccoon/main/.github/traffic/clones.json&cacheSeconds=1800)](https://github.com/thousandflowers/Raccoon/graphs/traffic)
+[![git clones](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/thousandflowers/Raccoon/main/.github/traffic/clones.json&cacheSeconds=100)](https://github.com/thousandflowers/Raccoon/graphs/traffic)
 [![Homebrew tap](https://img.shields.io/badge/brew%20tap-thousandflowers%2Fraccoon-FBB040?logo=homebrew&logoColor=white)](https://github.com/thousandflowers/homebrew-raccoon)
 [![Mentioned in Awesome macOS](https://awesome.re/mentioned-badge.svg)](https://github.com/iCHAIT/awesome-macOS)
 
