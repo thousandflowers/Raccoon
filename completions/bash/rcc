@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # rcc bash completion — source this file or add to bash_completion.d
 
-_rcc_audit_opts='--deep --fix --dry-run --force --quiet --report --json --csv --html --md --rtf --explain --remediation --baseline --baseline-diff --baseline-reset --history --diff --watch --schedule --profile --profile-save --profile-list --profile-delete --share --sheet --hours --notes --alert --notify --help -h'
+_rcc_audit_opts='--deep --fix --dry-run --force --quiet --report --json --csv --html --md --rtf --no-redact --explain --remediation --baseline --baseline-diff --baseline-reset --history --diff --watch --schedule --profile --profile-save --profile-list --profile-delete --share --sheet --hours --notes --alert --notify --help -h'
 
 _rcc() {
 	# shellcheck disable=SC2034
@@ -33,7 +33,7 @@ _rcc() {
 			;;
 		fleet)
 			# shellcheck disable=SC2207
-			COMPREPLY=($(compgen -W 'audit status scan group run add remove list --hosts --group --parallel --report --json --explain --user --subnet --timeout --add --help -h' -- "$cur"))
+			COMPREPLY=($(compgen -W 'audit status scan group run add remove list --hosts --group --parallel --report --json --explain --print-bundle --user --subnet --timeout --add --help -h' -- "$cur"))
 			;;
 		disk)
 			# shellcheck disable=SC2207

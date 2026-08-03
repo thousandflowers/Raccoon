@@ -199,6 +199,19 @@ ready ones to your host list. Hosts live in `~/.raccoon/fleet.conf` (one
 installed** — the audit script is streamed over SSH stdin to `bash`, so they need
 only bash, macOS, and an SSH server.
 
+**What gets sent, and how to verify it.** The streamed bundle is a single
+self-contained Bash script built from the exact same auditable source in this
+repo — `lib/core/common.sh`, `lib/audit/checks.sh`, and `lib/core/report.sh`
+concatenated — run on the remote with `--json --quiet`. Nothing is installed,
+nothing persists, and no third-party code is fetched. Remote results are
+redacted by default like any other report (pass `--no-redact` to opt out). To
+see exactly what would be sent — without contacting a single host — print it:
+
+```bash
+rcc fleet audit --print-bundle              # the exact script, to stdout
+rcc fleet audit --print-bundle | shasum -a 256   # pin a checksum to compare across runs
+```
+
 ### 🖥️ System information
 
 ```bash
@@ -354,7 +367,7 @@ Fair question for a tool that audits security and runs `sudo`. The honest answer
 - **No telemetry.** Raccoon makes no analytics or "phone-home" calls. Ever.
 - **Network calls are only the obvious ones:** `apps` fetches the Homebrew cask catalog and Sparkle appcasts to update apps; `audit --share` (opt-in only) uploads a report to GitHub; `fleet` connects over SSH to *your* hosts and uses Bonjour/ping on *your* LAN for `scan`; `upgrade` talks to the package managers you already use. Nothing leaves your machine unless you run one of those.
 - **`sudo` only when it's doing the work** — applying `audit --fix` changes or installing a cask — never just to look around.
-- **Reports can contain sensitive data** — open ports, hostnames, SSH keys, and (via `rcc wifi`) Keychain Wi-Fi passwords. Review any report before you share it.
+- **Reports redact secrets by default.** Every sharable format (`--json`, `--csv`, `--html`, `--report`, `--share`, and the fleet aggregate) scrubs passwords, keys, tokens, and IP/MAC addresses at a single choke point before anything is written — so a report is safe to hand over without hand-checking it first. The live on-screen summary still shows your own machine's real values. Pass `--no-redact` when you deliberately want them verbatim.
 - **Auditable.** ~6,500 lines of plain Bash across 21 command scripts, `shellcheck -S warning` clean, covered by 38 bats test files. Read any command in [`bin/`](bin/). Nothing else ships — the interactive TUI is built from source, not committed as a binary.
 
 ---
