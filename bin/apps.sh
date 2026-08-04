@@ -27,6 +27,13 @@ show_apps_help() {
 	echo "    --auto-launch    Open auto-updater apps instead of updating via brew"
 	echo "    --help, -h       This help"
 	echo ""
+	echo "  Sparkle feeds are fetched concurrently and the cask catalog is cached"
+	echo "  in ~/.raccoon for a day; both are read-only, so nothing is installed"
+	echo "  any faster or in a different order. RCC_FETCH_JOBS sets how many feeds"
+	echo "  are fetched at once (default 8) — lower it on a slow link."
+	echo ""
+	echo "  Command-line tools are not touched here — use 'rcc upgrade'."
+	echo ""
 }
 
 # RACCOON_TEST is set by the bats harness: never perform real updates under it
@@ -475,7 +482,16 @@ update_sparkle_apps() {
 
 	local updated=0 skipped=0
 	local app_dir app_path app_name feed xml remote_ver local_ver local_build dl_url decision
+	local slot manifest fetchlist
 
+	SPARKLE_FEED_DIR="$(mktemp -d /tmp/raccoon-feeds-XXXXXX)"
+	manifest="$SPARKLE_FEED_DIR/manifest.tsv"
+	fetchlist="$SPARKLE_FEED_DIR/fetchlist"
+	: >"$manifest"
+	: >"$fetchlist"
+	slot=0
+
+	# Pass 1 — collect candidates. Local reads only, no network.
 	# shellcheck disable=SC2046  # intentional word-split of the dir list
 	for app_dir in $(_app_dirs); do
 		[[ -d "$app_dir" ]] || continue
@@ -490,30 +506,50 @@ update_sparkle_apps() {
 			feed="$(defaults read "$app_path/Contents/Info" SUFeedURL 2>/dev/null || true)"
 			[[ -z "$feed" ]] && continue
 
-			xml="$(curl -fsSL --max-time 10 "$feed" 2>/dev/null || true)"
-			[[ -z "$xml" ]] && continue
-
 			local_ver="$(defaults read "$app_path/Contents/Info" CFBundleShortVersionString 2>/dev/null || true)"
 			local_build="$(defaults read "$app_path/Contents/Info" CFBundleVersion 2>/dev/null || true)"
 
-			decision="$(printf '%s' "$xml" | _sparkle_decide "$local_ver" "$local_build")"
-			if [[ -z "$decision" ]]; then
-				((skipped++)) || true
-				continue
-			fi
-			remote_ver="${decision%%$'\t'*}"
-			dl_url="${decision#*$'\t'}"
-
-			if [[ "$RCC_DRY_RUN" == "true" ]]; then
-				append_progress_output "sparkle: $app_name ${local_ver:-?} → $remote_ver"
-				continue
-			fi
-
-			_install_from_url "$app_name" "${local_ver:-?}" "$remote_ver" "$dl_url"
-			echo "$app_name" >>"${PROCESSED_APPS_FILE:-/dev/null}"
-			((updated++)) || true
+			slot=$((slot + 1))
+			printf '%s\t%s\t%s\t%s\n' "$slot" "$app_name" "$local_ver" "$local_build" >>"$manifest"
+			printf '%s\0%s\0' "$feed" "$SPARKLE_FEED_DIR/$slot.xml" >>"$fetchlist"
 		done
 	done
+
+	# Pass 2 — fetch every appcast at once. These are read-only GETs that change
+	# nothing on disk, and done serially they dominated the command (~16s for 13
+	# feeds). bash 3.2 has no `wait -n`, so xargs -P owns the concurrency cap.
+	# ponytail: fixed cap; RCC_FETCH_JOBS is the knob if a slow link needs fewer.
+	if [[ -s "$fetchlist" ]]; then
+		update_global_progress_info "sparkle: fetching $slot feeds..."
+		xargs -0 -P "${RCC_FETCH_JOBS:-8}" -n 2 \
+			sh -c 'curl -fsSL --connect-timeout 5 --max-time 10 "$1" -o "$2" 2>/dev/null || true' _ \
+			<"$fetchlist" || true
+	fi
+
+	# Pass 3 — compare and install. Strictly serial: this is the part that
+	# replaces apps on disk, and it behaves exactly as it did before.
+	while IFS=$'\t' read -r slot app_name local_ver local_build; do
+		[[ -n "$slot" ]] || continue
+		xml="$(cat "$SPARKLE_FEED_DIR/$slot.xml" 2>/dev/null || true)"
+		[[ -z "$xml" ]] && continue
+
+		decision="$(printf '%s' "$xml" | _sparkle_decide "$local_ver" "$local_build")"
+		if [[ -z "$decision" ]]; then
+			((skipped++)) || true
+			continue
+		fi
+		remote_ver="${decision%%$'\t'*}"
+		dl_url="${decision#*$'\t'}"
+
+		if [[ "$RCC_DRY_RUN" == "true" ]]; then
+			append_progress_output "sparkle: $app_name ${local_ver:-?} → $remote_ver"
+			continue
+		fi
+
+		_install_from_url "$app_name" "${local_ver:-?}" "$remote_ver" "$dl_url"
+		echo "$app_name" >>"${PROCESSED_APPS_FILE:-/dev/null}"
+		((updated++)) || true
+	done <"$manifest"
 
 	append_progress_output "sparkle: $updated updated, $skipped up to date"
 	increment_global_progress
@@ -525,9 +561,11 @@ update_sparkle_apps() {
 
 _rcc_apps_cleanup() {
 	stop_sudo_keepalive 2>/dev/null || true
-	[[ -n "${CASK_CATALOG_FILE:-}" ]] && rm -f "$CASK_CATALOG_FILE"
+	# CASK_CATALOG_FILE is the persistent ~/.raccoon cache now — deleting it here
+	# would defeat the TTL and refetch 16MB on every run.
 	[[ -n "${CASK_LOOKUP_FILE:-}" ]] && rm -f "$CASK_LOOKUP_FILE"
 	[[ -n "${PROCESSED_APPS_FILE:-}" ]] && rm -f "$PROCESSED_APPS_FILE"
+	[[ -n "${SPARKLE_FEED_DIR:-}" ]] && rm -rf "$SPARKLE_FEED_DIR"
 	return 0
 }
 
@@ -556,12 +594,27 @@ main() {
 	update_casks
 
 	# Layer 3 — Homebrew catalog.
-	# ponytail: re-downloads the ~5MB catalog each run; cache under ~/.raccoon
-	# with a daily TTL if the latency ever matters.
 	if [[ "$RCC_NO_CATALOG" != "true" ]] && command -v brew >/dev/null 2>&1; then
-		update_global_progress_info "catalog: downloading..."
-		CASK_CATALOG_FILE="$(mktemp /tmp/raccoon-cat-XXXXXX)"
-		if curl -fsSL --max-time 30 "https://formulae.brew.sh/api/cask.json" -o "$CASK_CATALOG_FILE" 2>/dev/null; then
+		# The catalog is ~16MB and changes at most daily, so refetching it every
+		# run is wasted bandwidth — worst exactly on the slow links where it
+		# already hurts. `find -mtime +1` is the portable "older than a day"
+		# test; bash 3.2 has no better one. Write via .tmp + mv so an
+		# interrupted download can never leave a truncated cache behind.
+		CASK_CATALOG_FILE="$HOME/.raccoon/cask-catalog.json"
+		mkdir -p "$HOME/.raccoon" 2>/dev/null || true
+
+		if [[ -s "$CASK_CATALOG_FILE" ]] && [[ -z "$(find "$CASK_CATALOG_FILE" -mtime +1 2>/dev/null)" ]]; then
+			update_global_progress_info "catalog: using cache"
+		else
+			update_global_progress_info "catalog: downloading..."
+			if curl -fsSL --connect-timeout 5 --max-time 30 "https://formulae.brew.sh/api/cask.json" -o "$CASK_CATALOG_FILE.tmp" 2>/dev/null; then
+				mv -f "$CASK_CATALOG_FILE.tmp" "$CASK_CATALOG_FILE"
+			else
+				rm -f "$CASK_CATALOG_FILE.tmp"
+			fi
+		fi
+
+		if [[ -s "$CASK_CATALOG_FILE" ]]; then
 			PROCESSED_APPS_FILE="$(mktemp /tmp/raccoon-proc-XXXXXX)"
 			CASK_LOOKUP_FILE=""
 			update_homebrew_catalog

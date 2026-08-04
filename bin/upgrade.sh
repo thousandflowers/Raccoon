@@ -9,10 +9,15 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_upgrade_help() {
-	print_help_header "upgrade" "Update package managers and tools" "[--dry-run]"
+	print_help_header "upgrade" "Update package managers and tools" "[--dry-run] [--parallel]"
 	echo "  --dry-run, -n    Show what would be upgraded without updating"
+	echo "  --parallel       Run all tools at once instead of one after another"
+	echo "  --serial         Force one at a time (default)"
 	echo ""
 	echo "  Tracked: brew pip npm pnpm bun uv go nvm rustup gem docker claude"
+	echo ""
+	echo "  GUI apps are not touched here — use 'rcc apps' for those."
+	echo "  RCC_PARALLEL=1 sets --parallel for every run."
 	echo ""
 }
 
@@ -20,6 +25,30 @@ show_upgrade_help() {
 # (the suite invokes this with bad/empty args to test parsing, not to upgrade).
 if [[ -n "${RACCOON_TEST:-}" ]]; then RCC_DRY_RUN=true; else RCC_DRY_RUN=false; fi
 RCC_DEFERRED_TAPS=()
+
+# Serial by default: the parallel path is newer, and these upgrades install
+# software rather than just read it. RCC_PARALLEL=1 opts in for every run.
+case "${RCC_PARALLEL:-}" in
+1 | true | yes) RCC_PARALLEL=true ;;
+*) RCC_PARALLEL=false ;;
+esac
+
+# Record a tool that failed, without aborting the other eleven.
+#
+# Every upgrade pipeline has to end in `|| something` — under `set -euo
+# pipefail` a single failing tool would otherwise kill the whole run. That
+# `something` used to be `true`, which threw the status away: npm could fail
+# outright and the command still printed "Completed" and exited 0.
+#
+# A file rather than an array, because in parallel mode each tool runs in a
+# subshell and an array assignment there dies with the subshell. Appends this
+# short are atomic, so concurrent writers cannot interleave.
+RCC_FAILURE_LOG=""
+
+_note_failure() {
+	[[ -n "$RCC_FAILURE_LOG" ]] && echo "$1" >>"$RCC_FAILURE_LOG"
+	return 0
+}
 
 for arg in "$@"; do
 	case "$arg" in
@@ -29,6 +58,12 @@ for arg in "$@"; do
 		;;
 	--dry-run | -n)
 		RCC_DRY_RUN=true
+		;;
+	--parallel)
+		RCC_PARALLEL=true
+		;;
+	--serial)
+		RCC_PARALLEL=false
 		;;
 	esac
 done
@@ -152,7 +187,8 @@ upgrade_homebrew() {
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "brew: dry run"
 		local output
-		output=$(brew outdated 2>&1 || true)
+		# --formula: casks belong to `rcc apps` (bare `brew outdated` lists casks too)
+		output=$(brew outdated --formula 2>&1 || true)
 		if [[ -n "$output" ]]; then
 			append_progress_output "brew: outdated packages found"
 			while IFS= read -r line; do
@@ -170,7 +206,7 @@ upgrade_homebrew() {
 	increment_global_progress
 
 	update_global_progress_info "brew: updating..."
-	brew update 2>&1 </dev/null | progress_pipe _parse_brew_update || true
+	brew update 2>&1 </dev/null | progress_pipe _parse_brew_update || _note_failure brew
 
 	increment_global_progress
 
@@ -182,7 +218,8 @@ upgrade_homebrew() {
 	if { true >/dev/tty; } 2>/dev/null; then
 		brew_stdin=/dev/tty
 	fi
-	GIT_TERMINAL_PROMPT=0 brew upgrade <"$brew_stdin" | progress_pipe _parse_brew_upgrade || true
+	# --formula: bare `brew upgrade` also upgrades casks, which is `rcc apps`' job
+	GIT_TERMINAL_PROMPT=0 brew upgrade --formula <"$brew_stdin" | progress_pipe _parse_brew_upgrade || _note_failure brew
 
 	increment_global_progress
 }
@@ -239,7 +276,7 @@ upgrade_pip() {
 	while IFS= read -r pkg; do
 		[[ -z "$pkg" ]] && continue
 		update_global_progress_info "pip: upgrade $pkg"
-		$pip_cmd install --upgrade "$pkg" 2>&1 | progress_pipe _parse_pip || true
+		$pip_cmd install --upgrade "$pkg" 2>&1 | progress_pipe _parse_pip || _note_failure pip
 	done <<< "$pkgs"
 
 	increment_global_progress
@@ -277,7 +314,7 @@ upgrade_npm() {
 	fi
 
 	update_global_progress_info "npm: updating..."
-	$npm_sudo npm update -g 2>&1 | progress_pipe _parse_npm || true
+	$npm_sudo npm update -g 2>&1 | progress_pipe _parse_npm || _note_failure npm
 
 	increment_global_progress
 	increment_global_progress
@@ -317,7 +354,7 @@ upgrade_nvm() {
 	increment_global_progress
 
 	update_global_progress_info "nvm: updating..."
-	nvm install --lts 2>&1 | progress_pipe _parse_nvm || true
+	nvm install --lts 2>&1 | progress_pipe _parse_nvm || _note_failure nvm
 
 	increment_global_progress
 	increment_global_progress
@@ -357,7 +394,7 @@ upgrade_rustup() {
 	increment_global_progress
 
 	update_global_progress_info "rustup: updating..."
-	rustup update 2>&1 | progress_pipe _parse_rustup || true
+	rustup update 2>&1 | progress_pipe _parse_rustup || _note_failure rustup
 
 	increment_global_progress
 }
@@ -406,7 +443,7 @@ upgrade_gem() {
 	fi
 
 	update_global_progress_info "gem: updating..."
-	gem update 2>&1 | progress_pipe _parse_gem || true
+	gem update 2>&1 | progress_pipe _parse_gem || _note_failure gem
 
 	# 3 slots total with the increment at line 366 above (matches every other gem path).
 	increment_global_progress
@@ -428,7 +465,7 @@ upgrade_pnpm() {
 		return 0
 	fi
 	update_global_progress_info "pnpm: updating..."
-	pnpm up -g 2>&1 | progress_pipe || true
+	pnpm up -g 2>&1 | progress_pipe || _note_failure pnpm
 	increment_global_progress
 	increment_global_progress
 }
@@ -448,7 +485,7 @@ upgrade_bun() {
 		return 0
 	fi
 	update_global_progress_info "bun: updating..."
-	bun upgrade 2>&1 | progress_pipe || true
+	bun upgrade 2>&1 | progress_pipe || _note_failure bun
 	increment_global_progress
 	increment_global_progress
 }
@@ -468,10 +505,10 @@ upgrade_uv() {
 		return 0
 	fi
 	update_global_progress_info "uv: updating..."
-	uv self update 2>&1 | progress_pipe || true
+	uv self update 2>&1 | progress_pipe || _note_failure uv
 	increment_global_progress
 	# ponytail: tool upgrade is best-effort, ignore failures
-	uv tool upgrade --all 2>&1 | progress_pipe || true
+	uv tool upgrade --all 2>&1 | progress_pipe || _note_failure uv
 	increment_global_progress
 }
 
@@ -492,10 +529,10 @@ upgrade_go() {
 	# ponytail: only update gopls and goimports — well-known Go tools
 	# 2 slots total (one per tool), matching the not-installed and dry-run paths.
 	update_global_progress_info "go: updating gopls..."
-	go install golang.org/x/tools/gopls@latest 2>&1 | progress_pipe || true
+	go install golang.org/x/tools/gopls@latest 2>&1 | progress_pipe || _note_failure go
 	increment_global_progress
 	update_global_progress_info "go: updating goimports..."
-	go install golang.org/x/tools/cmd/goimports@latest 2>&1 | progress_pipe || true
+	go install golang.org/x/tools/cmd/goimports@latest 2>&1 | progress_pipe || _note_failure go
 	increment_global_progress
 }
 
@@ -516,7 +553,7 @@ upgrade_docker() {
 	fi
 	# ponytail: prune images older than 24h — safe for daily runs
 	update_global_progress_info "docker: pruning images >24h..."
-	docker image prune -af --filter until=24h 2>&1 | progress_pipe || true
+	docker image prune -af --filter until=24h 2>&1 | progress_pipe || _note_failure docker
 	increment_global_progress
 	increment_global_progress
 }
@@ -536,7 +573,7 @@ upgrade_claude() {
 		return 0
 	fi
 	update_global_progress_info "claude: updating..."
-	claude update 2>&1 | progress_pipe || true
+	claude update 2>&1 | progress_pipe || _note_failure claude
 	increment_global_progress
 	increment_global_progress
 }
@@ -603,6 +640,44 @@ _show_deferred_taps() {
 	done
 }
 
+# Run the given upgrade functions concurrently.
+#
+# bash gives a subshell a private copy of the parent's variables, so a child's
+# increment_global_progress updates a counter the parent never sees, and twelve
+# children writing progress frames at once would interleave into garbage. So
+# each child logs to its own file, and the parent owns the counter and replays
+# the logs in declared order once everyone is done. The visible output matches
+# the serial run; it just arrives at the end rather than as it happens.
+#
+# sudo is primed by main() before we fork, so children inherit the cached
+# credential and never sit on an invisible password prompt.
+_run_upgrades_parallel() {
+	local job dir line
+
+	dir="$(mktemp -d /tmp/raccoon-upg-XXXXXX)"
+
+	update_global_progress_info "running $# upgrades in parallel..."
+	for job in "$@"; do
+		("$job" >"$dir/$job.log" 2>&1) &
+	done
+	wait
+
+	for job in "$@"; do
+		if [[ -f "$dir/$job.log" ]]; then
+			# Drop the children's progress frames: those counters are private
+			# copies and mean nothing here. Process substitution, not a pipe,
+			# so append_progress_output still runs in this shell and its buffer
+			# survives for the TTY redraw.
+			while IFS= read -r line; do
+				[[ -n "$line" ]] && append_progress_output "$line"
+			done < <(grep -v '^__RCC_PROGRESS__:' "$dir/$job.log" || true)
+		fi
+		increment_global_progress
+	done
+
+	rm -rf "$dir"
+}
+
 main() {
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		echo "${YELLOW}DRY RUN MODE - no changes made${NC}"
@@ -626,26 +701,56 @@ main() {
 		fi
 	fi
 
-	# ponytail: one progress slot per upgrade function
-	init_global_progress 30
+	RCC_FAILURE_LOG="$(mktemp /tmp/raccoon-fail-XXXXXX)"
 
-	upgrade_homebrew
-	upgrade_pip
-	upgrade_npm
-	upgrade_pnpm
-	upgrade_bun
-	upgrade_uv
-	upgrade_go
-	upgrade_nvm
-	upgrade_rustup
-	upgrade_gem
-	upgrade_docker
-	upgrade_claude
+	local job
+	local jobs=(
+		upgrade_homebrew
+		upgrade_pip
+		upgrade_npm
+		upgrade_pnpm
+		upgrade_bun
+		upgrade_uv
+		upgrade_go
+		upgrade_nvm
+		upgrade_rustup
+		upgrade_gem
+		upgrade_docker
+		upgrade_claude
+	)
+
+	if [[ "$RCC_PARALLEL" == "true" ]]; then
+		# One slot per tool: in parallel the parent owns the counter, so the
+		# finer-grained per-tool increments are not available to it.
+		init_global_progress "${#jobs[@]}"
+		_run_upgrades_parallel "${jobs[@]}"
+	else
+		# ponytail: one progress slot per upgrade function
+		init_global_progress 30
+		for job in "${jobs[@]}"; do
+			"$job"
+		done
+	fi
 
 	finish_global_progress
 	echo ""
 
 	_show_deferred_taps
+
+	# Report what actually failed. Without this the command exited 0 no matter
+	# how many tools broke, so a cron run or a piped caller could never tell an
+	# upgrade from a no-op.
+	local failed=""
+	if [[ -s "$RCC_FAILURE_LOG" ]]; then
+		failed="$(sort -u "$RCC_FAILURE_LOG" | tr '\n' ' ')"
+	fi
+	rm -f "$RCC_FAILURE_LOG"
+
+	if [[ -n "$failed" ]]; then
+		print_error "Failed: ${failed% }"
+		echo "  Re-run with the tool directly to see why."
+		return 1
+	fi
 
 	print_success "Completed"
 }

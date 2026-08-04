@@ -3,6 +3,22 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [Unreleased]
+
+### Changed
+
+- `upgrade`: no longer updates Homebrew **casks**. A bare `brew upgrade` covers formulae *and* casks, so `rcc upgrade` was silently replacing GUI apps despite advertising "package managers and tools" — duplicating `rcc apps`, which already covers every cask via `--greedy`. Both `brew upgrade` and `brew outdated` are now scoped with `--formula`. If you relied on `rcc upgrade` for GUI apps, use `rcc apps`.
+
+### Added
+
+- `upgrade --parallel`: run all twelve tools at once instead of one after another (5.0s → 2.0s on a dry run here). Serial stays the default — this path installs software, so concurrency is opt-in. `--serial` forces the old behaviour and overrides `RCC_PARALLEL=1`. Per-tool output is replayed in the usual order once every tool has finished, rather than as it happens: bash gives each subshell a private copy of the progress counter, so the parent has to own it.
+
+### Fixed
+
+- `upgrade`: reported success no matter what broke. Sixteen pipelines ended in `|| true` and no path ever returned non-zero, so a tool could fail outright and the command still printed "Completed" and exited 0 — a cron job or a piped caller had no way to tell an upgrade from a no-op. Failures are now collected per tool, listed on a `Failed: …` line, and the command exits 1. `npm outdated` keeps its `|| true`: it exits 1 whenever it finds something to update, so treating that as failure would cry wolf every run. Turning this on immediately surfaced three tools failing silently here, one of them Raccoon's own bug (see below).
+- `apps`: Sparkle appcasts were fetched one at a time, which dominated the command (16s for 13 feeds here). They are now fetched concurrently — read-only GETs, so nothing installs any faster or in a different order — and a dead feed no longer costs the full 10s, since `--connect-timeout 5` bounds the connect phase separately. Measured 16s → 5.3s. `RCC_FETCH_JOBS` (default 8) caps the concurrency.
+- `apps`: the ~16MB Homebrew cask catalog was re-downloaded on every run. It is now cached in `~/.raccoon/cask-catalog.json` for a day, written atomically so an interrupted download cannot leave a truncated cache behind. Measured 5.3s → 3.5s per run, plus 16MB of traffic saved each time. `--no-catalog` still skips the layer entirely.
+
 ## [0.13.4] - 2026-06-28
 
 ### Fixed

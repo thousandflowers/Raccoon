@@ -240,7 +240,8 @@ rcc certs                 # SSL certificate expiry report
 ### 🛠️ Developer tools
 
 ```bash
-rcc upgrade               # update brew, pip, npm, gem… at once (--dry-run to preview)
+rcc upgrade               # update brew formulae, pip, npm, gem… (--dry-run to preview)
+rcc upgrade --parallel    # …all at once instead of one after another
 rcc apps                  # update GUI apps in 4 layers (see below)
 rcc ssh                   # inspect keys, --export, --export-gpg
 rcc git                   # status, branches, stash, cleanup
@@ -309,7 +310,7 @@ to trigger their own updater. Skip a layer with `--no-catalog` / `--no-sparkle`.
 | `fonts` | Duplicate & corrupted fonts |
 | `history` | Shell history analysis |
 | `certs` | SSL certificate expiry report |
-| `upgrade` | Update brew/pip/npm/gem…; `--dry-run` |
+| `upgrade` | Update brew formulae/pip/npm/gem… (not GUI apps); `--dry-run`, `--parallel` |
 | `apps` | Update GUI apps in 4 layers |
 | `ssh` | Inspect/export keys |
 | `git` | Status, branches, stash, cleanup |

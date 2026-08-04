@@ -21,7 +21,7 @@ _rcc() {
 			;;
 		upgrade)
 			# shellcheck disable=SC2207
-			COMPREPLY=($(compgen -W '--dry-run -n --help -h' -- "$cur"))
+			COMPREPLY=($(compgen -W '--dry-run -n --parallel --serial --help -h' -- "$cur"))
 			;;
 		apps)
 			# shellcheck disable=SC2207

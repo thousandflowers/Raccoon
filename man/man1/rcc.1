@@ -12,11 +12,20 @@ a single CLI with an optional Bubble Tea TUI.
 .SS Core Tools
 .TP
 .B upgrade
-Update Homebrew, pip, npm, gem, rustup, nvm.
+Update Homebrew formulae, pip, npm, gem, rustup, nvm. GUI apps are left to
+\fBrcc apps\fR.
 .RS
 .TP
 \fB\-\-dry-run\fR, \fB\-n\fR
 Show what would be upgraded.
+.TP
+\fB\-\-parallel\fR
+Run every tool at once instead of one after another. Per-tool output is
+replayed once all of them finish, rather than as it happens. Set
+\fBRCC_PARALLEL=1\fR to make this the default for every run.
+.TP
+\fB\-\-serial\fR
+Run one tool at a time. This is the default, and overrides \fBRCC_PARALLEL\fR.
 .RE
 .TP
 .B apps
