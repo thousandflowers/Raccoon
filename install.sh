@@ -28,9 +28,22 @@ echo "Installing Raccoon (rcc)..."
 BIN_DIR=$(detect_bin_dir)
 mkdir -p "${BIN_DIR}"
 
+clone_repo() {
+	# Shallow + partial + sparse: skip history, and never fetch or check out
+	# docs/ (heavy GIFs) or tests/. Keeps ~/.raccoon small and fast to install.
+	# Falls back to a plain shallow clone if git is too old for partial clone.
+	if git clone --depth 1 --filter=blob:none --no-checkout "$REPO_URL" "${INSTALL_DIR}" 2>/dev/null; then
+		cd "${INSTALL_DIR}"
+		git sparse-checkout set --no-cone '/*' '!/docs/' '!/tests/' 2>/dev/null || true
+		git checkout
+	else
+		git clone --depth 1 "$REPO_URL" "${INSTALL_DIR}"
+	fi
+}
+
 if [[ ! -d "${INSTALL_DIR}" ]]; then
 	echo "Cloning repository..."
-	git clone --depth 1 "$REPO_URL" "${INSTALL_DIR}"
+	clone_repo
 else
 	echo "Updating existing installation..."
 	cd "${INSTALL_DIR}" && git fetch --depth 1 origin main && git reset --hard origin/main
@@ -51,6 +64,21 @@ fi
 
 chmod +x "${INSTALL_DIR}/rcc"
 chmod +x "${BIN_DIR}/rcc"
+
+# Optional interactive TUI (bin/rcc-ui). It is no longer committed to the repo,
+# so build it from source when Go is available; otherwise skip cleanly — the CLI
+# and the Bash text menu work without it.
+if command -v go >/dev/null 2>&1; then
+	echo "Building interactive TUI (Go found)..."
+	if ( cd "${INSTALL_DIR}/ui" && go build -o "${INSTALL_DIR}/bin/rcc-ui" . ); then
+		echo "✓ TUI built"
+	else
+		echo "⚠ TUI build failed — the text menu still works ('rcc' opens it)"
+	fi
+else
+	echo "Go not found — skipping the optional TUI. The CLI and text menu work anyway;"
+	echo "  for the richer TUI, install Go and re-run, or: brew install thousandflowers/raccoon/rcc"
+fi
 
 echo ""
 echo "✓ Raccoon installed successfully (v${VERSION})"

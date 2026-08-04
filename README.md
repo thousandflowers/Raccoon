@@ -20,7 +20,7 @@
 [![Homebrew tap](https://img.shields.io/badge/brew%20tap-thousandflowers%2Fraccoon-FBB040?logo=homebrew&logoColor=white)](https://github.com/thousandflowers/homebrew-raccoon)
 [![Mentioned in Awesome macOS](https://awesome.re/mentioned-badge.svg)](https://github.com/iCHAIT/awesome-macOS)
 
-Zero dependencies beyond macOS + git. ~1500 lines of shellcheck-clean Bash, covered by a comprehensive bats suite. Runs on the system Bash (3.2 → 5.x) — no Homebrew required.
+The CLI has zero runtime dependencies beyond macOS + git — Go is needed only to build the optional TUI. ~6,500 lines of shellcheck-clean Bash across 21 command scripts, covered by 38 bats test files. Runs on the system Bash (3.2 → 5.x) — no Homebrew required.
 
 ---
 
@@ -328,13 +328,13 @@ Fair question for a tool that audits security and runs `sudo`. The honest answer
 - **Network calls are only the obvious ones:** `apps` fetches the Homebrew cask catalog and Sparkle appcasts to update apps; `audit --share` (opt-in only) uploads a report to GitHub; `fleet` connects over SSH to *your* hosts and uses Bonjour/ping on *your* LAN for `scan`; `upgrade` talks to the package managers you already use. Nothing leaves your machine unless you run one of those.
 - **`sudo` only when it's doing the work** — applying `audit --fix` changes or installing a cask — never just to look around.
 - **Reports can contain sensitive data** — open ports, hostnames, SSH keys, and (via `rcc wifi`) Keychain Wi-Fi passwords. Review any report before you share it.
-- **Auditable.** ~1500 lines of plain Bash, `shellcheck -S warning` clean, covered by a comprehensive bats suite. Read any command in [`bin/`](bin/).
+- **Auditable.** ~6,500 lines of plain Bash across 21 command scripts, `shellcheck -S warning` clean, covered by 38 bats test files. Read any command in [`bin/`](bin/). Nothing else ships — the interactive TUI is built from source, not committed as a binary.
 
 ---
 
 ## Go TUI
 
-Raccoon ships an optional terminal UI built with [Bubble Tea](https://github.com/charmbracelet/bubbletea):
+Raccoon has an optional terminal UI built with [Bubble Tea](https://github.com/charmbracelet/bubbletea). It is **built from source, not committed as a binary**: `brew install` compiles it for you, and the `curl | bash` installer builds it automatically when Go is present. Without it, bare `rcc` falls back to a built-in Bash text menu (printing a one-line hint on how to get the TUI) — every command still works.
 
 ```
 ┌────────────────────────────────────────────────┐
@@ -353,9 +353,10 @@ Raccoon ships an optional terminal UI built with [Bubble Tea](https://github.com
 └────────────────────────────────────────────────┘
 ```
 
-Compile with `cd ui && ./build.sh`. The binary lands in `bin/rcc-ui` and is
-auto-detected by `rcc`. Argument-heavy fleet subcommands (`run`, `group add`,
-`audit --group`) stay on the CLI, where you can pass them.
+Build it yourself with `cd ui && ./build.sh` (needs Go). The binary lands in
+`bin/rcc-ui` (git-ignored) and is auto-detected by `rcc`. Argument-heavy fleet
+subcommands (`run`, `group add`, `audit --group`) stay on the CLI, where you can
+pass them.
 
 ---
 
