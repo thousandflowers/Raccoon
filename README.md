@@ -11,14 +11,6 @@
 [![CI](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/Raccoon/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/thousandflowers/Raccoon?sort=semver&color=blue)](https://github.com/thousandflowers/Raccoon/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![macOS](https://img.shields.io/badge/platform-macOS-000000?logo=apple&logoColor=white)
-![Bash](https://img.shields.io/badge/shell-bash%203.2%2B-4EAA25?logo=gnubash&logoColor=white)
-![ShellCheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)
-![Tests](https://img.shields.io/badge/tests-bats-blue)
-[![Last commit](https://img.shields.io/github/last-commit/thousandflowers/Raccoon)](https://github.com/thousandflowers/Raccoon/commits/main)
-[![git clones](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/thousandflowers/Raccoon/main/.github/traffic/clones.json&cacheSeconds=1800)](https://github.com/thousandflowers/Raccoon/graphs/traffic)
-[![Homebrew tap](https://img.shields.io/badge/brew%20tap-thousandflowers%2Fraccoon-FBB040?logo=homebrew&logoColor=white)](https://github.com/thousandflowers/homebrew-raccoon)
-[![Mentioned in Awesome macOS](https://awesome.re/mentioned-badge.svg)](https://github.com/iCHAIT/awesome-macOS)
 
 The CLI has zero runtime dependencies beyond macOS + git — Go is needed only to build the optional TUI. ~6,500 lines of shellcheck-clean Bash across 21 command scripts, covered by 38 bats test files. Runs on the system Bash (3.2 → 5.x) — no Homebrew required.
 
@@ -39,6 +31,8 @@ So I merged it with the script I already ran on my sisters' Macs — disk space,
 - [Fleet management](#️-fleet-management)
 - [All commands](#all-commands)
 - [Why Raccoon is different](#why-raccoon-is-different)
+- [How it compares](#how-it-compares)
+- [What Raccoon is not](#what-raccoon-is-not)
 - [Is it safe to pipe to `bash`?](#is-it-safe-to-pipe-to-bash)
 - [Go TUI](#go-tui)
 - [Shell completion](#shell-completion) · [Man page](#man-page) · [Project structure](#project-structure) · [Contributing](#contributing)
@@ -47,23 +41,26 @@ So I merged it with the script I already ran on my sisters' Macs — disk space,
 
 ## Install
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
-```
-
-Or via Homebrew:
+Via Homebrew (recommended):
 
 ```bash
 brew install thousandflowers/raccoon/rcc
 ```
 
 Or grab the single self-contained file — no git, no clone (CLI only; the
-interactive TUI still needs one of the installs above):
+interactive TUI needs Homebrew or the source install below):
 
 ```bash
 curl -fsSL https://github.com/thousandflowers/Raccoon/releases/latest/download/rcc -o rcc
 chmod +x rcc
 ./rcc audit
+```
+
+Or install from source with the one-file installer — it clones to `~/.raccoon`
+and symlinks `rcc`, nothing else ([is piping to `bash` safe?](#is-it-safe-to-pipe-to-bash)):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thousandflowers/Raccoon/main/install.sh | bash
 ```
 
 Run `rcc` to launch the interactive [menu](#go-tui), or `rcc <command>` for direct access.
@@ -284,7 +281,7 @@ to trigger their own updater. Skip a layer with `--no-catalog` / `--no-sparkle`.
 
 | Command | What it does |
 |---------|--------------|
-| `audit` | 30+ security checks; `--fix`, `--deep`, `--json`/`--csv`, `--report`, `--baseline`, `--profile`, `schedule` |
+| `audit` | 30+ security checks; `--fix`, `--deep`, `--explain`, `--json`/`--csv`, `--report`, `--remediation`, `--sheet`, `--baseline` / `--baseline-diff` / `--baseline-reset`, `--cis`, `--only`, `--profile`, `schedule` |
 | `fleet` | `scan`, `add`/`remove`/`list`, `group`, `run`, `audit`, `status` across many Macs over SSH |
 | `disk` | Internal/external/network drives, SMART; `disk large` for biggest files |
 | `network` | Interfaces, Wi-Fi, DNS, routing |
@@ -316,6 +313,36 @@ to trigger their own updater. Skip a layer with `--no-catalog` / `--no-sparkle`.
 - **No install on the remote Macs.** Fleet mode streams the audit over SSH stdin; remote machines need only bash, macOS, and an open SSH server.
 - **Auditable, not opinionated.** It never sets a public DNS resolver or strips Gatekeeper quarantine flags — both would silently weaken a working setup.
 - **One data model.** Text, JSON, CSV, Markdown, RTF, and the fleet aggregate all render from the same `AUDIT_RESULTS` array, so a new check shows up everywhere automatically.
+
+---
+
+## How it compares
+
+| Tool | Platform | Interface | Focus | Auto-fix | Multi-machine |
+|---|---|---|---|---|---|
+| **Raccoon** | macOS | CLI + text / Go TUI | Security audit + system info + SSH fleet + client reports | Yes, backed up | SSH, agentless |
+| [Pareto Security](https://paretosecurity.com/) | macOS, Windows, Linux | GUI menubar | Security checklist | One-click | Team cloud dashboard |
+| [Lynis](https://cisofy.com/lynis/) | Linux, macOS, Unix | CLI | Deep audit + compliance (HIPAA/ISO 27001/PCI) | No (advises) | Enterprise server |
+| [fort](https://github.com/djadmin/fort) | macOS | CLI (single binary) | Security audit + hardening (CIS/NIST/SOC 2) | Yes | No |
+| [Mole](https://github.com/tw93/Mole) | macOS | CLI / TUI | Cleanup & maintenance — *not* security | n/a | No |
+
+Reach for something else when it fits you better:
+
+- **Want a GUI menubar app you set once and forget?** Use **Pareto Security**.
+- **Auditing Linux/servers, or need formal compliance (HIPAA, ISO 27001, PCI DSS)?** Use **Lynis**.
+- **Just want disk cleanup and app uninstalls on your Mac?** Use **Mole** — Raccoon actually started as a PR to it.
+- **Want the smallest possible single-binary macOS checker?** Use **fort**.
+
+Raccoon fits when you want to audit — and hand a client a readable report on — a room of Macs from the terminal over SSH, with fixes you can undo.
+
+---
+
+## What Raccoon is not
+
+- **Not an MDM, and not a Jamf replacement.** It audits and reports; it does not enrol devices, enforce policy, or push configuration.
+- **Not a certified compliance tool.** `--cis` maps checks to the CIS macOS Benchmark for orientation — it is not an audited or certified assessment, and a clean run is not a compliance attestation.
+- **Not exhaustive, and not version-proof.** Checks are heuristic and macOS-version-sensitive. A pass means "these checks passed on this macOS version," not "this Mac is secure."
+- **macOS only.** No Linux, no Windows.
 
 ---
 
