@@ -78,12 +78,22 @@ _redact_value() {
 			return
 			;;
 	esac
-	# Otherwise scrub secret-shaped substrings: inline label:secret, IPv4, MAC.
-	# One sed pass, BSD/GNU compatible (no case-insensitive flag).
+	# Otherwise scrub secret-shaped substrings: inline label:secret, IPv4, MAC,
+	# IPv6. One sed pass, BSD/GNU compatible (no case-insensitive flag).
+	#
+	# Order matters: MAC before IPv6. Both are colon-separated hex, so the IPv6
+	# rule would otherwise swallow MACs and mislabel them as addresses.
+	#
+	# The IPv6 rule deliberately does NOT match every colon-separated hex run: it
+	# requires either a `::` or the full eight groups, so a clock reading like
+	# `10:30:45` and an uptime like `3:15` survive untouched. On a Tailscale box
+	# most of the interesting addresses are IPv6, so leaving them in defeated the
+	# point of redacting at all.
 	printf '%s' "$v" | sed -E \
 		-e 's/((PASSWORD|[Pp]assword|[Pp]assphrase|PSK|psk|[Ss]ecret|[Tt]oken|[Aa]pi[_-]?[Kk]ey)[[:space:]]*[:=][[:space:]]*)[^[:space:],;]+/\1[redacted]/g' \
 		-e 's/([0-9]{1,3}\.){3}[0-9]{1,3}/[redacted-ip]/g' \
-		-e 's/([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/[redacted-mac]/g'
+		-e 's/([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/[redacted-mac]/g' \
+		-e 's/([0-9a-fA-F]{1,4}(:[0-9a-fA-F]{1,4})*::([0-9a-fA-F]{1,4}(:[0-9a-fA-F]{1,4})*)?|::[0-9a-fA-F]{1,4}(:[0-9a-fA-F]{1,4})*|([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4})(%[A-Za-z0-9]+)?/[redacted-ip6]/g'
 }
 
 # Redact the AUDIT_RESULTS array in place — THE single choke point for secrets.
