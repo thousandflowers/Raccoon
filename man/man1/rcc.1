@@ -71,6 +71,12 @@ a coverage score. Per-machine checks only; org-level frameworks (SOC 2, ISO
 "Verify, don't trust": after the summary, show the exact command behind each
 check and re-run it live so you see the raw output yourself.
 .TP
+\fB\-\-no\-redact\fR
+By default every report format (\fB\-\-json\fR, \fB\-\-csv\fR, \fB\-\-html\fR,
+\fB\-\-report\fR, \fB\-\-share\fR, and the fleet aggregate) scrubs secrets —
+passwords, keys, IP and MAC addresses — from its values. Pass \fB\-\-no\-redact\fR
+to include them verbatim.
+.TP
 \fB\-\-only\fR \fIGROUPS\fR
 Run only the comma-separated check groups (\fIcore,network,auth,persistence,privacy,additional\fR).
 .TP
@@ -217,9 +223,14 @@ rcc audit \-\-md
 .SH FLEET
 Run audits across many Macs over SSH and aggregate the results.
 .TP
-.B rcc fleet audit \fR[\fB\-\-hosts\fR \fIFILE\fR] [\fB\-\-group\fR \fINAME\fR] [\fB\-\-parallel\fR \fIN\fR] [\fB\-\-report\fR \fIFILE\fR] [\fB\-\-json\fR] [\fB\-\-explain\fR]
+.B rcc fleet audit \fR[\fB\-\-hosts\fR \fIFILE\fR] [\fB\-\-group\fR \fINAME\fR] [\fB\-\-parallel\fR \fIN\fR] [\fB\-\-report\fR \fIFILE\fR] [\fB\-\-json\fR] [\fB\-\-explain\fR] [\fB\-\-print\-bundle\fR]
 Audit every configured host, or only a group with \fB\-\-group\fR (default 5
-parallel connections).
+parallel connections). Each host is audited by streaming a self-contained Bash
+bundle \(em the same \fBlib/\fR source shipped in this repo \(em over SSH stdin
+and running it with \fB\-\-json \-\-quiet\fR; nothing is installed on the remote.
+\fB\-\-print\-bundle\fR prints that exact bundle to stdout and exits without
+contacting any host, so you can read it or checksum it
+(\fBrcc fleet audit \-\-print\-bundle | shasum \-a 256\fR).
 .TP
 .B rcc fleet status
 Quick SSH reachability check for every host.

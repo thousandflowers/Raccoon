@@ -69,6 +69,7 @@ show_fleet_help() {
 	echo "Options (audit):"
 	echo "  --hosts FILE     Use an alternate hosts file (default: ~/.raccoon/fleet.conf)"
 	echo "  --parallel N     Max simultaneous connections (default: 5)"
+	echo "  --print-bundle   Print the exact script streamed to hosts, then exit (nothing is sent)"
 	echo "  --report FILE    Save an aggregate report (.md or .rtf)"
 	echo "  --json           Output structured JSON"
 	echo "  --explain        Plain-language notes for hosts with issues"
@@ -298,7 +299,7 @@ _save_fleet_history() {
 }
 
 cmd_audit() {
-	local single="" group=""
+	local single="" group="" print_bundle=""
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 			--hosts) if [[ $# -ge 2 ]]; then HOSTS_FILE="$2"; shift 2; else shift; fi ;;
@@ -308,10 +309,19 @@ cmd_audit() {
 			--host) if [[ $# -ge 2 ]]; then single="$2"; shift 2; else shift; fi ;;
 			--json) OUTPUT_FORMAT="json"; shift ;;
 			--explain) EXPLAIN=true; shift ;;
+			--print-bundle) print_bundle=true; shift ;;
 			--profile) shift; [[ $# -gt 0 && "$1" != -* ]] && shift ;;
 			*) shift ;;
 		esac
 	done
+
+	# --print-bundle: emit the exact script that gets streamed to every host over
+	# SSH stdin, then stop. Nothing is sent anywhere. Inspect it, or checksum it
+	# (`rcc fleet audit --print-bundle | shasum -a 256`) and compare across runs.
+	if [[ -n "$print_bundle" ]]; then
+		_remote_bundle
+		return 0
+	fi
 
 	if ! [[ "$PARALLEL" =~ ^[0-9]+$ ]] || [[ "$PARALLEL" -eq 0 ]]; then
 		PARALLEL=5

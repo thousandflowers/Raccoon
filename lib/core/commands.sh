@@ -114,6 +114,7 @@ show_health_history() {
     local dir="$HOME/.raccoon/audit-history"
     [[ -d "$dir" ]] || return 0
     local files count
+    # shellcheck disable=SC2012  # our own timestamped files (audit_<ts>.json) — never contain spaces/newlines, so ls|sort is safe and simplest
     files="$(ls "$dir"/audit_*.json 2>/dev/null | sort | tail -7 || true)"
     [[ -z "$files" ]] && return 0
     count="$(printf '%s\n' "$files" | grep -c . || true)"

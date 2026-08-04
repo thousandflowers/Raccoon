@@ -60,6 +60,57 @@ _report_counts() {
 	printf '%d %d %d %d' "$total" "$good" "$warn" "$fail"
 }
 
+# Scrub secrets from a single "Name: Value" pair. On by default; `rcc audit
+# --no-redact` sets RCC_REDACT=0 to emit raw values. Called once per entry by
+# _redact_audit_results (below), which is the single point every sharable format
+# funnels through — see that function's comment.
+_redact_value() {
+	local v="$1" name="${2:-}"
+	[[ "${RCC_REDACT:-1}" == 1 ]] || { printf '%s' "$v"; return; }
+	# When the field NAME marks the value as a secret ("Wi-Fi Password", "PSK",
+	# "Private Key", "API Key", "Token", "Credentials"), the whole value is
+	# sensitive — the label lives in the name, not the value. Redact it wholesale.
+	# Deliberately NOT matching a bare "Key" so "SSH Keys: 3 key(s)" survives.
+	case "$name" in
+		*[Pp]assword*|*[Pp]assphrase*|*PSK*|*[Ss]ecret*|*[Tt]oken* \
+		|*[Pp]rivate\ [Kk]ey*|*API\ [Kk]ey*|*[Aa]pi[_-][Kk]ey*|*[Cc]redential*)
+			printf '[redacted]'
+			return
+			;;
+	esac
+	# Otherwise scrub secret-shaped substrings: inline label:secret, IPv4, MAC.
+	# One sed pass, BSD/GNU compatible (no case-insensitive flag).
+	printf '%s' "$v" | sed -E \
+		-e 's/((PASSWORD|[Pp]assword|[Pp]assphrase|PSK|psk|[Ss]ecret|[Tt]oken|[Aa]pi[_-]?[Kk]ey)[[:space:]]*[:=][[:space:]]*)[^[:space:],;]+/\1[redacted]/g' \
+		-e 's/([0-9]{1,3}\.){3}[0-9]{1,3}/[redacted-ip]/g' \
+		-e 's/([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/[redacted-mac]/g'
+}
+
+# Redact the AUDIT_RESULTS array in place — THE single choke point for secrets.
+# Every sharable output (--json, --csv, --html, --report md/rtf, --share, and the
+# fleet aggregate, which re-runs a redacted `audit --json` on each host) renders
+# from this one array, so scrubbing it once here covers them all — no per-format
+# redaction. Call it after the live text summary (which shows your own machine's
+# real values on your own screen) and before any format is emitted. No-op when
+# RCC_REDACT=0 (--no-redact). Only the value is touched; status/category/name
+# stay intact so CIS mapping and grouping still work.
+_redact_audit_results() {
+	[[ "${RCC_REDACT:-1}" == 1 ]] || return 0
+	local i entry status category rest name value
+	for i in "${!AUDIT_RESULTS[@]}"; do
+		entry="${AUDIT_RESULTS[i]}"
+		status="${entry%%$'\t'*}"
+		rest="${entry#*$'\t'}"
+		category="${rest%%$'\t'*}"
+		rest="${rest#*$'\t'}"
+		if [[ "$rest" == *": "* ]]; then
+			name="${rest%%: *}"
+			value="$(_redact_value "${rest#*: }" "$name")"
+			AUDIT_RESULTS[i]="${status}"$'\t'"${category}"$'\t'"${name}: ${value}"
+		fi
+	done
+}
+
 # Split a TAB-record into the globals _PE_STATUS / _PE_CAT / _PE_NAME / _PE_VALUE
 # (bash 3.2 has no namerefs). Value is everything after the first ": " in the
 # "Name: Value" remainder; a remainder without ": " yields the whole string as

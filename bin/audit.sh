@@ -89,6 +89,7 @@ show_audit_help() {
 	echo "  --explain     Add plain-language notes under failing/warning checks"
 	echo "  --cis         Map checks to CIS Apple macOS Benchmark + coverage score"
 	echo "  --verbose, -v Show the exact command and raw output behind each check"
+	echo "  --no-redact   Include secrets verbatim in reports (default: redact)"
 	echo "  --only GROUPS  Run only these check groups (comma-separated)"
 	echo "  --list-checks List the available check groups and their checks"
 	echo "  --remediation Client-facing intervention report (found/fixed/to-do)"
@@ -139,6 +140,8 @@ show_audit_help() {
 	echo "  Destructive fixes snapshot originals to ~/.raccoon/fix-backups/ first."
 	echo "  Opt a machine out of specific fixes: list check names in"
 	echo "  ~/.raccoon/audit.conf (one per line, # for comments)."
+	echo "  Reports redact secrets (passwords, keys, IPs, MACs) by default;"
+	echo "  pass --no-redact to include them verbatim."
 	echo ""
 	echo "Exit codes (for CI/automation):"
 	echo "  0  all checks passed"
@@ -265,6 +268,11 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--explain)
 		EXPLAIN_MODE=true
+		shift
+		;;
+	--no-redact)
+		# Emit raw values in reports/evidence (default is to scrub secrets).
+		RCC_REDACT=0
 		shift
 		;;
 	--cis)
@@ -1263,9 +1271,11 @@ _audit_exit_code() {
 }
 
 # _redact: best-effort masking of secrets in raw output shown by --verbose.
+# On by default; `--no-redact` (RCC_REDACT=0) passes the stream through raw.
 # ponytail: covers the obvious key=value / long-hex shapes; widen the patterns
 # if a check ever surfaces a real secret.
 _redact() {
+	if [[ "${RCC_REDACT:-1}" != 1 ]]; then cat; return; fi
 	sed -E \
 		-e 's/(([Pp]assword|[Ss]ecret|[Tt]oken|[Aa]pi[_-]?[Kk]ey|[Bb]earer)[[:space:]]*[:=][[:space:]]*)[^[:space:]]+/\1***REDACTED***/g' \
 		-e 's/[A-Fa-f0-9]{40,}/***REDACTED***/g'
@@ -1465,6 +1475,7 @@ main() {
 
 	if [[ "$QUIET_MODE" == "true" ]]; then
 		_run_checks_quiet
+		_redact_audit_results   # scrub secrets before any machine format is emitted
 		case "$OUTPUT_FORMAT" in
 			json) print_output_json ;;
 			csv) print_output_csv ;;
@@ -1480,6 +1491,11 @@ main() {
 	fi
 
 	print_summary
+
+	# From here on the array feeds sharable formats (report files, stdout json/
+	# csv/md/rtf, --share, fleet). print_summary above already showed the real
+	# values in your own terminal; scrub the array before anything leaves it.
+	_redact_audit_results
 
 	if [[ "$VERBOSE_MODE" == "true" && "$OUTPUT_FORMAT" == "text" ]]; then
 		print_evidence

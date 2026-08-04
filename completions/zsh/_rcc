@@ -18,6 +18,7 @@ _rcc_audit_opts() {
     '--md:client-ready Markdown report'
     '--rtf:client-ready RTF report'
     '--explain:plain-language notes on issues'
+    '--no-redact:include secrets verbatim in reports (default: redact)'
     '--remediation:client-facing intervention report'
     '--baseline:save current state as reference baseline'
     '--baseline-diff:compare current state against baseline'
