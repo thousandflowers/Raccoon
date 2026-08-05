@@ -3,7 +3,19 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
-## [Unreleased]
+## [0.14.0] - 2026-08-05
+
+### Added
+
+- `audit`: CIS Benchmark mapping (`--cis`), an HTML report (`--html`), per-check evidence with `--verbose`, `--only` to run a subset of groups, and semantic exit codes so CI can gate on the result.
+- `audit`: reports redact secrets **by default** — password/key/token-named values, IPv4 and IPv6 addresses, and MAC addresses. `--no-redact` restores raw output.
+- `fleet`: integrity checking, with `--print-bundle` to inspect what is sent.
+- `SECURITY.md` and `CONTRIBUTING.md`.
+
+### Fixed
+
+- IPv6 addresses were not redacted in reports (#49). Times (`10:30:45`), zone identifiers (`%en0`) and bracketed hosts (`[::1]:443`) are no longer mangled by the redactor.
+- The TUI binary (8.8 MB) was tracked in git; it is untracked now and the repo is correspondingly smaller.
 
 ### Changed
 
