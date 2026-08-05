@@ -98,7 +98,8 @@ main() {
 
 	# ponytail: only physical disks from diskutil list (internal + external)
 	local disk_lines disk_line disk_id disk_type disk_info disk_size smart smart_colored
-	disk_lines=$(diskutil list 2>/dev/null | grep '(physical)' || true)
+	# diskutil prints "(internal, physical):" / "(external, physical):" — never a bare "(physical)"
+	disk_lines=$(diskutil list 2>/dev/null | grep 'physical)' || true)
 	if [[ -n "$disk_lines" ]]; then
 		while IFS= read -r disk_line; do
 			[[ -z "$disk_line" ]] && continue
