@@ -54,6 +54,14 @@ jobs:
         id: version
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
+          # The tag is the only version the formula and the release notes ever
+          # see. If VERSION disagrees, the tap ends up pointing at a version the
+          # source never claims, and the tag is already public by then. Fail here
+          # instead, while the only cost is a deleted tag.
+          if [[ "${TAG#v}" != "$(cat VERSION)" ]]; then
+            echo "ERROR: tag $TAG disagrees with VERSION $(cat VERSION)"
+            exit 1
+          fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=${TAG#v}" >> $GITHUB_OUTPUT
 
