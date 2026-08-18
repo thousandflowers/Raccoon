@@ -1,19 +1,17 @@
 Output ../gifs/rcc-menu.gif
 Set Theme "Ayu Mirage"
-Set FontSize 16
-Set Width 800
-Set Height 600
-Set Padding 32
-Set Framerate 12
-Set PlaybackSpeed 1.5
+Set FontSize 28
+Set Width 1400
+Set Height 1195
+Set Padding 48
+Set Framerate 20
+Set PlaybackSpeed 1.0
 Hide
 Type "cd $HOME/Raccoon" Enter
 Type "alias rcc=$HOME/Raccoon/rcc" Enter
+Type "mkdir -p $HOME/.raccoon && touch $HOME/.raccoon/onboarded" Enter
+Type "clear" Enter
 Show
 
 Type "rcc" Sleep 500ms Enter
-Sleep 2s
-Type "1" Enter
-Sleep 2s
-Type "q" Enter
-Sleep 1s
+Sleep 3s
