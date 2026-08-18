@@ -46,13 +46,21 @@ jobs:
   bats-portable:
     needs: shellcheck
     strategy:
+      # The point of this job is comparing the two platforms, so one failing
+      # must not cancel the other and hide half the answer.
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - name: Install bats
-        run: npm install -g bats
+        # Cloned rather than installed: a global npm install needs sudo on the
+        # Linux runner and brew is macOS-only, so this is the one form that is
+        # identical on both — and pins both platforms to the same bats.
+        run: |
+          git clone --depth 1 --branch v1.11.0 https://github.com/bats-core/bats-core.git "$RUNNER_TEMP/bats"
+          echo "$RUNNER_TEMP/bats/bin" >> "$GITHUB_PATH"
       - name: Run portable tests
         run: bats tests/test_overlap.bats
 
