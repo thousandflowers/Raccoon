@@ -3,6 +3,17 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [0.15.0] - 2026-08-18
+
+### Added
+
+- `overlap`: maps every PATH entry to the package manager behind it — brew, npm, cargo, go, pipx, macports, nix — resolving symlinks first. Resolution is the whole point: Homebrew's `bin` entries are relative links into `Cellar`, so an unresolved PATH makes every brew binary look unowned. Two extra categories keep the result readable: `system` for Apple's binaries under SIP (1208 of 2448 entries on the Mac this was written on — no manager installed them, none can remove them), and `shim` for mise/asdf/pyenv/rbenv/nvm/volta, whose per-project shadowing is their job rather than a problem. What survives in `orphan` is the part worth reading: the `curl | sh` scripts and stray `pip install`s that nothing manages any more. One row per PATH entry, not per executable, so broken and circular symlinks are listed and a name shipped by two managers stays two rows. Read-only, and no binary is ever executed — versions belong to manager metadata, so none are reported. `--json` for the machine-readable form.
+- CI now runs the `overlap` tests on `ubuntu-latest` as well as macOS. They build their own fake filesystem and never touch the host, so they are the one suite that is meaningful on Linux — enough to catch GNU-vs-BSD drift in `readlink` and `awk` that a macOS-only CI would hide.
+
+### Fixed
+
+- `audit`: a value wider than the report box ran straight through the right border and left the report ragged. `_box_row` padded a short value but did nothing to a long one; two real values were enough here — an IPv6 link-local DNS server and a six-digit quarantined-file count. Long values are now cut and marked with `>`, carrying any trailing colour reset across the truncation.
+
 ## [0.14.0] - 2026-08-05
 
 ### Added
