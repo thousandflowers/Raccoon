@@ -238,6 +238,38 @@ rcc history               # shell history analysis
 rcc certs                 # SSL certificate expiry report
 ```
 
+#### `rcc overlap` — who put that binary there
+
+Years of `brew`, `npm -g`, `cargo install` and `curl | sh` leave a PATH nobody
+can account for. `overlap` resolves every symlink and names the manager behind
+each entry:
+
+```
+| NAME               | PATH                               | RESOLVED                                     | MANAGER   |
+| ------------------ | ---------------------------------- | -------------------------------------------- | --------- |
+| rg                 | /opt/homebrew/bin/rg               | /opt/homebrew/Cellar/ripgrep/15.2.0/bin/rg   | brew      |
+| tsc                | /opt/homebrew/bin/tsc              | ...node_modules/typescript/bin/tsc           | npm       |
+| gopls              | ~/go/bin/gopls                     | ~/go/bin/gopls                               | go        |
+| python             | ~/.local/share/mise/shims/python   | ~/.local/share/mise/shims/python             | shim      |
+| ls                 | /bin/ls                            | /bin/ls                                      | system    |
+| icloudpd           | /opt/homebrew/bin/icloudpd         | /opt/homebrew/bin/icloudpd                   | orphan    |
+```
+
+Resolving the symlink is the whole point: `/opt/homebrew/bin/rg` is a relative
+link into `Cellar`, and without following it every brew binary looks unowned.
+
+Two categories exist to keep the result readable. **`system`** is Apple's own
+binaries under SIP — 1208 of 2448 entries on the Mac this was written on, none
+of them installed by a manager and none removable. **`shim`** is
+mise/asdf/pyenv/rbenv/nvm/volta: shadowing per project is their job, not a
+problem. What survives in **`orphan`** is the part worth reading — the
+`curl | sh` scripts and stray `pip install`s that nothing manages any more.
+
+One row per PATH entry, not per executable: broken and circular symlinks are
+listed too, and a name shipped by two managers stays two rows. Read-only, and
+no binary is ever run — versions belong to manager metadata, so none are
+reported. `--json` for the machine-readable form.
+
 ### 🛠️ Developer tools
 
 ```bash
