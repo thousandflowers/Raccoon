@@ -71,6 +71,15 @@ setup() {
 	assert_output_contains "OK"
 }
 
+@test "audit.sh: _box_row truncates a value wider than the border" {
+	source "$SCRIPT_DIR/bin/audit.sh"
+	border="$(_box_border)"
+	# a real overflow: an IPv6 link-local DNS server pushes the row past the box
+	long="DNS Servers: fe80::3ccd:40ff:fe37:9664%en0"
+	row="$(_box_row "$long" "$long")"
+	[[ "${#border}" -eq "${#row}" ]]
+}
+
 @test "audit.sh: _box_row pads to the border width" {
 	source "$SCRIPT_DIR/bin/audit.sh"
 	border="$(_box_border)"

@@ -58,6 +58,26 @@ _box_row() {
 	# lines and break the border. Collapse newlines so a row is always one line.
 	plain="${plain//$'\n'/ }"
 	rendered="${rendered//$'\n'/ }"
+
+	# A value wider than the box used to run straight through the right border
+	# and leave the report ragged — an IPv6 DNS server or a six-digit count is
+	# enough. Cut it instead, marking the cut with '>', and keep any trailing
+	# colour reset so the truncation does not bleed colour into the next row.
+	local max=$((BOX_INNER - 1))
+	if ((${#plain} > max)); then
+		local body="$rendered" reset=""
+		# Only carry the reset back if the row had one; adding it otherwise
+		# would inject escape bytes into a row that was pure text.
+		if [[ "$rendered" == *"$NC" ]]; then
+			body="${rendered%"$NC"}"
+			reset="$NC"
+		fi
+		local keep=$((${#body} - (${#plain} - max) - 1))
+		((keep < 0)) && keep=0
+		rendered="${body:0:keep}>${reset}"
+		plain="${plain:0:$((max - 1))}>"
+	fi
+
 	local pad=$((BOX_INNER - 1 - ${#plain}))
 	((pad < 0)) && pad=0
 	printf '| %s%*s|\n' "$rendered" "$pad" ''
