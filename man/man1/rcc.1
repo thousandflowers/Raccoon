@@ -189,6 +189,15 @@ Simulators, derived data, SPM packages.
 .B env
 Shell environment and PATH summary.
 .TP
+.B overlap
+Map the PATH to the package manager behind each entry (brew, npm, cargo, go,
+pipx, macports, nix), resolving symlinks first. Apple's own binaries report as
+\fBsystem\fR; shims (mise, asdf, pyenv, rbenv, nvm, volta) are a category of
+their own, not an overlap. One row per PATH entry, so broken and circular
+symlinks are listed too and a name shipped by two managers stays two rows.
+Read-only; binaries are never executed, so no versions are reported.
+\fB--json\fR for machine-readable output.
+.TP
 .B startup
 Launch agents and login items. \fBstartup clean\fR (or \fBstartup --clean\fR)
 interactively removes orphaned user launch agents — those whose executable no

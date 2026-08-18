@@ -841,6 +841,7 @@ func items() []item {
 		{title: "docker", script: "docker.sh", description: "Images, containers, volumes"},
 		{title: "xcode", script: "xcode.sh", description: "Simulators, derived data, SPM"},
 		{title: "env", script: "env.sh", description: "PATH, symlinks, tool versions"},
+		{title: "overlap", script: "overlap.sh", description: "Which manager is behind each PATH entry"},
 		{title: "startup", script: "startup.sh", description: "Launch agents, login items"},
 		{title: "trash", script: "trash.sh", description: "Trash size + contents"},
 		{title: "fonts", script: "fonts.sh", description: "Dupes, corrupted, catalog"},

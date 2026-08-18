@@ -229,6 +229,7 @@ rcc backup                # Time Machine status
 
 ```bash
 rcc env                   # shell environment & PATH breakdown
+rcc overlap               # which manager is behind each PATH entry (--json)
 rcc startup               # launch agents & login items
 rcc startup clean         # remove orphaned launch agents (interactive)
 rcc trash                 # trash size & empty
@@ -305,6 +306,7 @@ to trigger their own updater. Skip a layer with `--no-catalog` / `--no-sparkle`.
 | `battery` | Health %, cycles, temperature |
 | `backup` | Time Machine status |
 | `env` | Shell environment & PATH breakdown |
+| `overlap` | Maps each PATH entry to the manager behind it (brew, npm, cargo, go, pipx, macports, nix, system, shim); `--json` |
 | `startup` | Launch agents & login items; `startup clean` |
 | `trash` | Trash size & empty |
 | `fonts` | Duplicate & corrupted fonts |
@@ -388,7 +390,7 @@ Raccoon has an optional terminal UI built with [Bubble Tea](https://github.com/c
 │ disk          memory       ssh         git       │
 │ ports         battery      backup      env       │
 │ startup       trash        fonts       history   │
-│ certs         docker       xcode                 │
+│ certs         docker       xcode       overlap   │
 │                                                  │
 │ ←→ Navigate · ↑↓ Rows · / Search · Enter Run     │
 └────────────────────────────────────────────────┘

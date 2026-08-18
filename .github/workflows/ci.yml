@@ -40,6 +40,22 @@ jobs:
       - name: Build Go UI
         run: cd ui && go build -o /dev/null ./...
 
+  # The overlap tests build their own fake filesystem, so they are the one
+  # suite that is meaningful on Linux too — it catches GNU-vs-BSD drift in the
+  # tools overlap.sh leans on (readlink, awk) before macOS-only CI hides it.
+  bats-portable:
+    needs: shellcheck
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install bats
+        run: npm install -g bats
+      - name: Run portable tests
+        run: bats tests/test_overlap.bats
+
   bats:
     needs: shellcheck
     runs-on: macos-latest

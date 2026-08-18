@@ -32,6 +32,7 @@ case "${1:-""}" in
 		"battery") exec "${SCRIPT_DIR}/bin/battery.sh" "${@:2}" ;;
 		"backup")  exec "${SCRIPT_DIR}/bin/backup.sh" "${@:2}" ;;
 		"env")     exec "${SCRIPT_DIR}/bin/env.sh" "${@:2}" ;;
+		"overlap") exec "${SCRIPT_DIR}/bin/overlap.sh" "${@:2}" ;;
 		"audit")
 			case "${2:-}" in
 				"fix")   exec "${SCRIPT_DIR}/bin/audit.sh" --fix "${@:3}" ;;

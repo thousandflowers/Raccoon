@@ -70,6 +70,7 @@ _rcc() {
         'battery:battery health and cycles'
         'backup:Time Machine status'
         'env:shell environment'
+        'overlap:which manager is behind each PATH entry'
         'startup:launch agents and login items'
         'trash:trash contents'
         'fonts:font duplicates'

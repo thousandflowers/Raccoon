@@ -46,6 +46,7 @@ MENU_ITEMS=(
     "battery:Battery health"
     "backup:Time Machine"
     "env:Environment"
+    "overlap:PATH package-manager map"
     "startup:Launch agents"
     "trash:Trash"
     "fonts:Fonts"
