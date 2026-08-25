@@ -2,9 +2,9 @@
 
 Raccoon is a focused, zero-dependency macOS toolkit. PRs welcome for:
 
-- **New audit checks** — follow the pattern of the existing checks in `lib/`
-- **New `rcc` commands** — see the `rcc` entrypoint and `lib/`
-- **Bug fixes** — open an issue first for anything non-trivial
+- **New audit checks** - follow the pattern of the existing checks in `lib/`
+- **New `rcc` commands** - see the `rcc` entrypoint and `lib/`
+- **Bug fixes** - open an issue first for anything non-trivial
 
 ## Guidelines
 
@@ -17,7 +17,7 @@ Dev tools: `brew install bats-core shellcheck`.
 
 ## The Go TUI
 
-The interactive menu lives in `ui/` (Go) and is optional — `rcc` works without it.
+The interactive menu lives in `ui/` (Go) and is optional - `rcc` works without it.
 Build it only if your change touches the TUI.
 
 ## Releases

@@ -41,7 +41,7 @@ jobs:
         run: cd ui && go build -o /dev/null ./...
 
   # The overlap tests build their own fake filesystem, so they are the one
-  # suite that is meaningful on Linux too — it catches GNU-vs-BSD drift in the
+  # suite that is meaningful on Linux too - it catches GNU-vs-BSD drift in the
   # tools overlap.sh leans on (readlink, awk) before macOS-only CI hides it.
   bats-portable:
     needs: shellcheck
@@ -57,7 +57,7 @@ jobs:
       - name: Install bats
         # Cloned rather than installed: a global npm install needs sudo on the
         # Linux runner and brew is macOS-only, so this is the one form that is
-        # identical on both — and pins both platforms to the same bats.
+        # identical on both - and pins both platforms to the same bats.
         run: |
           git clone --depth 1 --branch v1.11.0 https://github.com/bats-core/bats-core.git "$RUNNER_TEMP/bats"
           echo "$RUNNER_TEMP/bats/bin" >> "$GITHUB_PATH"

@@ -7,19 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 
 ### Added
 
-- `overlap`: maps every PATH entry to the package manager behind it — brew, npm, cargo, go, pipx, macports, nix — resolving symlinks first. Resolution is the whole point: Homebrew's `bin` entries are relative links into `Cellar`, so an unresolved PATH makes every brew binary look unowned. Two extra categories keep the result readable: `system` for Apple's binaries under SIP (1208 of 2448 entries on the Mac this was written on — no manager installed them, none can remove them), and `shim` for mise/asdf/pyenv/rbenv/nvm/volta, whose per-project shadowing is their job rather than a problem. What survives in `orphan` is the part worth reading: the `curl | sh` scripts and stray `pip install`s that nothing manages any more. One row per PATH entry, not per executable, so broken and circular symlinks are listed and a name shipped by two managers stays two rows. Read-only, and no binary is ever executed — versions belong to manager metadata, so none are reported. `--json` for the machine-readable form.
-- CI now runs the `overlap` tests on `ubuntu-latest` as well as macOS. They build their own fake filesystem and never touch the host, so they are the one suite that is meaningful on Linux — enough to catch GNU-vs-BSD drift in `readlink` and `awk` that a macOS-only CI would hide.
+- `overlap`: maps every PATH entry to the package manager behind it - brew, npm, cargo, go, pipx, macports, nix - resolving symlinks first. Resolution is the whole point: Homebrew's `bin` entries are relative links into `Cellar`, so an unresolved PATH makes every brew binary look unowned. Two extra categories keep the result readable: `system` for Apple's binaries under SIP (1208 of 2448 entries on the Mac this was written on - no manager installed them, none can remove them), and `shim` for mise/asdf/pyenv/rbenv/nvm/volta, whose per-project shadowing is their job rather than a problem. What survives in `orphan` is the part worth reading: the `curl | sh` scripts and stray `pip install`s that nothing manages any more. One row per PATH entry, not per executable, so broken and circular symlinks are listed and a name shipped by two managers stays two rows. Read-only, and no binary is ever executed - versions belong to manager metadata, so none are reported. `--json` for the machine-readable form.
+- CI now runs the `overlap` tests on `ubuntu-latest` as well as macOS. They build their own fake filesystem and never touch the host, so they are the one suite that is meaningful on Linux - enough to catch GNU-vs-BSD drift in `readlink` and `awk` that a macOS-only CI would hide.
 
 ### Fixed
 
-- `audit`: a value wider than the report box ran straight through the right border and left the report ragged. `_box_row` padded a short value but did nothing to a long one; two real values were enough here — an IPv6 link-local DNS server and a six-digit quarantined-file count. Long values are now cut and marked with `>`, carrying any trailing colour reset across the truncation.
+- `audit`: a value wider than the report box ran straight through the right border and left the report ragged. `_box_row` padded a short value but did nothing to a long one; two real values were enough here - an IPv6 link-local DNS server and a six-digit quarantined-file count. Long values are now cut and marked with `>`, carrying any trailing colour reset across the truncation.
 
 ## [0.14.0] - 2026-08-05
 
 ### Added
 
 - `audit`: CIS Benchmark mapping (`--cis`), an HTML report (`--html`), per-check evidence with `--verbose`, `--only` to run a subset of groups, and semantic exit codes so CI can gate on the result.
-- `audit`: reports redact secrets **by default** — password/key/token-named values, IPv4 and IPv6 addresses, and MAC addresses. `--no-redact` restores raw output.
+- `audit`: reports redact secrets **by default** - password/key/token-named values, IPv4 and IPv6 addresses, and MAC addresses. `--no-redact` restores raw output.
 - `fleet`: integrity checking, with `--print-bundle` to inspect what is sent.
 - `SECURITY.md` and `CONTRIBUTING.md`.
 
@@ -30,16 +30,16 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 
 ### Changed
 
-- `upgrade`: no longer updates Homebrew **casks**. A bare `brew upgrade` covers formulae *and* casks, so `rcc upgrade` was silently replacing GUI apps despite advertising "package managers and tools" — duplicating `rcc apps`, which already covers every cask via `--greedy`. Both `brew upgrade` and `brew outdated` are now scoped with `--formula`. If you relied on `rcc upgrade` for GUI apps, use `rcc apps`.
+- `upgrade`: no longer updates Homebrew **casks**. A bare `brew upgrade` covers formulae *and* casks, so `rcc upgrade` was silently replacing GUI apps despite advertising "package managers and tools" - duplicating `rcc apps`, which already covers every cask via `--greedy`. Both `brew upgrade` and `brew outdated` are now scoped with `--formula`. If you relied on `rcc upgrade` for GUI apps, use `rcc apps`.
 
 ### Added
 
-- `upgrade --parallel`: run all twelve tools at once instead of one after another (5.0s → 2.0s on a dry run here). Serial stays the default — this path installs software, so concurrency is opt-in. `--serial` forces the old behaviour and overrides `RCC_PARALLEL=1`. Per-tool output is replayed in the usual order once every tool has finished, rather than as it happens: bash gives each subshell a private copy of the progress counter, so the parent has to own it.
+- `upgrade --parallel`: run all twelve tools at once instead of one after another (5.0s → 2.0s on a dry run here). Serial stays the default - this path installs software, so concurrency is opt-in. `--serial` forces the old behaviour and overrides `RCC_PARALLEL=1`. Per-tool output is replayed in the usual order once every tool has finished, rather than as it happens: bash gives each subshell a private copy of the progress counter, so the parent has to own it.
 
 ### Fixed
 
-- `upgrade`: reported success no matter what broke. Sixteen pipelines ended in `|| true` and no path ever returned non-zero, so a tool could fail outright and the command still printed "Completed" and exited 0 — a cron job or a piped caller had no way to tell an upgrade from a no-op. Failures are now collected per tool, listed on a `Failed: …` line, and the command exits 1. `npm outdated` keeps its `|| true`: it exits 1 whenever it finds something to update, so treating that as failure would cry wolf every run. Turning this on immediately surfaced three tools failing silently here, one of them Raccoon's own bug (see below).
-- `apps`: Sparkle appcasts were fetched one at a time, which dominated the command (16s for 13 feeds here). They are now fetched concurrently — read-only GETs, so nothing installs any faster or in a different order — and a dead feed no longer costs the full 10s, since `--connect-timeout 5` bounds the connect phase separately. Measured 16s → 5.3s. `RCC_FETCH_JOBS` (default 8) caps the concurrency.
+- `upgrade`: reported success no matter what broke. Sixteen pipelines ended in `|| true` and no path ever returned non-zero, so a tool could fail outright and the command still printed "Completed" and exited 0 - a cron job or a piped caller had no way to tell an upgrade from a no-op. Failures are now collected per tool, listed on a `Failed: …` line, and the command exits 1. `npm outdated` keeps its `|| true`: it exits 1 whenever it finds something to update, so treating that as failure would cry wolf every run. Turning this on immediately surfaced three tools failing silently here, one of them Raccoon's own bug (see below).
+- `apps`: Sparkle appcasts were fetched one at a time, which dominated the command (16s for 13 feeds here). They are now fetched concurrently - read-only GETs, so nothing installs any faster or in a different order - and a dead feed no longer costs the full 10s, since `--connect-timeout 5` bounds the connect phase separately. Measured 16s → 5.3s. `RCC_FETCH_JOBS` (default 8) caps the concurrency.
 - `apps`: the ~16MB Homebrew cask catalog was re-downloaded on every run. It is now cached in `~/.raccoon/cask-catalog.json` for a day, written atomically so an interrupted download cannot leave a truncated cache behind. Measured 5.3s → 3.5s per run, plus 16MB of traffic saved each time. `--no-catalog` still skips the layer entirely.
 
 ## [0.13.4] - 2026-06-28
@@ -47,7 +47,7 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 ### Fixed
 
 - `fleet remove`: matched hosts by substring, so `remove user@192.168.1.1` also deleted `user@192.168.1.10` (and any line containing that text). Now matches whole lines.
-- `fleet scan`: hosts that need `ssh-copy-id` were silently dropped — under `set -e` a failed probe `ssh` aborted before it could report "setup needed". Those hosts are reported again.
+- `fleet scan`: hosts that need `ssh-copy-id` were silently dropped - under `set -e` a failed probe `ssh` aborted before it could report "setup needed". Those hosts are reported again.
 - `fleet scan`: could run for minutes with no output on a busy network. Probes now run fully in parallel under a per-host timeout and an overall `SCAN_MAX` budget (default 45s, env-overridable), and it prints how many hosts it is probing.
 - `fleet scan` / `run` / `audit`: a background timeout killing `ssh` leaked a shell "Terminated" job message into stdout/JSON; suppressed without losing `ssh`'s own output.
 - `fleet run`: quoted multi-word arguments were flattened (`grep "a b"` → `grep a b`); arguments are now preserved with `printf %q`. Added a per-command timeout and a temp-dir cleanup trap.
@@ -60,8 +60,8 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 ### Fixed
 
 - `apps`: outdated GUI apps were detected but often not updated. Three causes in the Homebrew-catalog layer:
-  - Casks with a built-in auto-updater (`auto_updates`) were skipped, deferring to the app's own — frequently stale — updater. They are now updated via `brew install --cask --force` by default, matching `brew --greedy`. `--auto-launch` becomes opt-in to instead open the app so its internal updater runs.
-  - The catalog version was parsed with a greedy regex that grabbed the last `version` on the line — an older fallback inside per-OS `variations` blocks (e.g. VS Code read as 1.97.2 instead of 1.126.0), so the installed copy looked newer and was skipped as up to date. Now reads the top-level version. Never downgrades.
+  - Casks with a built-in auto-updater (`auto_updates`) were skipped, deferring to the app's own - frequently stale - updater. They are now updated via `brew install --cask --force` by default, matching `brew --greedy`. `--auto-launch` becomes opt-in to instead open the app so its internal updater runs.
+  - The catalog version was parsed with a greedy regex that grabbed the last `version` on the line - an older fallback inside per-OS `variations` blocks (e.g. VS Code read as 1.97.2 instead of 1.126.0), so the installed copy looked newer and was skipped as up to date. Now reads the top-level version. Never downgrades.
   - `pkg`/installer casks ship no `app` artifact and were dropped from the lookup entirely; they are now matched by the cask display name, recovering Microsoft Teams / Multipass-class apps. Pure awk, no new dependency.
 - `apps`: trim the `,revision` suffix from cask versions in the displayed output.
 
@@ -72,10 +72,10 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 
 ## [0.13.1] - 2026-06-26
 ### Added
-- `fleet scan` — discover Macs on the LAN (Bonjour + ping-sweep) and classify each host as ready / setup-needed / non-Mac; `--add` (or an interactive prompt) appends the fleet-ready hosts to `fleet.conf`. Options: `--user`, `--subnet`, `--timeout`, `--json`.
-- `fleet group add|remove|list` — named groups of already-added hosts (`~/.raccoon/fleet-groups.conf`).
-- `fleet run [--group NAME] [--parallel N] -- COMMAND` — run a command over SSH on every host, or just one group, in parallel.
-- `fleet audit --group NAME` — audit only the hosts in a group.
+- `fleet scan` - discover Macs on the LAN (Bonjour + ping-sweep) and classify each host as ready / setup-needed / non-Mac; `--add` (or an interactive prompt) appends the fleet-ready hosts to `fleet.conf`. Options: `--user`, `--subnet`, `--timeout`, `--json`.
+- `fleet group add|remove|list` - named groups of already-added hosts (`~/.raccoon/fleet-groups.conf`).
+- `fleet run [--group NAME] [--parallel N] -- COMMAND` - run a command over SSH on every host, or just one group, in parallel.
+- `fleet audit --group NAME` - audit only the hosts in a group.
 ### Fixed
 - `apps`: Sparkle update detection now reads the latest appcast `<item>` and compares like-for-like (marketing version vs `shortVersionString`, or build vs `sparkle:version`). Apps that auto-update and are installed outside Homebrew (e.g. Arc, IINA) are detected correctly instead of being mis-compared against build numbers or skipped.
 ### Changed
@@ -83,19 +83,19 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 
 ## [0.12.0] - 2026-06-25
 ### Added
-- `audit --explain` — plain-language notes for each check.
-- `audit --remediation` — before/after report for MSP technicians.
-- `startup --clean` — interactively remove orphaned LaunchAgents (with backup).
+- `audit --explain` - plain-language notes for each check.
+- `audit --remediation` - before/after report for MSP technicians.
+- `startup --clean` - interactively remove orphaned LaunchAgents (with backup).
 - First-run onboarding wizard.
-- `wifi` — active network, known SSIDs, opt-in Keychain passwords.
-- `audit --baseline` / `--baseline-diff` / `--baseline-reset` — reference-state monitoring.
+- `wifi` - active network, known SSIDs, opt-in Keychain passwords.
+- `audit --baseline` / `--baseline-diff` / `--baseline-reset` - reference-state monitoring.
 - `audit --schedule daily|weekly|monthly` (+ `status`/`remove`); native macOS alerts via `--alert`.
 - Audit health-history sparkline in the menu banner.
-- `disk --large` (`--min`, `--top`) — biggest files.
-- `audit --profile` — per-client config, branding, and baseline.
-- `audit --share` — publish the report as an anonymous GitHub Gist.
-- `audit --sheet` (`--hours`, `--notes`) — fill-in intervention sheet (Markdown/RTF).
-- `fleet` — SSH audit across multiple Macs (`audit`/`status`/`add`/`remove`/`list`); the remote runs a self-contained bundle, so no install is needed on the remote Macs.
+- `disk --large` (`--min`, `--top`) - biggest files.
+- `audit --profile` - per-client config, branding, and baseline.
+- `audit --share` - publish the report as an anonymous GitHub Gist.
+- `audit --sheet` (`--hours`, `--notes`) - fill-in intervention sheet (Markdown/RTF).
+- `fleet` - SSH audit across multiple Macs (`audit`/`status`/`add`/`remove`/`list`); the remote runs a self-contained bundle, so no install is needed on the remote Macs.
 ### Changed
 - `audit --json --quiet` now emits clean JSON (powers fleet mode); `print_output_json` includes the per-check `results` array.
 - The bash fallback menu is data-driven; assorted internal de-duplication.

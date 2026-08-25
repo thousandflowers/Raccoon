@@ -16,7 +16,7 @@ Show
 
 Type "rcc audit --deep --dry-run" Sleep 400ms Enter
 # Hidden wait: the audit takes ~4s, and none of it should become dead frames.
-# Not Wait+Screen — it stalls the recording once the output scrolls, which it
+# Not Wait+Screen - it stalls the recording once the output scrolls, which it
 # does at 20 rows.
 Hide
 Sleep 15s
