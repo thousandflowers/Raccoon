@@ -29,7 +29,7 @@ jobs:
         run: |
           set -uo pipefail
           if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::warning::TRAFFIC_TOKEN not set — skipping. Add a PAT (repo scope) as TRAFFIC_TOKEN to auto-update the clones badge."
+            echo "::warning::TRAFFIC_TOKEN not set - skipping. Add a PAT (repo scope) as TRAFFIC_TOKEN to auto-update the clones badge."
             exit 0
           fi
           mkdir -p .github/traffic
@@ -38,7 +38,7 @@ jobs:
 
           for r in Raccoon homebrew-raccoon; do
             if ! gh api "repos/${GITHUB_REPOSITORY_OWNER}/$r/traffic/clones" > /tmp/c.json 2>/tmp/err; then
-              echo "::warning::traffic API failed for $r: $(cat /tmp/err) — skipping"; exit 0
+              echo "::warning::traffic API failed for $r: $(cat /tmp/err) - skipping"; exit 0
             fi
             # Merge the 14-day window per repo+day, keeping the max seen (windows
             # overlap, so max avoids double-counting and undercounting).

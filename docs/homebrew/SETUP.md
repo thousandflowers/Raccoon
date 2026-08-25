@@ -1,4 +1,4 @@
-# Homebrew Tap Setup — thousandflowers/homebrew-raccoon
+# Homebrew Tap Setup - thousandflowers/homebrew-raccoon
 
 ## Repo structure
 
