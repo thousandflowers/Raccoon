@@ -66,3 +66,26 @@ teardown() {
 	assert_success
 	[[ -z "$_RCC_SUDO_KEEPALIVE_PID" ]]
 }
+
+# The keepalive loop sleeps as a background job it waits on. Killing only the
+# subshell used to leave that sleep reparented to launchd for up to 50 seconds.
+@test "sudo: keepalive leaves no orphaned sleep behind" {
+	export STUB_SUDO_N=0
+	start_sudo_keepalive
+	[[ -n "$_RCC_SUDO_KEEPALIVE_PID" ]]
+
+	local sleeper="" i=0
+	while [[ -z "$sleeper" && $i -lt 40 ]]; do
+		sleeper="$(pgrep -P "$_RCC_SUDO_KEEPALIVE_PID" | head -1)"
+		i=$((i + 1))
+		[[ -z "$sleeper" ]] && sleep 0.1
+	done
+	[[ -n "$sleeper" ]]
+
+	stop_sudo_keepalive
+	i=0
+	while kill -0 "$sleeper" 2>/dev/null && [[ $i -lt 40 ]]; do
+		i=$((i + 1)); sleep 0.1
+	done
+	! kill -0 "$sleeper" 2>/dev/null
+}

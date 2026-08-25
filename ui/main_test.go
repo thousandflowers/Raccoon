@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -84,5 +85,38 @@ func TestSpawnedScriptsAreToldNotToPrompt(t *testing.T) {
 	}
 	if out.cmd != nil && out.cmd.Process != nil {
 		_ = out.cmd.Wait()
+	}
+}
+
+// A pty with no size, or a window narrower than the padding, used to hand
+// strings.Repeat a negative count and panic the whole TUI on the first frame.
+func TestViewsSurviveAPathologicalTerminal(t *testing.T) {
+	sizes := []struct{ w, h int }{{0, 0}, {1, 1}, {2, 3}, {5, 5}, {9, 2}, {80, 24}}
+	states := []modelState{stateMenu, stateSearch, stateRunning, stateOutput}
+
+	for _, sz := range sizes {
+		for _, st := range states {
+			m := model{
+				items:         items(),
+				width:         sz.w,
+				height:        sz.h,
+				state:         st,
+				outputTitle:   "a title long enough to overrun any narrow separator",
+				currentScript: "apps.sh",
+				outputLines:   []string{"first", strings.Repeat("x", 500)},
+				progressCurr:  3,
+				progressTotal: 8,
+				progressLabel: "casks: upgrading...",
+				searchQuery:   "app",
+			}
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						t.Fatalf("View panicked at %dx%d state %d: %v", sz.w, sz.h, st, r)
+					}
+				}()
+				_ = m.View()
+			}()
+		}
 	}
 }

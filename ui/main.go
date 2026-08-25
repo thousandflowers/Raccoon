@@ -1145,9 +1145,17 @@ func (m model) menuView() string {
 
 // ─── Running View (live streaming) ─────────────────────────
 
+// sepWidth is the width of the rules the running and output views draw. It is
+// clamped at zero: a window narrower than the padding — or a model that has not
+// received its first WindowSizeMsg yet, where width is 0 — otherwise asks
+// strings.Repeat for a negative count, and that panics the whole TUI.
+func (m model) sepWidth() int {
+	return max(0, min(m.width-2, 60))
+}
+
 func (m model) runningView() string {
 	var b strings.Builder
-	sepLen := min(m.width-2, 60)
+	sepLen := m.sepWidth()
 
 	b.WriteString("  " + styleTitle.Render("» "+m.outputTitle) + "\n")
 
@@ -1185,7 +1193,7 @@ func (m model) runningView() string {
 		if m.outputTitle != "" {
 			label = m.outputTitle
 		}
-		sepLine := styleMuted.Render(strings.Repeat("─", sepLen-8-len(label)))
+		sepLine := styleMuted.Render(strings.Repeat("─", max(0, sepLen-8-len(label))))
 		b.WriteString(styleMuted.Render("  " + sepLine + " " + label + " " + strings.Repeat("─", 4)))
 		b.WriteString("\n")
 	}
@@ -1242,7 +1250,7 @@ func (m model) outputView() string {
 		status))
 	b.WriteString("\n")
 
-	sepLen := min(m.width-2, 60)
+	sepLen := m.sepWidth()
 	b.WriteString(styleMuted.Render("  " + strings.Repeat("─", sepLen)))
 	b.WriteString("\n\n")
 

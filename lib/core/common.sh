@@ -154,7 +154,17 @@ start_sudo_keepalive() {
     [[ -n "${RACCOON_TEST:-}" ]] && return 0
     sudo -n true 2>/dev/null || return 0   # only if already authenticated
     # $$ inside the subshell is the script's PID: the loop dies with the script.
-    ( while true; do sudo -n true 2>/dev/null; sleep 50; kill -0 "$$" 2>/dev/null || exit; done ) &
+    # The sleep runs as a job the subshell waits on, so a TERM interrupts the
+    # wait and the trap takes the sleep down with it — killing the subshell
+    # alone would leave its sleep reparented to launchd for up to 50 seconds.
+    ( trap 'kill "$_rcc_ka_sleep" 2>/dev/null; exit 0' TERM
+      _rcc_ka_sleep=""
+      while true; do
+          sudo -n true 2>/dev/null
+          sleep 50 & _rcc_ka_sleep=$!
+          wait "$_rcc_ka_sleep" 2>/dev/null || true
+          kill -0 "$$" 2>/dev/null || exit
+      done ) &
     _RCC_SUDO_KEEPALIVE_PID=$!
     disown 2>/dev/null || true
 }
