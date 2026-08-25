@@ -119,19 +119,18 @@ update_casks() {
 
 	increment_global_progress
 	update_global_progress_info "casks: upgrading..."
-	# brew --cask --greedy can re-invoke sudo for casks that need root. We cache
-	# sudo before calling this (see run()), but if a cache miss still triggers a
-	# prompt it must reach a real terminal. The old `</dev/null` handed sudo an
-	# instant EOF -> empty password -> rejection for users WITHOUT Touch ID, which
-	# was the real cause of issue #23 (Touch ID reads the GUI, not stdin, so it
-	# masked the bug). Read from the controlling TTY when there is one, falling
-	# back to /dev/null only when headless (where no prompt could be answered).
+	# brew --cask --greedy can re-invoke sudo for casks that need root. main()
+	# pre-caches sudo and a keepalive holds the timestamp for the whole run, so a
+	# prompt here is rare. When one does happen it must reach a real terminal:
+	# `</dev/null` hands sudo an instant EOF -> empty password -> rejection for
+	# users WITHOUT Touch ID (part of issue #23).
+	# Under RCC_NO_PROMPT the terminal belongs to the TUI, which is redrawing the
+	# progress bar every 200ms and reading keys itself — a prompt raised there is
+	# unanswerable and loops on "Sorry, try again", so fail the cask fast instead.
 	# No 2>&1: keep sudo's prompt on the terminal instead of swallowing it into
 	# the progress pipe.
-	# ponytail: pre-auth makes a prompt rare; if the 200ms progress redraw garbles
-	# it, suspend the bar around this call.
 	local brew_stdin=/dev/null
-	if { true >/dev/tty; } 2>/dev/null; then
+	if [[ "${RCC_NO_PROMPT:-}" != "1" ]] && has_tty; then
 		brew_stdin=/dev/tty
 	fi
 	brew upgrade --cask --greedy <"$brew_stdin" | progress_pipe _parse_cask || true
@@ -276,8 +275,12 @@ _install_from_url() {
 		return 0
 	fi
 
-	# cp/installer don't read stdin; sudo prompts on /dev/tty by default and the
-	# session is pre-cached, so no stdin redirect is needed here.
+	# These run inside the progress bar, which redraws every 200ms and would
+	# scramble any password read (issue #23) — and under the TUI the prompt would
+	# also race the key reader. `sudo -n` never prompts: main() pre-caches the
+	# timestamp and the keepalive holds it, so the normal path is unaffected and
+	# a genuinely uncached sudo fails the install instead of hanging on an
+	# unanswerable prompt.
 	case "$ext" in
 	dmg)
 		local mnt
@@ -294,10 +297,10 @@ _install_from_url() {
 			dst="/Applications/$(basename "$src")"
 			if [[ -d "$dst" ]]; then
 				bak="$dst.raccoon-bak-$(date +%Y%m%d%H%M%S)"
-				mv "$dst" "$bak" 2>/dev/null || sudo mv "$dst" "$bak" 2>/dev/null || true
+				mv "$dst" "$bak" 2>/dev/null || sudo -n mv "$dst" "$bak" 2>/dev/null || true
 			fi
 			cp -R "$src" /Applications/ 2>/dev/null ||
-				sudo cp -R "$src" /Applications/ 2>/dev/null || true
+				sudo -n cp -R "$src" /Applications/ 2>/dev/null || true
 			xattr -dr com.apple.quarantine "/Applications/$(basename "$src")" 2>/dev/null || true
 		fi
 		hdiutil detach -quiet "$mnt" 2>/dev/null || true
@@ -311,13 +314,13 @@ _install_from_url() {
 		src="$(find "$udir" -maxdepth 4 -name "*.app" -not -path "*/.*" 2>/dev/null | head -1 || true)"
 		if [[ -n "$src" ]]; then
 			cp -R "$src" /Applications/ 2>/dev/null ||
-				sudo cp -R "$src" /Applications/ 2>/dev/null || true
+				sudo -n cp -R "$src" /Applications/ 2>/dev/null || true
 			xattr -dr com.apple.quarantine "/Applications/$(basename "$src")" 2>/dev/null || true
 		fi
 		rm -rf "$udir"
 		;;
 	pkg)
-		sudo installer -pkg "$tmp" -target / 2>/dev/null || true
+		sudo -n installer -pkg "$tmp" -target / 2>/dev/null || true
 		;;
 	*)
 		append_progress_output "apps: ✗ $app_name — unknown format .$ext (skipped)"

@@ -110,15 +110,26 @@ print_step() {
     echo "${GRAY}[${n}/${total}]${NC} ${label}..."
 }
 
+# True when a controlling terminal is reachable. `[[ -t 0 ]]` is NOT equivalent:
+# stdin is /dev/null whenever rcc is spawned by another process (the TUI does
+# exactly that), yet /dev/tty is still there and is where sudo reads passwords.
+has_tty() { { true >/dev/tty; } 2>/dev/null; }
+
 # Cache sudo credentials, preferring Touch ID. Returns 0 if sudo is usable.
 # Safe to call before a progress UI / from inside the TUI: when pam_tid is
 # configured, `sudo -v` triggers a GUI Touch ID dialog that needs no tty and
-# does not fight terminal rendering. Falls back to a tty password prompt only
-# when a real terminal is attached. Never hangs headless without pam_tid.
+# does not fight terminal rendering. Falls back to a /dev/tty password prompt
+# when a controlling terminal exists. Never hangs headless without pam_tid.
 ensure_sudo() {
     [[ -n "${RACCOON_TEST:-}" ]] && return 1  # never prompt during tests
     command -v sudo >/dev/null 2>&1 || return 1
-    sudo -n true 2>/dev/null && return 0  # already cached
+    sudo -n true 2>/dev/null && return 0  # already cached (TUI pre-auth lands here)
+    # RCC_NO_PROMPT is set by any caller that owns the terminal — the Go TUI
+    # holds it in raw mode and runs its own key reader, so a password typed at a
+    # prompt raised here is split between sudo and the TUI input loop and comes
+    # back "Sorry, try again" (issue #23). Such callers pre-authenticate before
+    # spawning us, so a cache miss at this point means sudo is truly unavailable.
+    [[ "${RCC_NO_PROMPT:-}" == "1" ]] && return 1
     # Explain why, and DO NOT swallow the "Password:" prompt: it goes to stderr,
     # and hiding it (the old `sudo -v 2>/dev/null`) made rcc look like it hung
     # waiting on nothing (issue #23). Keep the prompt visible.
@@ -127,8 +138,8 @@ ensure_sudo() {
         # Touch ID GUI; if the user dismisses it, sudo falls back to a visible
         # tty password read.
         sudo -v && return 0
-    elif [[ -t 0 ]]; then
-        sudo -v && return 0
+    elif has_tty; then
+        sudo -v </dev/tty && return 0
     fi
     return 1
 }

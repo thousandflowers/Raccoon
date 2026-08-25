@@ -302,7 +302,10 @@ upgrade_npm() {
 	npm_sudo=""
 	if [[ ! -w "$npm_prefix" ]] && [[ ! -w "${npm_prefix}/lib/node_modules" ]]; then
 		append_progress_output "npm: prefix $npm_prefix not writable, trying sudo"
-		npm_sudo="sudo"
+		# -n: this runs inside the progress bar, where a password prompt gets
+		# overwritten by the 200ms redraw and rejected (issue #23). main()
+		# pre-caches sudo and the keepalive holds it for the whole run.
+		npm_sudo="sudo -n"
 	fi
 
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then

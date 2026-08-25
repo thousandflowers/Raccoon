@@ -13,7 +13,6 @@ import (
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"golang.org/x/term"
 )
 
 // ─── Messages ──────────────────────────────────────────────
@@ -29,6 +28,11 @@ type scriptDone struct {
 }
 
 type tickMsg struct{}
+
+// sudoPrimed reports the result of the pre-script `sudo -v` run by primeSudo.
+type sudoPrimed struct {
+	err error
+}
 
 // ─── Raccoon animation frames ──────────────────────────────
 // Each frame is exactly 4 lines. Title is rendered separately
@@ -752,6 +756,7 @@ type item struct {
 	script      string
 	args        []string // extra argv passed to the script (e.g. fleet subcommand)
 	description string
+	needsSudo   bool // authenticate before starting: the script touches system paths
 }
 
 type modelState int
@@ -777,6 +782,7 @@ type model struct {
 	cmd           *exec.Cmd // stored from message for kill signal
 	spinnerFrame  int
 	currentScript string
+	pendingArgs   []string // argv of the script started after sudo is primed
 	outputTitle   string
 
 	// Progress
@@ -822,9 +828,9 @@ func resolveBinPath() string {
 
 func items() []item {
 	return []item{
-		{title: "upgrade", script: "upgrade.sh", description: "Update packages (brew, pip, npm, gem)"},
-		{title: "apps", script: "apps.sh", description: "Update GUI apps (App Store + casks)"},
-		{title: "audit", script: "audit.sh", description: "Security audit + fix"},
+		{title: "upgrade", script: "upgrade.sh", description: "Update packages (brew, pip, npm, gem)", needsSudo: true},
+		{title: "apps", script: "apps.sh", description: "Update GUI apps (App Store + casks)", needsSudo: true},
+		{title: "audit", script: "audit.sh", description: "Security audit + fix", needsSudo: true},
 		{title: "network", script: "network.sh", description: "Interfaces, Wi-Fi, DNS, routing"},
 		{title: "fleet scan", script: "fleet.sh", args: []string{"scan"}, description: "Discover Macs on the LAN (Bonjour + ping)"},
 		{title: "fleet audit", script: "fleet.sh", args: []string{"audit"}, description: "Security audit across Macs over SSH"},
@@ -911,6 +917,23 @@ func tick() tea.Cmd {
 	})
 }
 
+// sudoCached reports whether a sudo timestamp is already valid, so an item that
+// needs root can skip the prompt entirely.
+func sudoCached() bool {
+	return exec.Command("sudo", "-n", "true").Run() == nil
+}
+
+// primeSudo authenticates BEFORE the script starts. tea.ExecProcess releases
+// the terminal first — cooked mode restored, TUI key reader stopped — so sudo
+// (or the Touch ID dialog) gets the terminal to itself. Prompting from inside
+// the running TUI instead is what made the password come back "Sorry, try
+// again" on Macs without Touch ID: issue #23.
+func primeSudo() tea.Cmd {
+	return tea.ExecProcess(exec.Command("sudo", "-v"), func(err error) tea.Msg {
+		return sudoPrimed{err: err}
+	})
+}
+
 // startScript starts a bash script and returns the first line of output.
 // It is a standalone function (not a model method) so scanner+cmd are
 // captured by closure, not lost to value-copy semantics.
@@ -926,6 +949,11 @@ func startScript(binPath, script string, args []string) tea.Cmd {
 	}
 	cmd.Stderr = cmd.Stdout
 	cmd.Stdin = nil // ponytail: prevent child from receiving TTY in raw mode and corrupting TUI
+	// The TUI owns the terminal — raw mode plus its own key reader — so a sudo
+	// prompt raised by the child would have its password split between sudo and
+	// the TUI input loop and rejected (issue #23). Scripts must never prompt;
+	// root access is authenticated up front by primeSudo instead.
+	cmd.Env = append(os.Environ(), "RCC_NO_PROMPT=1")
 
 	if err := cmd.Start(); err != nil {
 		return func() tea.Msg {
@@ -1007,6 +1035,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		clean := stripANSI(msg.line)
 		m.outputLines = append(m.outputLines, clean)
 		return m, readLine(msg.scanner, msg.cmd)
+
+	case sudoPrimed:
+		// The user may have quit while the terminal was released.
+		if m.state != stateRunning {
+			return m, nil
+		}
+		if msg.err != nil {
+			// Not fatal: ensure_sudo re-checks the cache and the scripts degrade
+			// to "sudo unavailable" on their own.
+			m.outputLines = append(m.outputLines, styleError.Render("  sudo not authenticated — steps needing root will be skipped"))
+		}
+		return m, tea.Batch(startScript(m.binPath, m.currentScript, m.pendingArgs), tick())
 
 	case scriptDone:
 		// Ignore a scriptDone that arrives after the user already killed the
@@ -1239,6 +1279,26 @@ func (m model) outputView() string {
 
 // ─── Key handlers ──────────────────────────────────────────
 
+// launch prepares the running view for it and returns the command that starts
+// it. Items that touch system paths authenticate first, outside the TUI.
+func (m *model) launch(it item) tea.Cmd {
+	m.state = stateRunning
+	m.outputLines = nil
+	m.outputTitle = it.title
+	m.currentScript = it.script
+	m.pendingArgs = it.args
+	m.progressCurr = 0
+	m.progressTotal = 0
+	m.progressLabel = ""
+	m.spinnerFrame = 0
+	if it.needsSudo && !sudoCached() {
+		// No tick(): the terminal is released while sudo runs, so there is
+		// nothing to animate until sudoPrimed comes back.
+		return primeSudo()
+	}
+	return tea.Batch(startScript(m.binPath, it.script, it.args), tick())
+}
+
 func (m *model) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	f := m.filtered()
 	switch msg.String() {
@@ -1258,15 +1318,7 @@ func (m *model) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "enter", " ":
 		if m.selected < len(f) && f[m.selected].script != "" {
-			m.state = stateRunning
-			m.outputLines = nil
-			m.outputTitle = f[m.selected].title
-			m.currentScript = f[m.selected].script
-			m.progressCurr = 0
-			m.progressTotal = 0
-			m.progressLabel = ""
-			m.spinnerFrame = 0
-			return m, tea.Batch(startScript(m.binPath, f[m.selected].script, f[m.selected].args), tick())
+			return m, m.launch(f[m.selected])
 		}
 	case "g":
 		m.selected = 0
@@ -1293,15 +1345,7 @@ func (m *model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyEnter:
 		f := m.filtered()
 		if m.selected < len(f) && f[m.selected].script != "" {
-			m.state = stateRunning
-			m.outputLines = nil
-			m.outputTitle = f[m.selected].title
-			m.currentScript = f[m.selected].script
-			m.progressCurr = 0
-			m.progressTotal = 0
-			m.progressLabel = ""
-			m.spinnerFrame = 0
-			return m, tea.Batch(startScript(m.binPath, f[m.selected].script, f[m.selected].args), tick())
+			return m, m.launch(f[m.selected])
 		}
 	case tea.KeyUp:
 		if m.selected > 0 {
@@ -1347,13 +1391,10 @@ func (m *model) handleOutputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func main() {
 	binPath := resolveBinPath()
 
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error setting raw terminal: %v\n", err)
-		os.Exit(1)
-	}
-	defer term.Restore(int(os.Stdin.Fd()), oldState)
-
+	// No manual term.MakeRaw here: tea.NewProgram already puts the terminal in
+	// raw mode, and tea.ExecProcess restores it to whatever state it found at
+	// startup. Raw-mode-before-Run made that "restore" hand a raw terminal to
+	// sudo, which is how the password prompt broke in the first place (#23).
 	m := model{
 		items:   items(),
 		binPath: binPath,
@@ -1364,7 +1405,17 @@ func main() {
 	// Don't orphan a running child: on SIGTERM (or any exit while a script is
 	// mid-run, e.g. upgrade.sh) the program returns here with the child still
 	// alive — kill it before we exit.
-	if fm, ok := finalModel.(model); ok && fm.cmd != nil && fm.cmd.Process != nil {
+	// The key handlers return *model, so the final model is a pointer after any
+	// keypress and the value-only assertion this used to do never matched — the
+	// child outlived us, still holding a primed sudo. Accept both forms.
+	var fm *model
+	switch v := finalModel.(type) {
+	case model:
+		fm = &v
+	case *model:
+		fm = v
+	}
+	if fm != nil && fm.cmd != nil && fm.cmd.Process != nil {
 		_ = fm.cmd.Process.Kill()
 	}
 	if err != nil {
