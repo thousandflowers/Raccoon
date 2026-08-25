@@ -934,6 +934,19 @@ func primeSudo() tea.Cmd {
 	})
 }
 
+// primeSudoIfNeeded skips the whole dance when a timestamp is already valid.
+// The check runs inside the command rather than in Update, because asking sudo
+// anything can block — a Mac with a directory-service sudoers takes its time —
+// and Update runs on the event loop, where blocking freezes the interface.
+func primeSudoIfNeeded() tea.Cmd {
+	return func() tea.Msg {
+		if sudoCached() {
+			return sudoPrimed{}
+		}
+		return primeSudo()()
+	}
+}
+
 // startScript starts a bash script and returns the first line of output.
 // It is a standalone function (not a model method) so scanner+cmd are
 // captured by closure, not lost to value-copy semantics.
@@ -1299,10 +1312,10 @@ func (m *model) launch(it item) tea.Cmd {
 	m.progressTotal = 0
 	m.progressLabel = ""
 	m.spinnerFrame = 0
-	if it.needsSudo && !sudoCached() {
-		// No tick(): the terminal is released while sudo runs, so there is
+	if it.needsSudo {
+		// No tick(): the terminal may be released while sudo runs, so there is
 		// nothing to animate until sudoPrimed comes back.
-		return primeSudo()
+		return primeSudoIfNeeded()
 	}
 	return tea.Batch(startScript(m.binPath, it.script, it.args), tick())
 }

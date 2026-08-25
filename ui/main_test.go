@@ -48,8 +48,8 @@ func TestLaunchSkipsThePromptWhenSudoIsCached(t *testing.T) {
 
 	msg := m.launch(item{title: "apps", script: "missing.sh", needsSudo: true})()
 
-	if got := fmt.Sprintf("%T", msg); got != "tea.BatchMsg" {
-		t.Fatalf("expected the script to start directly, got %s", got)
+	if _, ok := msg.(sudoPrimed); !ok {
+		t.Fatalf("a valid timestamp must skip the prompt entirely, got %T", msg)
 	}
 }
 

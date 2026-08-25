@@ -38,7 +38,11 @@ show_apps_help() {
 
 # RACCOON_TEST is set by the bats harness: never perform real updates under it
 # (the suite invokes this with bad/empty args to test parsing, not to update).
-if [[ -n "${RACCOON_TEST:-}" ]]; then RCC_DRY_RUN=true; else RCC_DRY_RUN=false; fi
+# Honour an inherited RCC_DRY_RUN: the rest of the script reads it as a knob, so
+# hard-resetting it here made `RCC_DRY_RUN=true rcc upgrade` silently run for
+# real. --dry-run still sets it, and tests always force it on.
+RCC_DRY_RUN="${RCC_DRY_RUN:-false}"
+[[ -n "${RACCOON_TEST:-}" ]] && RCC_DRY_RUN=true
 RCC_NO_CATALOG=false
 RCC_NO_SPARKLE=false
 RCC_AUTO_LAUNCH=false
@@ -582,7 +586,10 @@ main() {
 
 	# Cache sudo up front (Touch ID when available) so casks/pkgs that need root
 	# complete without a prompt mid-progress (issue #23).
-	if [[ "$RCC_DRY_RUN" != "true" ]] && command -v brew >/dev/null 2>&1; then
+	# /Applications is in the gate too: the Sparkle path installs there, and on a
+	# Mac where it is root-owned that needs a primed timestamp — the `sudo -n` it
+	# falls back to cannot ask for one from inside the progress bar.
+	if [[ "$RCC_DRY_RUN" != "true" ]] && { command -v brew >/dev/null 2>&1 || [[ ! -w /Applications ]]; }; then
 		if ensure_sudo; then
 			start_sudo_keepalive
 		else
