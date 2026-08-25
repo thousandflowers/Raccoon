@@ -134,12 +134,13 @@ ensure_sudo() {
     # and hiding it (the old `sudo -v 2>/dev/null`) made rcc look like it hung
     # waiting on nothing (issue #23). Keep the prompt visible.
     printf '%s\n' "${GRAY}rcc needs sudo for upgrades that touch system paths (casks, global npm).${NC}" >&2
-    if grep -qs pam_tid.so /etc/pam.d/sudo_local /etc/pam.d/sudo 2>/dev/null; then
-        # Touch ID GUI; if the user dismisses it, sudo falls back to a visible
-        # tty password read.
+    # Touch ID answers through a GUI dialog that needs no terminal at all;
+    # without it sudo reads the password from /dev/tty on its own, so a
+    # reachable /dev/tty is the gate. Redirecting stdin from /dev/tty here would
+    # only add a failure mode: with no controlling terminal the redirect fails
+    # before sudo even runs.
+    if grep -qs pam_tid.so /etc/pam.d/sudo_local /etc/pam.d/sudo 2>/dev/null || has_tty; then
         sudo -v && return 0
-    elif has_tty; then
-        sudo -v </dev/tty && return 0
     fi
     return 1
 }
