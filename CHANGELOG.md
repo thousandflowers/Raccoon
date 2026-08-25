@@ -3,6 +3,20 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [0.15.1] - 2026-08-25
+
+### Fixed
+
+- The sudo password prompt raised from inside the TUI could not be answered (#23). `rcc apps` asked for it while the TUI held the terminal in raw mode with its own key reader running: raw mode turns off CR-to-newline translation, so pressing Enter never ended sudo's read, and the password came back with whatever was typed next appended to it - "Sorry, try again", every time, on any Mac without Touch ID. Reproduced against a stub sudo that reads a real password: before the fix it received `hunter2qq`, the two keystrokes meant for the TUI swallowed into the read. Root access is now authenticated up front with the terminal released, so no prompt is ever raised underneath the interface, and any script the TUI spawns is told never to prompt. `ensure_sudo` gates its own password path on a reachable `/dev/tty` rather than on stdin being a terminal, which it never is for a spawned script - that mismatch is why the TUI reported "sudo unavailable" and skipped root-only work outright.
+- The TUI crashed on its first running frame whenever the terminal reported a width below two, which is what a pty opened without a size reports. Both the running and output views handed `width - 2` straight to `strings.Repeat`, and that panics on a negative count, taking the whole program down with `strings: negative Repeat count`. Separator widths are clamped now.
+- The sudo keepalive left its `sleep` behind. Stopping it killed the loop but not the sleep the loop was blocked in, so every run that primed sudo left a process reparented to launchd for up to fifty seconds after `rcc` had exited.
+- Quitting the TUI while a script ran did not stop the script. The exit-time kill asserted the wrong model type - the key handlers hand back a pointer - so it never matched, and the script outlived the interface that started it, still holding a primed sudo timestamp.
+- `RCC_DRY_RUN` was read as a knob throughout `apps` and `upgrade` but reset to false at the top of both, so exporting it did nothing and `RCC_DRY_RUN=true rcc upgrade` ran for real. An inherited value is honoured now; `--dry-run` still sets it.
+- `upgrade` removed its failure log only on the happy path, stranding a `/tmp/raccoon-fail-XXXXXX` behind whenever a run was interrupted.
+- The sudo pre-authentication was gated on Homebrew alone. A Mac with a root-owned global npm prefix and no brew never primed a timestamp, so the `sudo -n` behind the npm upgrade could only fail; the same held for the Sparkle install path where `/Applications` is not writable. Both gates ask what actually needs root now.
+- `audit` holds a sudo keepalive for the length of a scan. A deep scan can outlive the five-minute timestamp - `softwareupdate` alone takes minutes - and the re-prompt landed mid-report where it could not be answered.
+- The TUI asked sudo whether a timestamp was cached from inside its update loop, freezing the interface for as long as that call took. On a Mac whose sudoers comes from a directory service, that is not instant.
+
 ## [0.15.0] - 2026-08-18
 
 ### Added
