@@ -1368,6 +1368,11 @@ main() {
 	# when auth genuinely can't happen.
 	if ensure_sudo; then
 		SUDO_AVAILABLE=true
+		# A deep scan can outlive the 5-minute sudo timestamp (softwareupdate
+		# alone takes minutes), and a re-prompt landing mid-report is exactly the
+		# unanswerable prompt of issue #23. Hold the credential for the run.
+		trap stop_sudo_keepalive EXIT
+		start_sudo_keepalive
 	else
 		SUDO_AVAILABLE=false
 		if [[ "$DEEP_SCAN" == "true" || "$QUIET_MODE" == "true" ]]; then

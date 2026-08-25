@@ -23,7 +23,11 @@ show_upgrade_help() {
 
 # RACCOON_TEST is set by the bats harness: never run real upgrades under it
 # (the suite invokes this with bad/empty args to test parsing, not to upgrade).
-if [[ -n "${RACCOON_TEST:-}" ]]; then RCC_DRY_RUN=true; else RCC_DRY_RUN=false; fi
+# Honour an inherited RCC_DRY_RUN: the rest of the script reads it as a knob, so
+# hard-resetting it here made `RCC_DRY_RUN=true rcc upgrade` silently run for
+# real. --dry-run still sets it, and tests always force it on.
+RCC_DRY_RUN="${RCC_DRY_RUN:-false}"
+[[ -n "${RACCOON_TEST:-}" ]] && RCC_DRY_RUN=true
 RCC_DEFERRED_TAPS=()
 
 # Serial by default: the parallel path is newer, and these upgrades install
@@ -48,6 +52,25 @@ RCC_FAILURE_LOG=""
 _note_failure() {
 	[[ -n "$RCC_FAILURE_LOG" ]] && echo "$1" >>"$RCC_FAILURE_LOG"
 	return 0
+}
+
+# Interrupting a run used to strand its failure log in /tmp, because the only
+# rm sat on the happy path.
+_rcc_upgrade_cleanup() {
+	stop_sudo_keepalive 2>/dev/null || true
+	[[ -n "$RCC_FAILURE_LOG" ]] && rm -f "$RCC_FAILURE_LOG"
+	return 0
+}
+
+# True when updating global npm packages will need root. Asked before the
+# progress bar starts so main() can prime sudo: a prompt raised later is
+# overwritten by the redraw (issue #23), and `sudo -n` without a primed
+# timestamp just fails the upgrade.
+_npm_needs_sudo() {
+	command -v npm >/dev/null 2>&1 || return 1
+	local prefix
+	prefix="$(npm config get prefix 2>/dev/null || echo "/usr/local")"
+	[[ ! -w "$prefix" && ! -w "${prefix}/lib/node_modules" ]]
 }
 
 for arg in "$@"; do
@@ -297,12 +320,13 @@ upgrade_npm() {
 	increment_global_progress
 
 	# ponytail: check npm prefix writability; fallback to sudo instead of skip
-	local npm_prefix npm_sudo
-	npm_prefix=$(npm config get prefix 2>/dev/null || echo "/usr/local")
-	npm_sudo=""
-	if [[ ! -w "$npm_prefix" ]] && [[ ! -w "${npm_prefix}/lib/node_modules" ]]; then
-		append_progress_output "npm: prefix $npm_prefix not writable, trying sudo"
-		npm_sudo="sudo"
+	local npm_sudo=""
+	if _npm_needs_sudo; then
+		append_progress_output "npm: prefix not writable, trying sudo"
+		# -n: this runs inside the progress bar, where a password prompt gets
+		# overwritten by the 200ms redraw and rejected (issue #23). main()
+		# pre-caches sudo and the keepalive holds it for the whole run.
+		npm_sudo="sudo -n"
 	fi
 
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
@@ -687,14 +711,17 @@ main() {
 	# Pre-flight: handle tap trust before progress bar
 	_check_taps_preflight
 
+	trap _rcc_upgrade_cleanup EXIT
+
 	# Cache sudo up front (Touch ID when available) so cask upgrades that need
 	# root actually complete. Mid-progress the 200ms redraw overwrites any sudo
 	# prompt, so the upgrade would silently stall and the package not update.
-	if [[ "$RCC_DRY_RUN" != "true" ]] && command -v brew >/dev/null 2>&1; then
+	# npm is in the gate too: a global prefix owned by root needs sudo even on a
+	# Mac with no Homebrew, and without a primed timestamp `sudo -n` just fails.
+	if [[ "$RCC_DRY_RUN" != "true" ]] && { command -v brew >/dev/null 2>&1 || _npm_needs_sudo; }; then
 		if ensure_sudo; then
 			# Refresh the timestamp across the whole (possibly >5min) run so a
 			# cask/npm sudo never re-prompts mid-progress and gets garbled.
-			trap stop_sudo_keepalive EXIT
 			start_sudo_keepalive
 		else
 			echo "${YELLOW}⚠ sudo unavailable — casks needing root may be skipped${NC}"
@@ -745,6 +772,7 @@ main() {
 		failed="$(sort -u "$RCC_FAILURE_LOG" | tr '\n' ' ')"
 	fi
 	rm -f "$RCC_FAILURE_LOG"
+	RCC_FAILURE_LOG=""
 
 	if [[ -n "$failed" ]]; then
 		print_error "Failed: ${failed% }"
