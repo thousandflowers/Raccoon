@@ -197,3 +197,37 @@ XML
 	assert_output_contains "--no-catalog"
 	assert_output_contains "--auto-launch"
 }
+
+# The point of delegating layer 4 to Sparkle: a real pass over an outdated app
+# must leave the directory byte-for-byte as it found it. The old code moved the
+# bundle aside and copied a new one in with `|| true` on every line, so a failed
+# copy left no app at all — that is how Disk Drill was lost on 2026-06-25.
+@test "sparkle: a real pass touches nothing in the apps directory" {
+	cat > "$HOME/appcast.xml" <<'XML'
+<rss><channel><item>
+<sparkle:shortVersionString>9.9.9</sparkle:shortVersionString>
+<enclosure url="https://example.invalid/App.dmg"/>
+</item></channel></rss>
+XML
+	_make_app "SparkleApp" "1.0.0" "file://$HOME/appcast.xml"
+
+	# Fingerprint every path under the directory with its size and mtime.
+	_fingerprint() {
+		find "$APPDIR" | sort | while read -r f; do
+			printf '%s\t%s\n' "$f" "$(stat -f '%z %m' "$f" 2>/dev/null || echo '?')"
+		done
+	}
+	before="$(_fingerprint)"
+
+	# Not a dry run: this is the path that used to install. RCC_OPEN keeps the
+	# suite from launching anything.
+	RCC_DRY_RUN=false RCC_OPEN=true run update_sparkle_apps
+	[ "$status" -eq 0 ]
+
+	after="$(_fingerprint)"
+	[ "$before" = "$after" ]
+
+	# And nothing was left behind next to it either.
+	run bash -c "ls -d '$APPDIR'/*.raccoon-bak-* 2>/dev/null"
+	[ "$status" -ne 0 ]
+}

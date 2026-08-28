@@ -32,7 +32,10 @@ Run one tool at a time. This is the default, and overrides \fBRCC_PARALLEL\fR.
 Update installed GUI apps in four layers: Mac App Store (\fBmas\fR), Homebrew
 casks (\fB\-\-greedy\fR), the Homebrew cask catalog (7000+ apps matched to
 /Applications by name, no install required), and Sparkle feeds
-(\fBSUFeedURL\fR). Apps with built-in auto-updaters are skipped by default.
+(\fBSUFeedURL\fR). Layer 4 installs nothing: those apps ship Sparkle, which
+swaps the bundle atomically and verifies its signature, so \fBrcc\fR reports the
+update and opens the app for its own updater to apply. Nothing in this command
+writes to /Applications. Apps with built-in auto-updaters are skipped by default.
 .RS
 .TP
 \fB\-\-dry-run\fR, \fB\-n\fR
