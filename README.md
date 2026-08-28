@@ -289,6 +289,11 @@ Sparkle feeds (apps with a `SUFeedURL` in their plist). Apps with built-in
 auto-updaters are detected and skipped by default; `--auto-launch` opens them
 to trigger their own updater. Skip a layer with `--no-catalog` / `--no-sparkle`.
 
+Layer 4 never installs anything. An app with a `SUFeedURL` ships Sparkle, which
+swaps the bundle atomically and verifies its EdDSA signature — neither of which
+a shell script can do. `rcc` reports that an update exists and opens the app so
+its own updater applies it. **Nothing in `rcc apps` writes to `/Applications`.**
+
 <details>
 <summary>📸 More command demos</summary>
 
@@ -400,7 +405,7 @@ Fair question for a tool that audits security and runs `sudo`. The honest answer
 
 - **Read it first.** The installer is one file - [`install.sh`](install.sh). It clones the repo to `~/.raccoon` and symlinks `rcc`; nothing else. Prefer Homebrew (`brew install thousandflowers/raccoon/rcc`) if you'd rather not pipe to a shell.
 - **No telemetry.** Raccoon makes no analytics or "phone-home" calls. Ever.
-- **Network calls are only the obvious ones:** `apps` fetches the Homebrew cask catalog and Sparkle appcasts to update apps; `audit --share` (opt-in only) uploads a report to GitHub; `fleet` connects over SSH to *your* hosts and uses Bonjour/ping on *your* LAN for `scan`; `upgrade` talks to the package managers you already use. Nothing leaves your machine unless you run one of those.
+- **Network calls are only the obvious ones:** `apps` fetches the Homebrew cask catalog and Sparkle appcasts to find updates; `audit --share` (opt-in only) uploads a report to GitHub; `fleet` connects over SSH to *your* hosts and uses Bonjour/ping on *your* LAN for `scan`; `upgrade` talks to the package managers you already use. Nothing leaves your machine unless you run one of those.
 - **`sudo` only when it's doing the work** - applying `audit --fix` changes or installing a cask - never just to look around.
 - **Reports redact secrets by default.** Every sharable format (`--json`, `--csv`, `--html`, `--report`, `--share`, and the fleet aggregate) scrubs passwords, keys, tokens, and IP/MAC addresses at a single choke point before anything is written - so a report is safe to hand over without hand-checking it first. The live on-screen summary still shows your own machine's real values. Pass `--no-redact` when you deliberately want them verbatim.
 - **Auditable.** ~6,500 lines of plain Bash across 21 command scripts, `shellcheck -S warning` clean, covered by 38 bats test files. Read any command in [`bin/`](bin/). Nothing else ships - the interactive TUI is built from source, not committed as a binary.

@@ -14,11 +14,16 @@ show_apps_help() {
 	echo "    1. Mac App Store      (mas)"
 	echo "    2. Homebrew casks     (brew upgrade --cask --greedy)"
 	echo "    3. Homebrew catalog   (7000+ apps matched by name, no install needed)"
-	echo "    4. Sparkle feed       (apps with SUFeedURL in their plist)"
+	echo "    4. Sparkle feed       (apps with SUFeedURL: opened, they update themselves)"
 	echo ""
 	echo "  Apps with a built-in auto-updater (Slack, Chrome, Zoom...) are updated"
 	echo "  via Homebrew like everything else, since their internal updater often"
 	echo "  lags. Use --auto-launch to instead open them so their own updater runs."
+	echo ""
+	echo "  Layer 4 never installs anything. Those apps ship Sparkle, which swaps"
+	echo "  the bundle atomically and verifies its signature; rcc only tells you an"
+	echo "  update exists and opens the app so its own updater can take over."
+	echo "  Nothing in this command writes to /Applications."
 	echo ""
 	echo "  Options:"
 	echo "    --dry-run, -n    Show what would be updated, without updating"
@@ -262,81 +267,6 @@ _version_outdated() {
 	return 1
 }
 
-# Download and install a DMG/ZIP/PKG from a URL. No external dependencies.
-_install_from_url() {
-	local app_name="$1" local_ver="$2" remote_ver="$3" url="$4"
-	local ext="${url##*.}"
-	ext="${ext%%\?*}"
-	ext="$(echo "$ext" | tr '[:upper:]' '[:lower:]')"
-
-	local tmp
-	tmp="$(mktemp /tmp/raccoon-dl-XXXXXX)"
-
-	update_global_progress_info "apps: downloading $app_name..."
-	if ! curl -fsSL --max-time 120 "$url" -o "$tmp" 2>/dev/null; then
-		rm -f "$tmp"
-		append_progress_output "apps: ✗ $app_name — download failed (skipped)"
-		return 0
-	fi
-
-	# These run inside the progress bar, which redraws every 200ms and would
-	# scramble any password read (issue #23) — and under the TUI the prompt would
-	# also race the key reader. `sudo -n` never prompts: main() pre-caches the
-	# timestamp and the keepalive holds it, so the normal path is unaffected and
-	# a genuinely uncached sudo fails the install instead of hanging on an
-	# unanswerable prompt.
-	case "$ext" in
-	dmg)
-		local mnt
-		mnt="$(mktemp -d /tmp/raccoon-mnt-XXXXXX)"
-		if ! hdiutil attach -nobrowse -quiet -mountpoint "$mnt" "$tmp" 2>/dev/null; then
-			rm -f "$tmp"
-			rmdir "$mnt" 2>/dev/null || true
-			return 0
-		fi
-		local src
-		src="$(find "$mnt" -maxdepth 3 -name "*.app" -not -path "*/.*" 2>/dev/null | head -1 || true)"
-		if [[ -n "$src" ]]; then
-			local dst bak
-			dst="/Applications/$(basename "$src")"
-			if [[ -d "$dst" ]]; then
-				bak="$dst.raccoon-bak-$(date +%Y%m%d%H%M%S)"
-				mv "$dst" "$bak" 2>/dev/null || sudo -n mv "$dst" "$bak" 2>/dev/null || true
-			fi
-			cp -R "$src" /Applications/ 2>/dev/null ||
-				sudo -n cp -R "$src" /Applications/ 2>/dev/null || true
-			xattr -dr com.apple.quarantine "/Applications/$(basename "$src")" 2>/dev/null || true
-		fi
-		hdiutil detach -quiet "$mnt" 2>/dev/null || true
-		rm -rf "$mnt"
-		;;
-	zip)
-		local udir
-		udir="$(mktemp -d /tmp/raccoon-unz-XXXXXX)"
-		unzip -q "$tmp" -d "$udir" 2>/dev/null || true
-		local src
-		src="$(find "$udir" -maxdepth 4 -name "*.app" -not -path "*/.*" 2>/dev/null | head -1 || true)"
-		if [[ -n "$src" ]]; then
-			cp -R "$src" /Applications/ 2>/dev/null ||
-				sudo -n cp -R "$src" /Applications/ 2>/dev/null || true
-			xattr -dr com.apple.quarantine "/Applications/$(basename "$src")" 2>/dev/null || true
-		fi
-		rm -rf "$udir"
-		;;
-	pkg)
-		sudo -n installer -pkg "$tmp" -target / 2>/dev/null || true
-		;;
-	*)
-		append_progress_output "apps: ✗ $app_name — unknown format .$ext (skipped)"
-		rm -f "$tmp"
-		return 0
-		;;
-	esac
-
-	rm -f "$tmp"
-	append_progress_output "apps: ✓ $app_name ($local_ver → $remote_ver)"
-}
-
 # Directories scanned for .app bundles. Overridable for testing.
 _app_dirs() {
 	if [[ -n "${RCC_APP_DIRS:-}" ]]; then
@@ -450,7 +380,7 @@ update_homebrew_catalog() {
 
 # Decide a Sparkle update from an appcast piped on stdin. Args: local short
 # version (CFBundleShortVersionString), local build (CFBundleVersion). Prints
-# "<remote_ver>\t<dl_url>" when an update is available, nothing otherwise.
+# the remote version when an update is available, nothing otherwise.
 # Compares like-for-like — marketing version vs shortVersionString, or build vs
 # sparkle:version — never a build number against a marketing string, which is
 # what made the old "head -1 of the whole feed" logic misfire (e.g. comparing
@@ -459,7 +389,7 @@ update_homebrew_catalog() {
 # convention. Switch to a max-version scan if a real feed ever violates that.
 _sparkle_decide() {
 	local l_short="$1" l_build="$2"
-	local xml item r_short r_build dl_url local_ver remote_ver
+	local xml item r_short r_build enclosure local_ver remote_ver
 	xml="$(cat)"
 	# No `exit` after the first record: awk must drain stdin, otherwise printf
 	# gets SIGPIPE and (under set -o pipefail) aborts this function on big feeds.
@@ -469,7 +399,7 @@ _sparkle_decide() {
 	[[ -z "$r_short" ]] && r_short="$(printf '%s\n' "$item" | grep -o '<sparkle:shortVersionString>[^<]*' | head -1 | sed 's/.*>//' || true)"
 	r_build="$(printf '%s\n' "$item" | grep -o 'sparkle:version="[^"]*"' | head -1 | sed 's/.*="//; s/"//' || true)"
 	[[ -z "$r_build" ]] && r_build="$(printf '%s\n' "$item" | grep -o '<sparkle:version>[^<]*' | head -1 | sed 's/.*>//' || true)"
-	dl_url="$(printf '%s\n' "$item" | grep -oE 'url="https://[^"]*\.(dmg|zip|pkg|tbz|tar\.[a-z]+)' | head -1 | sed 's/url="//' || true)"
+	enclosure="$(printf '%s\n' "$item" | grep -oE 'url="https://[^"]*\.(dmg|zip|pkg|tbz|tar\.[a-z]+)' | head -1 | sed 's/url="//' || true)"
 
 	if [[ -n "$r_short" && -n "$l_short" ]]; then
 		local_ver="$l_short"; remote_ver="$r_short"
@@ -478,9 +408,11 @@ _sparkle_decide() {
 	else
 		return 0
 	fi
-	[[ -z "$dl_url" ]] && return 0
+	# An item with no downloadable enclosure is not an update anyone can take,
+	# so it is still the gate — rcc simply no longer fetches what it points at.
+	[[ -z "$enclosure" ]] && return 0
 	_version_outdated "$local_ver" "$remote_ver" || return 0
-	printf '%s\t%s\n' "$remote_ver" "$dl_url"
+	printf '%s\n' "$remote_ver"
 }
 
 update_sparkle_apps() {
@@ -488,7 +420,7 @@ update_sparkle_apps() {
 	increment_global_progress
 
 	local updated=0 skipped=0
-	local app_dir app_path app_name feed xml remote_ver local_ver local_build dl_url decision
+	local app_dir app_path app_name feed xml remote_ver local_ver local_build
 	local slot manifest fetchlist
 
 	SPARKLE_FEED_DIR="$(mktemp -d /tmp/raccoon-feeds-XXXXXX)"
@@ -517,7 +449,9 @@ update_sparkle_apps() {
 			local_build="$(defaults read "$app_path/Contents/Info" CFBundleVersion 2>/dev/null || true)"
 
 			slot=$((slot + 1))
-			printf '%s\t%s\t%s\t%s\n' "$slot" "$app_name" "$local_ver" "$local_build" >>"$manifest"
+			# app_path travels with the row: pass 3 opens the app, and by then
+			# the loop that knew where it lives is long gone.
+			printf '%s\t%s\t%s\t%s\t%s\n' "$slot" "$app_name" "$local_ver" "$local_build" "$app_path" >>"$manifest"
 			printf '%s\0%s\0' "$feed" "$SPARKLE_FEED_DIR/$slot.xml" >>"$fetchlist"
 		done
 	done
@@ -535,25 +469,36 @@ update_sparkle_apps() {
 
 	# Pass 3 — compare and install. Strictly serial: this is the part that
 	# replaces apps on disk, and it behaves exactly as it did before.
-	while IFS=$'\t' read -r slot app_name local_ver local_build; do
+	while IFS=$'\t' read -r slot app_name local_ver local_build app_path; do
 		[[ -n "$slot" ]] || continue
 		xml="$(cat "$SPARKLE_FEED_DIR/$slot.xml" 2>/dev/null || true)"
 		[[ -z "$xml" ]] && continue
 
-		decision="$(printf '%s' "$xml" | _sparkle_decide "$local_ver" "$local_build")"
-		if [[ -z "$decision" ]]; then
+		remote_ver="$(printf '%s' "$xml" | _sparkle_decide "$local_ver" "$local_build")"
+		if [[ -z "$remote_ver" ]]; then
 			((skipped++)) || true
 			continue
 		fi
-		remote_ver="${decision%%$'\t'*}"
-		dl_url="${decision#*$'\t'}"
 
 		if [[ "$RCC_DRY_RUN" == "true" ]]; then
 			append_progress_output "sparkle: $app_name ${local_ver:-?} → $remote_ver"
 			continue
 		fi
 
-		_install_from_url "$app_name" "${local_ver:-?}" "$remote_ver" "$dl_url"
+		# A layer 4 app has SUFeedURL in its plist, which means Sparkle is built
+		# into it: Sparkle swaps the bundle atomically and checks the EdDSA
+		# signature, and a bash script can do neither. Opening the app hands the
+		# update to the updater written for it.
+		#
+		# rcc used to download and install these itself, moving the old bundle
+		# aside and copying the new one in with `|| true` on every line. When the
+		# copy failed the app was already gone and a tick was printed anyway;
+		# that is how Disk Drill was destroyed on 2026-06-25. Nothing in this
+		# command writes to /Applications any more.
+		# Seam, as with RACCOON_SSH in fleet.sh: the suites must be able to run
+		# this path without launching anything.
+		"${RCC_OPEN:-open}" -a "$app_path" 2>/dev/null || true
+		append_progress_output "apps: ↗ $app_name (${local_ver:-?} → $remote_ver) — opened, its own updater will install"
 		echo "$app_name" >>"${PROCESSED_APPS_FILE:-/dev/null}"
 		((updated++)) || true
 	done <"$manifest"
@@ -586,10 +531,11 @@ main() {
 
 	# Cache sudo up front (Touch ID when available) so casks/pkgs that need root
 	# complete without a prompt mid-progress (issue #23).
-	# /Applications is in the gate too: the Sparkle path installs there, and on a
-	# Mac where it is root-owned that needs a primed timestamp — the `sudo -n` it
-	# falls back to cannot ask for one from inside the progress bar.
-	if [[ "$RCC_DRY_RUN" != "true" ]] && { command -v brew >/dev/null 2>&1 || [[ ! -w /Applications ]]; }; then
+	#
+	# /Applications used to be part of this gate, because the Sparkle path wrote
+	# there and needed a primed timestamp. It no longer writes anywhere, so only
+	# brew can still need root.
+	if [[ "$RCC_DRY_RUN" != "true" ]] && command -v brew >/dev/null 2>&1; then
 		if ensure_sudo; then
 			start_sudo_keepalive
 		else
