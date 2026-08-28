@@ -380,7 +380,7 @@ update_homebrew_catalog() {
 
 # Decide a Sparkle update from an appcast piped on stdin. Args: local short
 # version (CFBundleShortVersionString), local build (CFBundleVersion). Prints
-# the remote version when an update is available, nothing otherwise.
+# "<remote_ver>\t<dl_url>" when an update is available, nothing otherwise.
 # Compares like-for-like — marketing version vs shortVersionString, or build vs
 # sparkle:version — never a build number against a marketing string, which is
 # what made the old "head -1 of the whole feed" logic misfire (e.g. comparing
@@ -389,7 +389,7 @@ update_homebrew_catalog() {
 # convention. Switch to a max-version scan if a real feed ever violates that.
 _sparkle_decide() {
 	local l_short="$1" l_build="$2"
-	local xml item r_short r_build enclosure local_ver remote_ver
+	local xml item r_short r_build dl_url local_ver remote_ver
 	xml="$(cat)"
 	# No `exit` after the first record: awk must drain stdin, otherwise printf
 	# gets SIGPIPE and (under set -o pipefail) aborts this function on big feeds.
@@ -399,7 +399,7 @@ _sparkle_decide() {
 	[[ -z "$r_short" ]] && r_short="$(printf '%s\n' "$item" | grep -o '<sparkle:shortVersionString>[^<]*' | head -1 | sed 's/.*>//' || true)"
 	r_build="$(printf '%s\n' "$item" | grep -o 'sparkle:version="[^"]*"' | head -1 | sed 's/.*="//; s/"//' || true)"
 	[[ -z "$r_build" ]] && r_build="$(printf '%s\n' "$item" | grep -o '<sparkle:version>[^<]*' | head -1 | sed 's/.*>//' || true)"
-	enclosure="$(printf '%s\n' "$item" | grep -oE 'url="https://[^"]*\.(dmg|zip|pkg|tbz|tar\.[a-z]+)' | head -1 | sed 's/url="//' || true)"
+	dl_url="$(printf '%s\n' "$item" | grep -oE 'url="https://[^"]*\.(dmg|zip|pkg|tbz|tar\.[a-z]+)' | head -1 | sed 's/url="//' || true)"
 
 	if [[ -n "$r_short" && -n "$l_short" ]]; then
 		local_ver="$l_short"; remote_ver="$r_short"
@@ -408,11 +408,9 @@ _sparkle_decide() {
 	else
 		return 0
 	fi
-	# An item with no downloadable enclosure is not an update anyone can take,
-	# so it is still the gate — rcc simply no longer fetches what it points at.
-	[[ -z "$enclosure" ]] && return 0
+	[[ -z "$dl_url" ]] && return 0
 	_version_outdated "$local_ver" "$remote_ver" || return 0
-	printf '%s\n' "$remote_ver"
+	printf '%s\t%s\n' "$remote_ver" "$dl_url"
 }
 
 update_sparkle_apps() {
@@ -420,7 +418,7 @@ update_sparkle_apps() {
 	increment_global_progress
 
 	local updated=0 skipped=0
-	local app_dir app_path app_name feed xml remote_ver local_ver local_build
+	local app_dir app_path app_name feed xml remote_ver local_ver local_build decision
 	local slot manifest fetchlist
 
 	SPARKLE_FEED_DIR="$(mktemp -d /tmp/raccoon-feeds-XXXXXX)"
@@ -474,11 +472,14 @@ update_sparkle_apps() {
 		xml="$(cat "$SPARKLE_FEED_DIR/$slot.xml" 2>/dev/null || true)"
 		[[ -z "$xml" ]] && continue
 
-		remote_ver="$(printf '%s' "$xml" | _sparkle_decide "$local_ver" "$local_build")"
-		if [[ -z "$remote_ver" ]]; then
+		decision="$(printf '%s' "$xml" | _sparkle_decide "$local_ver" "$local_build")"
+		if [[ -z "$decision" ]]; then
 			((skipped++)) || true
 			continue
 		fi
+		# _sparkle_decide still reports the enclosure URL — it is what proves the
+		# item is a real update — but nothing downloads it any more.
+		remote_ver="${decision%%$'\t'*}"
 
 		if [[ "$RCC_DRY_RUN" == "true" ]]; then
 			append_progress_output "sparkle: $app_name ${local_ver:-?} → $remote_ver"
