@@ -122,7 +122,7 @@ show_health_history() {
 
 show_brand_banner() {
     echo ""
-    echo -e "${GREEN}     _${NC}"
+    echo -e "${GREEN}    _${NC}"
     echo -e "${GREEN}   / \_/\_   ${NC}Raccoon ${TAGLINE}"
     echo -e "${GREEN}  ( o.o )  ${NC}"
     echo -e "${GREEN}   > ^ <${NC}"
