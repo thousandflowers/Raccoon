@@ -62,3 +62,15 @@ teardown() {
 	assert_success
 	assert_output "re-linked"
 }
+
+@test "install.sh reports the real version, not the fallback expression" {
+	echo "0.16.0" > "$HOME/.raccoon/VERSION"
+	# The real function out of install.sh, not a copy of it: the bug this covers
+	# was that get_version read the wrong file, which a reimplementation here
+	# would have reproduced as "correct".
+	eval "$(sed -n '/^get_version()/,/^}/p' "$SCRIPT_DIR/install.sh")"
+	INSTALL_DIR="$HOME/.raccoon"
+	run get_version
+	assert_success
+	[[ "$output" == "0.16.0" ]]
+}

@@ -3,7 +3,7 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
-## [0.16.0] - 2026-08-30
+## [0.16.0] - 2026-08-31
 
 ### Added
 
