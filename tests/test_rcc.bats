@@ -166,3 +166,17 @@ teardown() { teardown_raccoon_env; }
     assert_failure
 }
 
+@test "rcc: bash completion offers every command the menu has" {
+	# The word list is written by hand and drifted once already: apps shipped
+	# with a flag branch further down the file but was never suggested as a
+	# first word, so tab did not know the command existed.
+	local words
+	words=$(grep -oE "compgen -W '[^']+'" "$SCRIPT_DIR/completions/bash/rcc" | head -1)
+	while read -r name; do
+		[[ -n "$name" ]] || continue
+		[[ "$words" == *" $name "* || "$words" == *"'$name "* ]] || {
+			echo "bash completion is missing: $name"
+			false
+		}
+	done < <(grep -oE '^\s+"[a-z]+:' "$SCRIPT_DIR/lib/core/commands.sh" | tr -d ' ":')
+}
