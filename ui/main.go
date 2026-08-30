@@ -2814,6 +2814,34 @@ func (m model) View() string {
 
 // ─── Menu View ─────────────────────────────────────────────
 
+// menuChromeLines is what menuView draws around the command list: a leading
+// blank, four lines of raccoon, the blank under it, the blank above the footer,
+// and the footer — eight rows — plus one held back, because the view ends in a
+// newline and writing that on the last row of the window scrolls it. The search
+// prompt adds one more.
+const menuChromeLines = 9
+
+// menuWindow is the slice of the list that fits on screen, positioned to keep
+// the selection in view. Without it the menu drew all 29 commands into a 24-row
+// terminal and the raccoon scrolled off the top — the running and output views
+// have clamped to m.height all along, the menu was the one that did not.
+// Height is 0 until the first WindowSizeMsg, and that means "no limit known".
+func (m model) menuWindow(total int) (int, int) {
+	if m.height <= 0 {
+		return 0, total
+	}
+	chrome := menuChromeLines
+	if m.searchQuery != "" {
+		chrome++
+	}
+	visible := max(1, min(total, m.height-chrome))
+	if visible >= total {
+		return 0, total
+	}
+	start := max(0, min(m.selected-visible/2, total-visible))
+	return start, start + visible
+}
+
 func (m model) menuView() string {
 	var b strings.Builder
 
@@ -2827,7 +2855,9 @@ func (m model) menuView() string {
 	if len(f) == 0 {
 		b.WriteString(styleError.Render("  No matches found") + "\n\n")
 	} else {
-		for i, it := range f {
+		start, end := m.menuWindow(len(f))
+		for i := start; i < end; i++ {
+			it := f[i]
 			if i == m.selected {
 				b.WriteString(styleSelected.Render(it.title) + "  " + styleDesc.Render(it.description) + "\n")
 			} else {
