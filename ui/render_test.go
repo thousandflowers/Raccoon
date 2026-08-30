@@ -155,3 +155,15 @@ func TestMenuWindowShowsEverythingBeforeTheFirstResize(t *testing.T) {
 		t.Errorf("window [%d,%d), want the whole list of %d", start, end, len(m.items))
 	}
 }
+
+// The menu banner was drawn by hand and drifted: its head sat one column right
+// of every other raccoon in the program, so the tip missed the notch between
+// the ears. It has to be the same animal the animations draw.
+func TestMenuBannerIsTheSameRaccoon(t *testing.T) {
+	view := model{items: items(), width: 80, height: 40}.menuView()
+	for _, line := range strings.Split(raccoonFrames[0], "\n") {
+		if !strings.Contains(view, line) {
+			t.Errorf("banner is missing %q", line)
+		}
+	}
+}
