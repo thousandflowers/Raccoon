@@ -115,3 +115,55 @@ func TestArtNeverStarvesTheOutput(t *testing.T) {
 		}
 	}
 }
+
+// The menu is the first thing rcc draws, and on an 80x24 terminal it used to
+// draw 29 commands into 24 rows: the terminal scrolled and the raccoon at the
+// top was gone before the user saw it. The view must fit the window it is given.
+func TestMenuViewFitsTheTerminal(t *testing.T) {
+	for _, height := range []int{10, 24, 40, 100} {
+		m := model{items: items(), width: 80, height: height}
+		lines := strings.Split(strings.TrimSuffix(m.menuView(), "\n"), "\n")
+
+		// height-1, not height: the trailing newline the view ends on scrolls
+		// the window if it lands on the last row, which is the whole bug.
+		if len(lines) > height-1 {
+			t.Errorf("height %d: menu rendered %d rows", height, len(lines))
+		}
+		if !strings.Contains(m.menuView(), "( o.o )") {
+			t.Errorf("height %d: the raccoon is missing from the top", height)
+		}
+	}
+}
+
+// Scrolling past the last visible row must bring the selection with it, or the
+// cursor lands on a command that is not on screen.
+func TestMenuViewKeepsTheSelectionVisible(t *testing.T) {
+	all := items()
+	for _, selected := range []int{0, 5, len(all) / 2, len(all) - 1} {
+		m := model{items: all, width: 80, height: 24, selected: selected}
+		start, end := m.menuWindow(len(all))
+		if selected < start || selected >= end {
+			t.Errorf("selected %d outside the window [%d,%d)", selected, start, end)
+		}
+	}
+}
+
+// A model that has not been told its size yet must not hide anything.
+func TestMenuWindowShowsEverythingBeforeTheFirstResize(t *testing.T) {
+	m := model{items: items(), width: 0, height: 0}
+	if start, end := m.menuWindow(len(m.items)); start != 0 || end != len(m.items) {
+		t.Errorf("window [%d,%d), want the whole list of %d", start, end, len(m.items))
+	}
+}
+
+// The menu banner was drawn by hand and drifted: its head sat one column right
+// of every other raccoon in the program, so the tip missed the notch between
+// the ears. It has to be the same animal the animations draw.
+func TestMenuBannerIsTheSameRaccoon(t *testing.T) {
+	view := model{items: items(), width: 80, height: 40}.menuView()
+	for _, line := range strings.Split(raccoonFrames[0], "\n") {
+		if !strings.Contains(view, line) {
+			t.Errorf("banner is missing %q", line)
+		}
+	}
+}

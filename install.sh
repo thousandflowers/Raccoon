@@ -17,9 +17,14 @@ detect_bin_dir() {
 	fi
 }
 
+# The version lives in the VERSION file — commands.sh only reads it, and has
+# done since the formula started stamping the tag there. Grepping commands.sh
+# for VERSION= matched its `VERSION="${VERSION:-dev}"` fallback and printed that
+# line verbatim, so every curl install ended on "installed successfully
+# (v${VERSION:-dev})".
 get_version() {
-	if [[ -f "${INSTALL_DIR}/lib/core/commands.sh" ]]; then
-		grep '^VERSION=' "${INSTALL_DIR}/lib/core/commands.sh" | sed 's/VERSION="\([^"]*\)"/\1/'
+	if [[ -f "${INSTALL_DIR}/VERSION" ]]; then
+		tr -d '[:space:]' < "${INSTALL_DIR}/VERSION"
 	fi
 }
 

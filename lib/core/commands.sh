@@ -61,18 +61,28 @@ TOTAL_OPTIONS=${#MENU_ITEMS[@]}
 show_version() {
     echo "Raccoon version ${VERSION}"
     echo "macOS companion toolkit"
+}
+
+# MENU_ITEMS entries are "name:description"; printing them raw put the colon in
+# front of the user. Split on the first one and pad the names to the longest,
+# computed rather than fixed so a new command can never break the column.
+show_help() {
+    local item name width=0
+    for item in "${MENU_ITEMS[@]}"; do
+        [[ "$item" == "---" ]] && continue
+        name="${item%%:*}"
+        if (( ${#name} > width )); then width=${#name}; fi
+    done
+
+    show_version
     echo ""
     echo "Commands:"
     for item in "${MENU_ITEMS[@]}"; do
         [[ "$item" == "---" ]] && continue
-        echo "  rcc $item"
+        printf '  rcc %-*s  %s\n' "$width" "${item%%:*}" "${item#*:}"
     done
     echo ""
     echo "Run 'rcc' for interactive menu"
-}
-
-show_help() {
-    show_version
 }
 
 # Mini sparkline of the last 7 audits under the banner: ● = no failures,

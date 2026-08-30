@@ -36,30 +36,32 @@ type sudoPrimed struct {
 }
 
 // ─── Raccoon animation frames ──────────────────────────────
-// Each frame is exactly 4 lines. Title is rendered separately
-// above the art, so all 4 lines are pure ASCII scene.
+// Every frame within one animation has the same number of lines — four for
+// most, more where the scene needs the room — because a frame of a different
+// height makes the raccoon jump between beats. Title is rendered separately
+// above the art, so the lines are pure ASCII scene.
 
 type raccoonAnimation []string
 
 // Default fallback (5 basic frames)
 var raccoonFrames = raccoonAnimation{
-	`     _
+	`    _
    / \_/\_
   ( o.o )
    > ^ <`,
-	`     _
+	`    _
    / \_/\_
   ( -.- )
    > ^ <`,
-	`     _
+	`    _
    / \_/\_
   ( ^.^ )
    > ^ <`,
-	`     _
+	`    _
    / \_/\_
   ( *.* )
    > ^ <`,
-	`     _
+	`    _
    / \_/\_
   ( >.< )
    > ^ <`,
@@ -67,7 +69,7 @@ var raccoonFrames = raccoonAnimation{
 
 // Each script gets its own animation with a completely unique
 // visual style — different body shapes, objects, and action
-// sequences. All frames are exactly 4 lines.
+// sequences. Frame height is per-animation, not four everywhere.
 var scriptFrames = map[string]raccoonAnimation{
 	// wifi — a field of waves filling the width, with the name of each
 	// remembered network sailing through it. Not connected leaves the field
@@ -2814,11 +2816,39 @@ func (m model) View() string {
 
 // ─── Menu View ─────────────────────────────────────────────
 
+// menuChromeLines is what menuView draws around the command list: a leading
+// blank, four lines of raccoon, the blank under it, the blank above the footer,
+// and the footer — eight rows — plus one held back, because the view ends in a
+// newline and writing that on the last row of the window scrolls it. The search
+// prompt adds one more.
+const menuChromeLines = 9
+
+// menuWindow is the slice of the list that fits on screen, positioned to keep
+// the selection in view. Without it the menu drew all 29 commands into a 24-row
+// terminal and the raccoon scrolled off the top — the running and output views
+// have clamped to m.height all along, the menu was the one that did not.
+// Height is 0 until the first WindowSizeMsg, and that means "no limit known".
+func (m model) menuWindow(total int) (int, int) {
+	if m.height <= 0 {
+		return 0, total
+	}
+	chrome := menuChromeLines
+	if m.searchQuery != "" {
+		chrome++
+	}
+	visible := max(1, min(total, m.height-chrome))
+	if visible >= total {
+		return 0, total
+	}
+	start := max(0, min(m.selected-visible/2, total-visible))
+	return start, start + visible
+}
+
 func (m model) menuView() string {
 	var b strings.Builder
 
 	b.WriteString("\n")
-	b.WriteString(styleTitle.Render("     _") + "\n")
+	b.WriteString(styleTitle.Render("    _") + "\n")
 	b.WriteString(styleTitle.Render("   / \\_/\\_") + "  " + styleTitle.Render("Raccoon") + "\n")
 	b.WriteString(styleTitle.Render("  ( o.o )") + "  " + styleDesc.Render("macOS companion toolkit") + "\n")
 	b.WriteString(styleTitle.Render("   > ^ <") + "\n\n")
@@ -2827,7 +2857,9 @@ func (m model) menuView() string {
 	if len(f) == 0 {
 		b.WriteString(styleError.Render("  No matches found") + "\n\n")
 	} else {
-		for i, it := range f {
+		start, end := m.menuWindow(len(f))
+		for i := start; i < end; i++ {
+			it := f[i]
 			if i == m.selected {
 				b.WriteString(styleSelected.Render(it.title) + "  " + styleDesc.Render(it.description) + "\n")
 			} else {

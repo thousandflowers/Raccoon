@@ -4,6 +4,7 @@ ui/rcc-ui
 ui/ui
 ui/rcc-ui-*
 dist/
+node_modules/
 
 # Audit output and history
 audit_*.json
