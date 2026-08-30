@@ -39,6 +39,21 @@ teardown() {
 	assert_output_contains "Raccoon version"
 }
 
+@test "show_version does not list the commands" {
+	run show_version
+	assert_success
+	[[ "$output" != *"Commands:"* ]]
+}
+
+@test "show_help splits the menu entries into two columns" {
+	run show_help
+	assert_success
+	assert_output_contains "Commands:"
+	# The raw "name:description" form must never reach the user.
+	[[ "$output" != *"upgrade:Update packages"* ]]
+	assert_output_contains "upgrade "
+}
+
 @test "reset_terminal does not error" {
 	run reset_terminal
 	assert_success

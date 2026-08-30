@@ -3,6 +3,18 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [0.16.0] - 2026-08-30
+
+### Added
+
+- Every command draws its own animation while it runs, and reads live output to do it. All 22 scripts had shared five frames of a raccoon blinking, or one of nineteen variants of the same face with a different symbol stuck to its right; now `audit` follows the failures already printed, `disk` reads the Percent column volume by volume (APFS volumes share free space, so dividing per volume lies), `memory` shows four fatigue bands from wired+compressed against swap fill, `env` walks the PATH as a trail with holes where entries are missing, and so on for the rest. Three rules hold across all of them, and the tests fail if they stop holding: the silhouette is never deformed - objects hang beside the raccoon or the whole shape translates, but it never loses a piece, where the old frames mutilated the head into `__\_/\_`; every frame in an animation is the same height, where 92 of the old 157 had three lines against the rest's four and made the raccoon jump between beats; and nothing is claimed that has not happened, so `audit` announces no verdict before its checks finish and `git` never shows a commit crossing to a remote, which `rcc git` cannot push to.
+
+### Fixed
+
+- `rcc apps` no longer writes to `/Applications` at all. Layer 4 installed by hand: `_install_from_url` moved the existing bundle aside and copied the new one in with `|| true` on every line, so a failed copy left no app behind and still printed `✓ <app>`. That is how Disk Drill was destroyed on 2026-06-25 - it survives only as four `.raccoon-bak-*` folders. Every layer 4 app carries `SUFeedURL` in its plist, which means it ships Sparkle, and Sparkle swaps the bundle atomically and verifies the EdDSA signature; a bash script can do neither. The layer now reports the update and opens the app, letting the updater written for it do the install. Falling out of that: the manifest carries `app_path` because pass 3 opens the app after the loop that knew where it lives has ended, `_sparkle_decide` returns just the version (the enclosure URL had no consumer left, though its presence is still the gate - an item nobody can download is not an update), `/Applications` leaves the sudo gate so only brew can still need root, and `RCC_OPEN` seams the launch the way `RACCOON_SSH` already does in `fleet.sh` so the suite can exercise the path without opening anything. Layers 1-3 and `--no-sparkle`/`--auto-launch` are untouched.
+- `rcc help` printed the raw menu entries, colon and all - `rcc upgrade:Update packages`. The list is stored as `name:description` and the loop echoed it whole; names and descriptions are two padded columns now, the width computed from the longest name so a new command cannot break it.
+- `rcc --version` printed the entire command list: `show_help` was an alias for `show_version`, so asking for a version got thirty lines. `--version` is the two lines it claims to be, and the command list belongs to `help`.
+
 ## [0.15.1] - 2026-08-25
 
 ### Fixed
