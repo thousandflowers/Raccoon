@@ -4,6 +4,15 @@ Working note for the session that refreshes `docs/gifs/`. Written 2026-08-31,
 right after 0.17.0 was prepared locally. Everything below was verified by
 reading the repo, not by memory.
 
+**That session has since run.** What it did, and where it departed from this
+plan, is in the commits from `docs: give Remotion and vhs disjoint output
+paths` onward. In short: the collision was twenty files rather than one; hero
+was reshot with vhs under a throwaway HOME; `menu.txt` was transcribed from
+`menuView()`; nine of the nineteen fixtures were recaptured and ten were
+deliberately kept, each for a reason recorded in its commit; and the six real
+names in the Go test fixtures were made synthetic. The plan below is kept as
+written so the reasoning stays readable next to what actually happened.
+
 The GIFs are stale in two different ways. Nineteen of the twenty Remotion
 fixtures were captured on 2026-06-22 and show 0.11.0-era output. `hero.gif`,
 the first image in the README, is older still and is not produced by the
