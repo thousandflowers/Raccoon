@@ -1,8 +1,9 @@
+
 +---------------------------------------+
 | Core Security                         |
 +---------------------------------------+
-| ✓ FileVault: Enabled                  |
-| ✓ SIP: Enabled                        |
+| ⚠ FileVault: Unknown                  |
+| ⚠ SIP: Unknown                        |
 | ✓ Gatekeeper: Enabled                 |
 | ✗ Firewall: Disabled                  |
 | ⚠ Stealth Mode: Disabled              |
@@ -12,11 +13,11 @@
 +---------------------------------------+
 | Network                               |
 +---------------------------------------+
-| ✓ Open Ports: 3 listening             |
-| ✓ DNS Servers: DHCP-provided          |
+| ✓ Open Ports: 0 listening             |
+| ✓ DNS Servers: 1.1.1.1                |
 | ✓ VPN: None configured                |
-| ⚠ Bluetooth: On                       |
-| ✓ Sharing: None enabled               |
+| ⚠ Bluetooth: Unknown                  |
+| ⚠ Sharing: 1 enabled                  |
 | ✓ SSH Daemon: Disabled                |
 +---------------------------------------+
 
@@ -24,34 +25,45 @@
 | User & Auth                           |
 +---------------------------------------+
 | ✓ Auto-Login: Disabled                |
-| ✓ Keychain: 3 available               |
+| ✓ Keychain: 1 available               |
+| ✓ SSH Keys: None                      |
 | ✓ Authorized Keys: None               |
-| ✓ Sudoers: OK                         |
+| ✗ Sudoers: Error                      |
 +---------------------------------------+
 
 +---------------------------------------+
 | Persistence                           |
 +---------------------------------------+
-| ✓ User LaunchAgents: 4 items          |
+| ✓ User LaunchAgents: None             |
+| ✓ System LaunchAgents: 7 items        |
+| ✓ LaunchDaemons: 14 items             |
 | ✓ Cron Jobs: None                     |
-| ✓ Login Items: 9 items                |
+| ✓ At Jobs: None                       |
+| ✓ Login Items: 6 items                |
 +---------------------------------------+
 
 +---------------------------------------+
 | Additional                            |
 +---------------------------------------+
-| ✓ XProtect: Active                    |
-| ✓ Quarantined Files: 3 (Gatekeeper)   |
-| ✓ .ssh Permissions: Secure            |
+| ⚠ XProtect: Unknown                   |
+| ⚠ Screen Lock: Default                |
+| ⚠ .ssh Permissions: Insecure          |
+| ✓ Quarantined Files: None             |
+| ✓ Kernel Extensions: 1 (third-party)  |
+| ✓ Sudo Access: Limited                |
+| ⚠ DNS-over-HTTPS: Disabled            |
 +---------------------------------------+
 
-  Summary:  18 pass   2 warn   1 fail
++---------------------------------------+
+| Summary                               |
++---------------------------------------+
+| Pass     19                           |
+| Warning  9                            |
+| Fail     2                            |
++---------------------------------------+
+| ✗ Action required                     |
++---------------------------------------+
 
-  Would fix (--dry-run):
-    → Firewall: socketfilterfw --enable
-    → Stealth Mode: --setstealthmode on
-
-  ℹ Destructive fixes back up to ~/.raccoon/fix-backups/ first.
-  ℹ Opt out per machine via ~/.raccoon/audit.conf.
+7 issue(s) can be fixed automatically. Run: rcc audit --fix
 
 ✓ Completed

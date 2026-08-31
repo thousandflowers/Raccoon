@@ -9,8 +9,7 @@
 [2/4] DerivedData...
 | Metric               | Value                |
 | -------------------- | -------------------- |
-| Size                 | 0B                   |
-| Projects             | 1                    |
+| DerivedData          | not found            |
 ✓
 
 [3/4] Device Support...
@@ -30,7 +29,7 @@
 
 [4/4] Xcode Version...
   Version info:
-| Xcode 26.5                               |
+| Xcode 26.6                               |
 ✓
 
 ✓ Completed

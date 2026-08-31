@@ -33,7 +33,7 @@ add "$(scutil --get LocalHostName 2>/dev/null)"
 # than on its shape: a bare run of capitals matches ESTABLISHED.
 shapes=(
 	'[a-z0-9._-]+@[a-z0-9.-]+\.(local|lan|home)'
-	'fe80::[0-9a-f:]+'
+	'fe80:[0-9a-f]*:[0-9a-f:]+'
 	'([0-9a-f]{2}:){5}[0-9a-f]{2}'
 	'[Ss]erial([ _-]?[Nn]umber)?[^A-Za-z0-9]+[A-Z0-9]{8,}'
 )

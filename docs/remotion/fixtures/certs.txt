@@ -4,7 +4,7 @@
 [1/3] User Keychain Certificates...
 Total               Valid     Expiring      Expired  Self-Signed
 ────────────────────────────────────────────────────────────────────────────
-42                     28            0           14            8
+42                     26            2           14            8
 ✓
 
 [3/4] Keychain Locations...

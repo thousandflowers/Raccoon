@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="docs/gifs/hero.gif" alt="Raccoon - rcc audit running" width="800">
+  <img src="docs/gifs/hero.gif" alt="The Raccoon menu, and rcc disk running from it" width="800">
 </p>
 
 # 🦝 Raccoon
@@ -12,7 +12,7 @@
 [![Release](https://img.shields.io/github/v/release/thousandflowers/Raccoon?sort=semver&color=blue)](https://github.com/thousandflowers/Raccoon/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-The CLI has zero runtime dependencies beyond macOS + git - Go is needed only to build the optional TUI. ~6,500 lines of shellcheck-clean Bash across 21 command scripts, covered by 38 bats test files. Runs on the system Bash (3.2 → 5.x) - no Homebrew required.
+The CLI has zero runtime dependencies beyond macOS + git - Go is needed only to build the optional TUI. ~9,300 lines of shellcheck-clean Bash across 22 command scripts, covered by 496 tests in 44 bats files. Runs on the system Bash (3.2 → 5.x) - no Homebrew required.
 
 ---
 
@@ -99,11 +99,20 @@ rm -rf ~/.raccoon && rm "$(which rcc)"      # curl install
 
 ```bash
 rcc audit                 # 30+ security checks (Gatekeeper, firewall, SIP, sharing…)
-rcc audit --fix           # apply safe fixes — every change is backed up first
+rcc audit --fix           # apply safe fixes - every change is backed up first
 rcc audit --deep          # add slower, deeper checks
 rcc audit --json          # machine-readable output (also: --csv, --report file.md)
 rcc audit --baseline      # snapshot now; later runs diff against it
 rcc audit --verbose       # show the exact command + raw output behind each check
+```
+
+`--json` is implemented by 7 of the 22 commands (`audit`, `battery`, `memory`,
+`overlap`, `ports`, `trash`, `wifi`). Eight more refuse it with exit 64 and a
+one-line reason rather than printing the human report and calling it JSON. On
+`audit`, `--csv` still appends its rows below the boxed report instead of
+replacing it.
+
+```bash
 rcc audit --cis           # map checks to the CIS Apple macOS Benchmark + coverage
 rcc audit --only core,network   # run only some check groups (--list-checks to list)
 rcc audit --report out.html     # auditor-ready self-contained HTML report
@@ -127,7 +136,7 @@ $ rcc audit
   ✓ FileVault            Enabled
   ✓ Gatekeeper           Enabled
   ✓ SIP                  Enabled
-  ⚠ Firewall             On — stealth mode off
+  ⚠ Firewall             On - stealth mode off
   ✓ Screen Lock          Locks immediately
   ⚠ Sharing              Remote Login (SSH) enabled
   ✗ Software Updates     3 updates pending
@@ -161,7 +170,7 @@ produces a branded intervention sheet (also `--report report.rtf` for Pages/Word
 
 **Date:** 2026-06-26
 **Technician:** Mario Rossi
-**Client:** Jane Doe — MacFix Pro
+**Client:** Jane Doe - MacFix Pro
 
 ## Issues found and resolved
 
@@ -290,7 +299,7 @@ auto-updaters are detected and skipped by default; `--auto-launch` opens them
 to trigger their own updater. Skip a layer with `--no-catalog` / `--no-sparkle`.
 
 Layer 4 never installs anything. An app with a `SUFeedURL` ships Sparkle, which
-swaps the bundle atomically and verifies its EdDSA signature — neither of which
+swaps the bundle atomically and verifies its EdDSA signature - neither of which
 a shell script can do. `rcc` reports that an update exists and opens the app so
 its own updater applies it. **Nothing in `rcc apps` writes to `/Applications`.**
 
@@ -408,7 +417,7 @@ Fair question for a tool that audits security and runs `sudo`. The honest answer
 - **Network calls are only the obvious ones:** `apps` fetches the Homebrew cask catalog and Sparkle appcasts to find updates; `audit --share` (opt-in only) uploads a report to GitHub; `fleet` connects over SSH to *your* hosts and uses Bonjour/ping on *your* LAN for `scan`; `upgrade` talks to the package managers you already use. Nothing leaves your machine unless you run one of those.
 - **`sudo` only when it's doing the work** - applying `audit --fix` changes or installing a cask - never just to look around.
 - **Reports redact secrets by default.** Every sharable format (`--json`, `--csv`, `--html`, `--report`, `--share`, and the fleet aggregate) scrubs passwords, keys, tokens, and IP/MAC addresses at a single choke point before anything is written - so a report is safe to hand over without hand-checking it first. The live on-screen summary still shows your own machine's real values. Pass `--no-redact` when you deliberately want them verbatim.
-- **Auditable.** ~6,500 lines of plain Bash across 21 command scripts, `shellcheck -S warning` clean, covered by 38 bats test files. Read any command in [`bin/`](bin/). Nothing else ships - the interactive TUI is built from source, not committed as a binary.
+- **Auditable.** ~9,300 lines of plain Bash across 22 command scripts, `shellcheck -S warning` clean, covered by 496 tests in 44 bats files. Read any command in [`bin/`](bin/). Nothing else ships - the interactive TUI is built from source, not committed as a binary.
 
 ---
 
@@ -416,21 +425,41 @@ Fair question for a tool that audits security and runs `sudo`. The honest answer
 
 Raccoon has an optional terminal UI built with [Bubble Tea](https://github.com/charmbracelet/bubbletea). It is **built from source, not committed as a binary**: `brew install` compiles it for you, and the `curl | bash` installer builds it automatically when Go is present. Without it, bare `rcc` falls back to a built-in Bash text menu (printing a one-line hint on how to get the TUI) - every command still works.
 
+22 commands in four categories, with `fleet` collapsed behind its marker:
+
 ```
-┌────────────────────────────────────────────────┐
-│ Raccoon                                          │
-│ macOS companion toolkit                          │
-│                                                  │
-│ upgrade       audit        network               │
-│ fleet scan    fleet audit  fleet status          │
-│ fleet list    fleet groups                       │
-│ disk          memory       ssh         git       │
-│ ports         battery      backup      env       │
-│ startup       trash        fonts       history   │
-│ certs         docker       xcode       overlap   │
-│                                                  │
-│ ←→ Navigate · ↑↓ Rows · / Search · Enter Run     │
-└────────────────────────────────────────────────┘
+   n___n  Raccoon
+  [ o.o ]  macOS companion toolkit
+   > ^ <
+
+── Maintenance ─────────────────────────────────────────────
+audit  Security audit + fix
+upgrade  Update packages (brew, pip, npm, gem)
+apps  Update GUI apps (App Store + casks)
+backup  Time Machine status
+trash  Trash size + contents
+── System ──────────────────────────────────────────────────
+disk  Disk space, APFS, SMART status
+memory  Processes sorted by RAM usage
+battery  Health, cycles, charging
+startup  Launch agents, login items
+fonts  Dupes, corrupted, catalog
+── Network ─────────────────────────────────────────────────
+network  Interfaces, Wi-Fi, DNS, routing
+wifi  Wi-Fi and saved passwords
+ports  Open ports and listeners
+certs  SSL certificate overview
+ssh  SSH key management
+fleet ▸  Audit Mac fleet over SSH
+── Development ─────────────────────────────────────────────
+git  Repo scan, branches, stash
+docker  Images, containers, volumes
+xcode  Simulators, derived data, SPM
+env  PATH, symlinks, tool versions
+overlap  Which manager is behind each PATH entry
+history  Shell history analysis
+
+  ↑↓ j/k Navigate · Enter Run · / Search
 ```
 
 Build it yourself with `cd ui && ./build.sh` (needs Go). The binary lands in

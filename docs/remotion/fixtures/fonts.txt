@@ -14,8 +14,8 @@
 [3/4] FontConfig Catalog...
 | Metric                    | Count                |
 | ------------------------- | -------------------- |
-| Total fonts               | 895                  |
-| Unique families           | 895                  |
+| Total fonts               | 940                  |
+| Unique families           | 940                  |
 ✓
 
 [4/4] Duplicate & Corrupt Check...

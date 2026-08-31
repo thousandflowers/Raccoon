@@ -4,26 +4,27 @@
 [1/5] Physical Disks...
 | Disk       | Int/Ext  | Size         | Mount                | SMART      |
 | ---------- | -------- | ------------ | -------------------- | ---------- |
+| disk0      | internal | 500.3 GB     | none                 | Verified   |
 ✓
 
 [2/5] Volumes...
 | Volume                 | Mount                  | Type     | Used       | Free       |
 | ---------------------- | ---------------------- | -------- | ---------- | ---------- |
-| System                 | /                      | APFS     | 12Gi       | 91Gi       |
-| Data                   | /System/Volumes/Data   | APFS     | 342Gi      | 91Gi       |
+| System                 | /                      | APFS     | 12Gi       | 66Gi       |
+| Data                   | /System/Volumes/Data   | APFS     | 364Gi      | 66Gi       |
 ✓
 
 [3/5] APFS Container...
 | Container          | Size         | Free         |
 | ------------------ | ------------ | ------------ |
-| disk3              | 494.4 GB     | 97.6 GB      |
+| disk3              | 494.4 GB     | 71.3 GB      |
 ✓
 
 [4/5] Space Usage...
 | Mount                  | Used       | Free       | Percent    |
 | ---------------------- | ---------- | ---------- | ---------- |
-| /                      | 12Gi       | 91Gi       | 12%        |
-| /System/Volumes/Data   | 342Gi      | 91Gi       | 80%        |
+| /                      | 12Gi       | 66Gi       | 16%        |
+| /System/Volumes/Data   | 364Gi      | 66Gi       | 85%        |
 ✓
 
 [5/5] Network Mounts...

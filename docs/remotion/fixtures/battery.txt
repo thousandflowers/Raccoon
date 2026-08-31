@@ -3,11 +3,11 @@
 
 | Metric          | Value                |
 | --------------- | -------------------- |
-| Cycle Count     | 640                  |
+| Cycle Count     | 694                  |
 | Max Capacity    | 85% (good)           |
 | Condition       | Normal               |
-| Charge Level    | 91%                  |
-| Charging        | Yes                  |
+| Charge Level    | 100%                 |
+| Charging        | No                   |
 | Fully Charged   | No                   |
 
 ✓ Completed

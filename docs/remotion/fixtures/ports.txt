@@ -1,11 +1,15 @@
 
 -- Network Ports
 
-| PORT     | PROTO  | PROCESS              | STATE      |
-| -------- | ------ | -------------------- | ---------- |
-| 8        | TCP    | rapportd             | ESTABLISHED |
-| 10       | TCP    | sharingd             | ESTABLISHED |
-| 7000     | TCP    | ControlCe            | LISTEN     |
-| 60338    | TCP    | rapportd             | LISTEN     |
+| PORT     | PROTO  | PID     | PROCESS              | STATE        | ADDRESS                  |
+| -------- | ------ | ------- | -------------------- | ------------ | ------------------------ |
+| 3283     | TCP    | 1862    | ARDAgent             | LISTEN       | *:3283                   |
+| 3283     | UDP    | 1862    | ARDAgent             |              | *:3283                   |
+| 3722     | UDP    | 1630    | rapportd             |              | *:3722                   |
+| 5000     | TCP    | 1631    | ControlCenter        | LISTEN       | *:5000                   |
+| 7000     | TCP    | 1631    | ControlCenter        | LISTEN       | *:7000                   |
+| 55588    | UDP    | 88928   | homed                |              | *:55588                  |
+| 56122    | TCP    | 1630    | rapportd             | LISTEN       | *:56122                  |
+| 56122    | TCP    | 1630    | rapportd             | ESTABLISHED  | 192.168.1.20:56122       |
 
 ✓ Completed
