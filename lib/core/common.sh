@@ -246,6 +246,18 @@ show_progress_bar() {
 		return 0
 	fi
 
+	# Every step is "label:command". Without the separator both expansions below
+	# return the whole string, which lands in the `cmd == label` branch and marks
+	# the step done without ever running it — a pass reported for work that never
+	# happened. Refuse the malformed step instead, before anything is drawn.
+	local step
+	for step in "${steps[@]}"; do
+		if [[ "$step" != *:* ]]; then
+			printf 'show_progress_bar: step has no ":" separator: %s\n' "$step" >&2
+			return 1
+		fi
+	done
+
 	local tmpfile
 	tmpfile=$(mktemp)
 	# Expand $tmpfile now to capture path (intentional SC2064)
@@ -396,6 +408,30 @@ print_table_row() {
         printf " %s%*s %s" "$text" "$pad" "" "$sep"
     done
     echo ""
+}
+
+# =====================================================================
+# Reading an lsof endpoint
+# =====================================================================
+
+# lsof writes a connected socket's NAME as "local->peer" and an unconnected one
+# as just the local end. Splitting the whole field on ":" and keeping the last
+# piece therefore returns the *peer's* port on anything connected, and taking
+# the first ":digits" match returns a hextet out of an IPv6 address. Both were
+# shipped, in different commands, which is why the rule lives in one place now.
+
+# rcc_local_endpoint: this machine's end of an lsof NAME field.
+rcc_local_endpoint() {
+	printf '%s\n' "${1%%->*}"
+}
+
+# rcc_local_port: the port on that end — what follows its last colon. In
+# [fe80::1]:56122 that colon is the one after the closing bracket, so an IPv6
+# literal needs no case of its own. Prints nothing when there is no port.
+rcc_local_port() {
+	local endpoint="${1%%->*}"
+	[[ "$endpoint" == *:* ]] || return 0
+	printf '%s\n' "${endpoint##*:}"
 }
 
 # =====================================================================

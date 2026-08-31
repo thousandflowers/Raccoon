@@ -89,6 +89,62 @@ _safe_name() {
 	printf '%s' "$1" | tr '/:@ .' '______'
 }
 
+# A port is digits, and inside the range a port can actually be.
+_is_port() {
+	[[ "$1" =~ ^[0-9]+$ ]] || return 1
+	((10#$1 >= 1 && 10#$1 <= 65535))
+}
+
+# _split_hostport: read the "host[:port]" a fleet.conf line starts with into
+# HL_HOST / HL_PORT.
+#
+# A colon does not mean a port here: an IPv6 literal is mostly colons, and
+# `case *:[0-9]*` used to read fe80::1 as host "fe80:" on port 1 — ssh then
+# went to a machine that does not exist. The forms, decided in this order:
+#
+#   [addr]:port   bracketed literal carrying a port
+#   [addr]        bracketed literal, no port
+#   a:b:c…        two or more colons and no brackets: a bare IPv6 literal
+#   host:port     exactly one colon
+#   host          none
+#
+# The brackets are dropped. ssh takes a bare literal as the destination — the
+# port travels in -p and never in a URI, so there is nothing to disambiguate
+# (checked with `ssh -G`, which parses without connecting) — and one form keeps
+# _safe_name from having to care.
+#
+# A port that is not a port is not treated as one: the characters go back to
+# the host, where they fail visibly, rather than becoming an invented number.
+_split_hostport() {
+	local hp="$1"
+	HL_HOST=""; HL_PORT=""
+	case "$hp" in
+		\[*\]:*)
+			HL_PORT="${hp#*\]:}"
+			HL_HOST="${hp%%\]:*}"
+			HL_HOST="${HL_HOST#\[}"
+			;;
+		\[*\])
+			HL_HOST="${hp#\[}"
+			HL_HOST="${HL_HOST%\]}"
+			;;
+		*:*:*)
+			HL_HOST="$hp"
+			;;
+		*:*)
+			HL_PORT="${hp##*:}"
+			HL_HOST="${hp%:*}"
+			;;
+		*)
+			HL_HOST="$hp"
+			;;
+	esac
+	if [[ -n "$HL_PORT" ]] && ! _is_port "$HL_PORT"; then
+		HL_HOST="$hp"
+		HL_PORT=""
+	fi
+}
+
 # Parse a fleet.conf line into HL_HOST / HL_PORT / HL_PROFILE. Returns 1 for
 # blank/comment lines.
 _parse_host_line() {
@@ -104,10 +160,7 @@ _parse_host_line() {
 			HL_PROFILE="$(printf '%s' "$rest" | sed -n 's/.*--profile[[:space:]]\{1,\}\([^[:space:]]\{1,\}\).*/\1/p')"
 			;;
 	esac
-	case "$hostport" in
-		*:[0-9]*) HL_PORT="${hostport##*:}"; HL_HOST="${hostport%:*}" ;;
-		*) HL_HOST="$hostport" ;;
-	esac
+	_split_hostport "$hostport"
 	return 0
 }
 

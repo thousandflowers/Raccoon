@@ -129,7 +129,18 @@ main() {
 	print_table_header "Port|Service|Description" 8 15 30
 	local port_found=0
 	local ports
-	ports=$(lsof -i -P -n 2>/dev/null | grep LISTEN | grep -vE "^COMMAND" | awk '{print $9}' | sed 's/.*://' | sort -u || true)
+	# `sed 's/.*://'` used to stand here. It happens to be right for the rows
+	# that reach it, but only because `grep LISTEN` removes every connected
+	# socket first: widen that filter and it would start reporting the peer's
+	# port, which is the bug bin/ports.sh shipped. rcc_local_port reads the
+	# shape of the address instead, so correctness no longer rides on the grep.
+	local endpoints
+	endpoints=$(lsof -i -P -n 2>/dev/null | grep LISTEN | grep -vE "^COMMAND" | awk '{print $9}' || true)
+	ports=$(
+		while IFS= read -r endpoint; do
+			[[ -n "$endpoint" ]] && rcc_local_port "$endpoint"
+		done <<< "$endpoints" | sort -u
+	)
 	while IFS= read -r port; do
 		[[ -z "$port" ]] && continue
 		local type

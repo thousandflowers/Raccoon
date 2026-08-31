@@ -166,3 +166,56 @@ teardown() { teardown_raccoon_env; }
     [[ -z "$SPINNER_PID" ]]
 }
 
+
+# ─── lsof endpoints ─────────────────────────────────────────────────────
+#
+# The rule that ports.sh got wrong twice, in one place now. A connected socket
+# is written "local->peer", so the port is on the left of the arrow; on the
+# near side it is what follows the last colon, which for an IPv6 literal is the
+# one after the closing bracket.
+
+@test "common: rcc_local_port reads a listening IPv4 socket" {
+	[[ "$(rcc_local_port '*:7000')" == "7000" ]]
+	[[ "$(rcc_local_port '127.0.0.1:8765')" == "8765" ]]
+}
+
+@test "common: rcc_local_port reads a listening IPv6 socket, not a hextet" {
+	[[ "$(rcc_local_port '[fe80:e::479:7b38:ef37:a217]:56122')" == "56122" ]]
+}
+
+@test "common: rcc_local_port takes the local end of a connected IPv4 socket" {
+	[[ "$(rcc_local_port '172.20.10.3:51794->160.79.104.10:443')" == "51794" ]]
+}
+
+@test "common: rcc_local_port takes the local end of a connected IPv6 socket" {
+	local name='[fe80:e::479:7b38:ef37:a217]:56122->[fe80:e::3ccd:40ff:fe37:9664]:54343'
+	[[ "$(rcc_local_port "$name")" == "56122" ]]
+}
+
+@test "common: rcc_local_port keeps the star of an unbound socket" {
+	[[ "$(rcc_local_port '*:*')" == "*" ]]
+}
+
+@test "common: rcc_local_port says nothing when there is no port" {
+	[[ -z "$(rcc_local_port 'nocolonhere')" ]]
+}
+
+@test "common: rcc_local_endpoint drops the peer" {
+	[[ "$(rcc_local_endpoint '172.20.10.3:51794->160.79.104.10:443')" == "172.20.10.3:51794" ]]
+	[[ "$(rcc_local_endpoint '*:7000')" == "*:7000" ]]
+}
+
+# ─── show_progress_bar steps ────────────────────────────────────────────
+
+@test "common: a step without a colon is refused, not reported as done" {
+	run show_progress_bar "just-a-label"
+	[[ "$status" -ne 0 ]]
+	assert_output_contains 'no ":" separator'
+	[[ "$output" != *"done"* ]]
+}
+
+@test "common: a well-formed step is still accepted" {
+	run show_progress_bar "label:true"
+	[[ "$status" -eq 0 ]]
+	[[ "$output" != *'no ":" separator'* ]]
+}

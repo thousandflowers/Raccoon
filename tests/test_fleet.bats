@@ -217,3 +217,103 @@ teardown() {
 	assert_failure
 	assert_output_contains "Usage: rcc fleet"
 }
+
+# ─── host:port parsing ──────────────────────────────────────────────────
+#
+# `case *:[0-9]*` read any colon-then-digit as a port, so every bare IPv6
+# literal became a host that does not exist on a port nobody asked for. ssh is
+# recorded through the RACCOON_SSH seam — nothing here touches the network.
+
+_record_ssh() {
+	cat > "$HOME/recordssh" <<'MOCK'
+#!/bin/bash
+printf '%s\n' "$*" >> "$SSH_LOG"
+echo ok
+MOCK
+	chmod +x "$HOME/recordssh"
+	export SSH_LOG="$HOME/ssh.log"
+	: > "$SSH_LOG"
+	export RACCOON_SSH="$HOME/recordssh"
+}
+
+# Write one host line, run `fleet status`, and hand back what ssh was called with.
+_status_for() {
+	_record_ssh
+	printf '%s\n' "$1" > "$HOME/.raccoon/fleet.conf"
+	bash "$SCRIPT_DIR/bin/fleet.sh" status > /dev/null 2>&1 || true
+	cat "$SSH_LOG"
+}
+
+@test "fleet: a bare IPv6 literal is a host, not a host and a port" {
+	run _status_for "fe80::1"
+	assert_output_contains " fe80::1"
+	[[ "$output" != *"-p 1"* ]]
+	[[ "$output" != *"fe80: "* ]]
+}
+
+@test "fleet: a bare global IPv6 literal keeps all of its colons" {
+	run _status_for "2001:db8::1"
+	assert_output_contains " 2001:db8::1"
+	[[ "$output" != *"-p "* ]]
+}
+
+@test "fleet: a bracketed IPv6 literal loses the brackets and gains no port" {
+	run _status_for "[2001:db8::1]"
+	assert_output_contains " 2001:db8::1"
+	[[ "$output" != *"-p "* ]]
+	[[ "$output" != *"["* ]]
+}
+
+@test "fleet: the loopback literal survives" {
+	run _status_for "::1"
+	assert_output_contains " ::1"
+	[[ "$output" != *"-p "* ]]
+}
+
+@test "fleet: a bracketed IPv6 literal with a port keeps both" {
+	run _status_for "[2001:db8::1]:22"
+	assert_output_contains "-p 22"
+	assert_output_contains " 2001:db8::1"
+	[[ "$output" != *"["* ]]
+}
+
+@test "fleet: a hostname with a port still splits" {
+	run _status_for "mac.local:2222"
+	assert_output_contains "-p 2222"
+	assert_output_contains " mac.local"
+}
+
+@test "fleet: a hostname with hyphens is not mistaken for anything" {
+	run _status_for "my-host-01"
+	assert_output_contains " my-host-01"
+	[[ "$output" != *"-p "* ]]
+}
+
+@test "fleet: a port out of range is not a port" {
+	run _status_for "mac.local:99999"
+	[[ "$output" != *"-p "* ]]
+	assert_output_contains " mac.local:99999"
+}
+
+@test "fleet: port zero is not a port either" {
+	run _status_for "mac.local:0"
+	[[ "$output" != *"-p "* ]]
+}
+
+@test "fleet: a non-numeric port is not a port" {
+	run _status_for "mac.local:ssh"
+	[[ "$output" != *"-p "* ]]
+	assert_output_contains " mac.local:ssh"
+}
+
+@test "fleet: an unclosed bracket invents nothing" {
+	run _status_for "[2001:db8::1:22"
+	[[ "$output" != *"-p "* ]]
+	assert_output_contains "[2001:db8::1:22"
+}
+
+@test "fleet: a user@ prefix survives on an IPv6 literal" {
+	run _status_for "mario@2001:db8::1"
+	assert_output_contains " mario@2001:db8::1"
+	[[ "$output" != *"-p "* ]]
+}
