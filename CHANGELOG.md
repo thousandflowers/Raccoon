@@ -111,6 +111,17 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 
 ### Known defects
 
+- `--json` is still silently ignored by seven commands. This release made eight
+  refuse it with exit 64 rather than print the human report, but `apps`,
+  `backup`, `env`, `git`, `ssh`, `fleet` and `upgrade` were not among them: they
+  accept the flag and print the report anyway, which is the behaviour the change
+  set out to remove. Seven of the twenty-two implement `--json` for real
+  (`audit`, `battery`, `memory`, `overlap`, `ports`, `trash`, `wifi`). `upgrade`
+  is the odd one: it emits `__RCC_PROGRESS__` markers on stdout, so even its
+  human output is not clean text. Left undone because the list of eight was
+  drawn from the commands with a report worth serialising, and extending the
+  refusal to the rest is a second behaviour change nobody has asked for.
+
 - `rcc audit --csv` still prints the boxed report and then appends the CSV to
   the same stdout, which is what `--json` did until this release. A reader has
   to be told which line to start at. The fix is one token in the same condition
