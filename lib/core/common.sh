@@ -428,6 +428,12 @@ rcc_local_endpoint() {
 # rcc_local_port: the port on that end — what follows its last colon. In
 # [fe80::1]:56122 that colon is the one after the closing bracket, so an IPv6
 # literal needs no case of its own. Prints nothing when there is no port.
+#
+# THIS RULE IS WRITTEN TWICE. The other copy is the awk function local_port in
+# bin/ports.sh, which reads its whole table in one pass and cannot call a shell
+# function per row. Change one and you must change the other; the two are held
+# together by tests/test_port_equivalence.bats, which feeds them the same
+# inputs and fails naming the input and both answers.
 rcc_local_port() {
 	local endpoint="${1%%->*}"
 	[[ "$endpoint" == *:* ]] || return 0

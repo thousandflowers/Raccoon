@@ -67,6 +67,14 @@ _ports_awk() {
 	# The local port is what follows the last colon on the near side of "->".
 	# In [fe80::1]:56122 that colon is the one after the closing bracket, so
 	# scanning from the right needs no special case for IPv6.
+	#
+	# THIS RULE IS WRITTEN TWICE. The other copy is rcc_local_port in
+	# lib/core/common.sh, which bin/network.sh calls per line; it lives there
+	# because this one reads the whole table in a single awk pass and would lose
+	# that by handing every row back to the shell. Change one and you must change
+	# the other; the two are held together by tests/test_port_equivalence.bats,
+	# which lifts this function straight out of this file and compares it against
+	# the bash copy on the same inputs.
 	function local_port(addr,   i) {
 		for (i = length(addr); i > 0; i--)
 			if (substr(addr, i, 1) == ":") return substr(addr, i + 1)
