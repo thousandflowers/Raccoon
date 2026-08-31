@@ -11,11 +11,12 @@
 # it, and rcc is reached through a symlink inside that HOME rather than by
 # typing a real path. No absolute path appears in this file either.
 #
-# Pre-flight, before recording. It must print nothing:
-#   H=$(mktemp -d); HOME="$H" ../../rcc disk |
-#     grep -nE '/Users/|@|quetzalcoatl|lampone'; rm -rf "$H"
-# The GIF can only show what the terminal printed, so a clean capture here is
-# a clean set of frames. Re-run it if the demo command below is changed.
+# Pre-flight, before recording. It must exit 0 and print nothing:
+#   H=$(mktemp -d); HOME="$H" ../../rcc disk | ../gif-helpers/preflight.sh
+# It builds its patterns from whoami, hostname, ComputerName and $HOME at run
+# time, so it stays true on a machine that is not this one. The GIF can only
+# show what the terminal printed, so a clean capture there is a clean set of
+# frames. Re-run it if the demo command below is changed.
 
 Output ../gifs/hero.gif
 
@@ -47,8 +48,13 @@ Show
 Type "rcc" Sleep 400ms Enter
 Sleep 1500ms
 
-# Down five times: audit, upgrade, apps, backup, trash, then disk. The cursor
-# crossing from Maintenance into System is what shows the categories exist.
+# audit, upgrade, apps, backup, trash, disk. The cursor crossing from
+# Maintenance into System is what shows the categories exist.
+#
+# Six presses, not five: the first one arrives while the TUI is still taking
+# over the terminal and is swallowed. Verified by extracting a frame, not by
+# counting the list.
+Down Sleep 180ms
 Down Sleep 180ms
 Down Sleep 180ms
 Down Sleep 180ms
