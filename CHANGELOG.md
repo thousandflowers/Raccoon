@@ -3,19 +3,59 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
-## [Unreleased]
+## [0.17.0] - 2026-08-31
+
+### Added
+
+- The Raycast extension's `audit` command is a list of checks instead of a wall
+  of text. It reads `rcc audit --json`, which it had never done, and gives one
+  selectable row per check with the report's own status deciding the colour;
+  the panel beside it is fields rather than prose, carrying the category, the
+  finding, the CIS reference where there is one, and the command that verifies
+  it by hand. Per row: copy that command, copy the reference, and add the check
+  to `~/.raccoon/audit.conf` so the audit stops offering to fix it, which is
+  offered only where a fix exists and is gone once used. Nothing is shown that
+  would do nothing: a Mac with nothing wrong reports no fixable checks at all,
+  which is the ordinary case, and the thirty rows are all still there.
+- Both Raycast integrations are under version control. They existed on one disk
+  only, and the extension's icon was the sole copy of a drawing with no vector
+  source.
+- Each result of `rcc audit --json` carries `fix_available`. It answers whether
+  a fix exists for that check right now, not whether the check has one in the
+  source, because the audit only offers a fix when there is something to change.
 
 ### Changed
 
-- `rcc fleet` with no subcommand now prints its subcommands instead of running an audit. The default was `audit`, so the shortest thing anyone could type opened SSH connections to every host in `~/.raccoon/fleet.conf` — the most invasive thing the command can do, reached by typing the least. **This is a visible change of behaviour**: a script with a bare `rcc fleet` in it will get the help text and do nothing. `rcc fleet audit` is unchanged and is how the audit is run. Every other command was checked for the same shape; the only other subcommand default is `rcc fleet group`, which falls back to `list` and reads nothing but a text file.
-- The menu is four categories — Maintenance, System, Network, Development — and lists commands, not ways of launching them. The six flag forms of audit (`deep`, `quiet`, `fix`, `json`, `history`, `watch`) are out of it: a flag's place is `rcc audit --help` and the man page, where all six already were. `fleet` is one row that opens its five subcommands in place rather than five rows of the twenty-five, which is what made the first screen read as a fleet manager. `wifi` is in the menu at last: it has had a script since the beginning, its own animation since 0.16.0, and no way into the interface. Twenty-two rows, one per script in `bin/`, and the tests now check each list against the scripts that exist rather than against each other — comparing the two menus to one another is what let both of them go on missing `wifi`.
+- `rcc fleet` with no subcommand now prints its subcommands instead of running an audit. The default was `audit`, so the shortest thing anyone could type opened SSH connections to every host in `~/.raccoon/fleet.conf` - the most invasive thing the command can do, reached by typing the least. **This is a visible change of behaviour**: a script with a bare `rcc fleet` in it will get the help text and do nothing. `rcc fleet audit` is unchanged and is how the audit is run. Every other command was checked for the same shape; the only other subcommand default is `rcc fleet group`, which falls back to `list` and reads nothing but a text file.
+- The menu is four categories - Maintenance, System, Network, Development - and lists commands, not ways of launching them. The six flag forms of audit (`deep`, `quiet`, `fix`, `json`, `history`, `watch`) are out of it: a flag's place is `rcc audit --help` and the man page, where all six already were. `fleet` is one row that opens its five subcommands in place rather than five rows of the twenty-five, which is what made the first screen read as a fleet manager. `wifi` is in the menu at last: it has had a script since the beginning, its own animation since 0.16.0, and no way into the interface. Twenty-two rows, one per script in `bin/`, and the tests now check each list against the scripts that exist rather than against each other - comparing the two menus to one another is what let both of them go on missing `wifi`.
+- `rcc ports` reports the local port. On a connected socket it reported the
+  peer's: `172.20.10.3:51794->160.79.104.10:443` came back as port 443, which is
+  Apple's, not one open here, and 92 of the 150 sockets on the machine this was
+  found on were reported that way. The table got it wrong differently, returning
+  a hextet out of `[fe80:e::479:7b38:ef37:a217]:56122` as if it were a port. It
+  also showed three rows out of a hundred and fifty, because `sort -u` keyed on
+  the rendered line whose first field is the border. Anyone parsing that output
+  was parsing wrong numbers, which is why this is here rather than under fixes.
+- `rcc audit --json` and `rcc memory --json` print JSON and nothing else. They
+  printed the human report first and appended the JSON to the same stdout: valid
+  JSON started at line 66 of 96 for audit, and the machine invocation was
+  `--json --quiet` with nobody having written that down. `--quiet` still means
+  what it meant.
+- `certs`, `disk`, `docker`, `fonts`, `history`, `network`, `startup` and `xcode`
+  refuse `--json` with exit 64 instead of accepting it and printing the human
+  report. The flag was parsed and advertised in their help, and the branch was
+  empty: it did nothing at all, in silence, for six releases. The refusal says
+  "not implemented yet" rather than "unknown option", because the flag is coming.
+  64 is EX_USAGE and deliberately not 2, which audit and fleet already spend on
+  "warnings only".
+
 - `rcc --help` lists the same twenty-eight commands in the new order. The order is one editorial decision, not two, so it follows the menu; the format is unchanged, two columns and no category rows, which is what `raycast/generate.sh` parses. Regenerating produces the same twenty-eight script commands byte for byte.
 
 ### Fixed
 
 - `rcc audit` stopped at the end to ask "Fix N issue(s) automatically? [y/N]" and
   read stdin with nothing checking whether there was anyone to answer, so every
-  text-mode run — a bare `rcc audit`, `--dry-run`, `--explain` — waited forever
+  text-mode run - a bare `rcc audit`, `--dry-run`, `--explain` - waited forever
   wherever stdin does not close. Under cron it never returned; in the test suite
   it held one test for eleven minutes before it was killed. `--dry-run` reaching
   it was its own contradiction: a run that promises to change nothing stopping to
@@ -26,7 +66,48 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
   reads how many fixes are available and how to apply them, and loses only the
   question it could not answer. Machine formats never reached the prompt and are
   unchanged.
-- `MENU_ITEMS` was three things at once: the menu, the source of `rcc --help`, and through that help the source of the Raycast extension. Three consumers reading one array shaped for the first of them is why the two menus drifted apart — the bash one grew the audit flags as rows, the Go one grew five fleet subcommands instead, and twenty of the twenty-eight entries they shared were in a different order. There is one array now, and each entry says where it appears.
+- `rcc ports --json` was not JSON. `lsof` writes a space in a command name as
+  `\x20` and only quotes were escaped, so a Mac with Adobe installed produced
+  `{"process": "Adobe\x20"}` and every parser refused it. The output now carries
+  `pid`, `user` and `address` as well; `address` is the one that matters, since
+  `127.0.0.1:8765` is reachable from this machine alone and `*:7000` is reachable
+  from the network, and that distinction was being thrown away before the JSON
+  was built.
+- `rcc fleet` split every IPv6 literal into a truncated host and an invented
+  port. `fe80::1` became host `fe80:` on port 1, `::1` became host `:` on port 1,
+  and only the bracketed-with-a-port form came out right. Unlike the ports
+  defect this one did not print a wrong number, it sent ssh to a machine that
+  does not exist. A port now has to be digits in 1..65535 or it is not treated
+  as one, and brackets are dropped because `ssh` takes a bare literal.
+- `rcc network` read its listening ports correctly only by accident. It used the
+  same idiom `ports` got wrong, and was saved by a `grep LISTEN` upstream that
+  removed every connected socket first; widening that filter would have brought
+  the bug straight back. The rule now lives in one place, where the shape of the
+  address decides rather than the filter, and the section's output is unchanged.
+- A step handed to the progress bar without its separator was reported as done
+  without ever running. It fell into the branch that treats a missing command as
+  nothing to do, and reported a pass for work that did not happen.
+- `raycast/generate.sh` read a help format that stopped existing in 0.16.0 and
+  removed all twenty-eight script commands before parsing. The parse returned
+  nothing, so running it would have wiped them and written an empty command table
+  over the extension's. It reads the current format and runs to completion before
+  anything is removed.
+- Four things in the Raycast extension: a failed command looked exactly like a
+  successful one, because the exit status was resolved and never read; a command
+  that finished without printing anything left "Running" on screen for good;
+  stdout and stderr went into one buffer with no way to tell them apart; and a
+  hint told the user to press an action that did not exist.
+
+- `MENU_ITEMS` was three things at once: the menu, the source of `rcc --help`, and through that help the source of the Raycast extension. Three consumers reading one array shaped for the first of them is why the two menus drifted apart - the bash one grew the audit flags as rows, the Go one grew five fleet subcommands instead, and twenty of the twenty-eight entries they shared were in a different order. There is one array now, and each entry says where it appears.
+
+### Appearance
+
+- The raccoon reads as a raccoon. The ears were `/ \_/\_` and the eyes `( o.o )`,
+  which is a cat; they are `n___n` and `[ o.o ]` now, across all 114 frames, the
+  banner in both interfaces, and the frames the animations fall back on. The row
+  above the head is blank rather than gone, so every frame keeps its height, and
+  eyes and muzzle stay on the column they were on. The package box swapped the
+  other way, `[o]` to `(o)`, so it cannot collide with the eyes.
 
 ### Known defects
 
@@ -40,8 +121,8 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
   can answer: `bin/audit.sh:622` ("Remove the baseline?"), `bin/audit.sh:716`
   ("Remove profile 'X'?"), and `bin/startup.sh:104` and `:129` (removing orphan
   launch agents). Under cron or CI they wait forever. The guard is `[[ -t 0 ]]`,
-  which this repository already uses five times — `bin/fleet.sh:501` and `:862`,
-  `bin/upgrade.sh:655`, and twice in `bin/audit.sh` — but it is not a mechanical
+  which this repository already uses five times - `bin/fleet.sh:501` and `:862`,
+  `bin/upgrade.sh:655`, and twice in `bin/audit.sh` - but it is not a mechanical
   edit: at the audit fix prompt, not asking meant not fixing, which is what
   already happened; at `startup.sh` not asking means deciding whether to delete a
   plist, and that decision belongs to whoever makes it, one prompt at a time.
@@ -51,7 +132,7 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
   test that runs a full audit inherits that, which makes the audit files the slow
   half of the suite. Independent of the two entries above.
 - The Raycast audit list shows no time. Everything on that screen describes an
-  instant — `fix_available` turns false the moment the thing is fixed — and a
+  instant - `fix_available` turns false the moment the thing is fixed - and a
   window left open shows a photograph with no date on it. The report carries a
   `timestamp` and the list drops it. It is not done because all three places it
   could go require moving something else first: `navigationTitle` already holds
@@ -63,14 +144,14 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
   loading indicator, and a stale clock beside a spinner is worse than no clock.
   When every option asks for something else to move, the thing is not ready.
 
-- `docs/audit.gif`, `docs/interactive-menu.gif` and `docs/progress-bar.gif` are
-  orphans: 1.4 MB between them, referenced by nothing — not the README, not any
-  other file under `docs/` — and they still show the old cat face. Either they
-  are regenerated with the rest or they go; the decision belongs with the GIF
-  regeneration, and this line is here so it is not forgotten before then.
-
-- Eight commands — `certs`, `disk`, `docker`, `fonts`, `history`, `network`,
-  `startup`, `xcode` — have no machine-readable output at all. They refuse
+- `docs/gifs/hero.gif`, the image at the top of the README, is not produced by
+  anything. The Remotion harness renders twenty compositions, all of them
+  `docs/gifs/rcc-<id>.gif`; there is no `hero` composition and no `hero.txt`
+  fixture. Recapturing every fixture will not touch it, which is what makes this
+  structural rather than stale: the first image anyone sees opening the project
+  is the one image nothing can regenerate.
+- Eight commands - `certs`, `disk`, `docker`, `fonts`, `history`, `network`,
+  `startup`, `xcode` - have no machine-readable output at all. They refuse
   `--json` with exit 64 rather than pretending, but the flag is still unwritten.
   Implementing them is 0.18.0 work, and the shape it should take is worth
   learning from the first consumer that exists.
