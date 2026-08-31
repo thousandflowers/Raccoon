@@ -13,6 +13,23 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
   that made `--json` clean, in `bin/audit.sh`; it is left undone deliberately,
   because it is a second visible change of behaviour and nobody has asked for
   it yet.
+- `docs/audit.gif`, `docs/interactive-menu.gif` and `docs/progress-bar.gif` are
+  orphans: 1.4 MB between them, referenced by nothing — not the README, not any
+  other file under `docs/` — and they still show the old cat face. Either they
+  are regenerated with the rest or they go; the decision belongs with the GIF
+  regeneration, and this line is here so it is not forgotten before then.
+- `audit: flag --dry-run exits 0 or 1`, in `tests/test_audit_detail.bats:16`,
+  can hang the whole suite. Two things sit under it. Its duration depends on
+  what the machine is doing, because the audit shells out to `softwareupdate -l`
+  (`lib/audit/checks.sh:62`), which took seven seconds on the machine this was
+  written on and can take minutes on another. And when the audit has queued
+  fixes, `bin/audit.sh:1531` asks "Fix N issue(s) automatically? [y/N]" and
+  reads stdin: with stdin on `/dev/null` the read gets EOF and the whole thing
+  finishes in ten seconds, but with a stdin that never closes it waits forever.
+  Observed here at eleven minutes on a single test. Whether it happens at all
+  depends on the machine having something fixable, so a clean Mac never sees it.
+  Left alone deliberately.
+
 - Eight commands — `certs`, `disk`, `docker`, `fonts`, `history`, `network`,
   `startup`, `xcode` — have no machine-readable output at all. They refuse
   `--json` with exit 64 rather than pretending, but the flag is still unwritten.
