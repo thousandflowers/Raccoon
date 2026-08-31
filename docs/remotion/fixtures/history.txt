@@ -13,11 +13,11 @@
 [2/2] Recent Commands...
 | Recent Command                      |
 | ----------------------------------- |
-| ffmpeg                              |
-| ffmpeg                              |
-| headroom                            |
-| mo                                  |
-| brew                                |
+| ls                                  |
+| git                                 |
+| cd                                  |
+| grep                                |
+| make                                |
 ✓
 
 ✓ Completed

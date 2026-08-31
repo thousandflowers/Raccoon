@@ -25,6 +25,74 @@ correction under "Why `hero` goes first".
 
 ---
 
+## What counts as clean
+
+**A name that ships with macOS says nothing about who owns the Mac. A
+third-party name is a list of what this person chose to install.** That is the
+criterion. Everything below is an example of it, or an account of how long it
+took to arrive at.
+
+Apple's own processes, launch agents and paths can stay: every Mac has
+`mediaanalysisd`, `com.apple.progressd` and `/Applications/Safari.app`, so
+naming them narrows nothing. `Raycast`, `Tailscale`, `Notion`, `DockDoor` are a
+different thing entirely: each one is a decision this person made, and together
+they are a portrait. The same goes for a list of recent shell commands, which is
+by construction a photograph of what the person at the keyboard does, and for
+repository names, which are a portrait of what they build.
+
+The one name that has a right to be there is the repository the GIF belongs to.
+`Raccoon` stays in the git fixture for that reason and no other.
+
+### How the criterion got here, and why that matters
+
+It moved four times in two days, and **every version found something the
+previous one had declared clean**:
+
+| version | rule | what it missed |
+|---|---|---|
+| 1 | no real data | it was never checked beyond one file's provenance; a `git grep` for the username later found three more places |
+| 2 | no machine names | machine names, hostnames and home paths went; `example.tape` carried an absolute home path, two test files carried the real account and machine names |
+| 3 | no third-party software | Tailscale, Raycast, Notion, AutoRaise, DockDoor, FigmaAgent, a browser, a chat client, and nine Claude Code plugins, one of them `i-have-adhd`, which is a health disclosure |
+| 4 | nothing that says what you do or who you are | recent shell commands (`headroom`, `mo`) and a repository name one hyphen from a real project |
+
+Version 3 was written *because* version 2 passed everything. Version 4 was
+written because version 3 passed everything. There is no reason to think version
+4 is the last one.
+
+### The preflight is a list, not a detector
+
+`docs/gif-helpers/preflight.sh` finds only what somebody already thought to look
+for. Machine identifiers it derives at run time and will catch on any machine;
+third-party names it matches against a fixed list, and that list holds what has
+actually turned up here, nothing more. A capture full of software it has never
+heard of passes with exit 0.
+
+Two things it got wrong while being written, both worth keeping in mind because
+they are the shape of the next mistake:
+
+- It matched case-sensitively, and walked straight past
+  `io.tailscale.ipn.macsys.login-item-helper` one line after declaring the same
+  file clean of `Tailscale`.
+- Once made case-insensitive it matched substrings, so `Arc` flagged
+  `research-tool` and `Dia` flagged `mediaanalysisd`. A check that cries wolf is
+  a check that gets ignored, which is how the next hole opens.
+
+### The only check that worked
+
+Every problem in the list above was found by **extracting a frame and looking at
+it**. Not by reading the fixture, not by running the preflight, not by reading
+the diff. The `i-have-adhd` line, the public IPv6 address, the version number
+that said 0.16.0, the `__RCC_PROGRESS__` markers, the second Tailscale: all of
+them survived a green preflight and were visible the moment someone rendered the
+image and read it.
+
+So, for whoever recaptures these in six months: **exit 0 from the preflight is
+not permission to ship.** It means nothing on the list was found. Extract a
+frame from every GIF you touched and read it, including the ones you did not
+mean to change.
+
+---
+
 ## Step 0 - the collision, resolved
 
 **Done.** It was wider than this note first said: not one file, twenty. Every
