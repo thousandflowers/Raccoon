@@ -14,7 +14,6 @@ show_docker_help() {
 	echo "Show Docker images, containers, and space usage"
 	echo ""
 	echo "Options:"
-	echo "  --json          Output in JSON format"
 	echo "  --help, -h      Show this help"
 }
 
@@ -25,6 +24,7 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
+		_rcc_json_unimplemented docker
 		;;
 	esac
 done

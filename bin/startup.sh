@@ -14,7 +14,6 @@ show_startup_help() {
 	echo "Show startup items, launch agents, and login items"
 	echo ""
 	echo "Options:"
-	echo "  --json          Output in JSON format"
 	echo "  --clean         Remove orphaned launch agents (interactive, with backup)"
 	echo "  --help, -h      Show this help"
 	echo ""
@@ -35,6 +34,7 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
+		_rcc_json_unimplemented startup
 		;;
 	--clean)
 		CLEAN_MODE=true

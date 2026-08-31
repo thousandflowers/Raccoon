@@ -12,7 +12,6 @@ show_certs_help() {
 	echo "Show SSL certificates in keychain"
 	echo ""
 	echo "Options:"
-	echo "  --json          Output in JSON format"
 	echo "  --expired       Show only expired certificates"
 	echo "  --expiring N   Show certificates expiring within N days"
 	echo "  --detail        Show full certificate details"
@@ -33,6 +32,7 @@ while [[ $# -gt 0 ]]; do
 		exit 0
 		;;
 	--json)
+		_rcc_json_unimplemented certs
 		;;
 	--expired)
 		SHOW_EXPIRED=true

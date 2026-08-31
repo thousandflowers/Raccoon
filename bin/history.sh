@@ -14,7 +14,6 @@ show_history_help() {
 	echo "Show shell command history"
 	echo ""
 	echo "Options:"
-	echo "  --json          Output in JSON format"
 	echo "  --help, -h      Show this help"
 }
 
@@ -28,6 +27,7 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
+		_rcc_json_unimplemented history
 		;;
 	*)
 		;;

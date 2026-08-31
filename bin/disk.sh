@@ -14,7 +14,6 @@ show_disk_help() {
 	echo "Show disk status — internal, external, and network volumes"
 	echo ""
 	echo "Options:"
-	echo "  --json              Output in JSON format"
 	echo "  --large [PATH]      Find the biggest files (default PATH: \$HOME)"
 	echo "    --min SIZE        Minimum file size (default: 100M)"
 	echo "    --top N           How many to show (default: 20)"
@@ -40,7 +39,7 @@ while [[ $# -gt 0 ]]; do
 		exit 0
 		;;
 	--json)
-		shift
+		_rcc_json_unimplemented disk
 		;;
 	--large)
 		LARGE_MODE=true

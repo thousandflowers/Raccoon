@@ -14,7 +14,6 @@ show_network_help() {
 	echo "Show network status with multi-scan confidence scoring"
 	echo ""
 	echo "Options:"
-	echo "  --json          Output in JSON format"
 	echo "  --help, -h      Show this help"
 }
 
@@ -29,6 +28,7 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
+		_rcc_json_unimplemented network
 		;;
 	*)
 		;;

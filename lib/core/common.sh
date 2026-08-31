@@ -411,6 +411,29 @@ print_table_row() {
 }
 
 # =====================================================================
+# Refusing a flag that was never written
+# =====================================================================
+
+# EX_USAGE from sysexits(3). Deliberately not 2: audit and fleet already use 2
+# to mean "warnings only", and the Raycast extension reads it that way in
+# src/exit.ts, so a second meaning would make a report that found something look
+# like a run that broke.
+RCC_EX_USAGE=64
+
+# _rcc_json_unimplemented: refuse --json where nobody ever wrote it.
+#
+# Eight commands declared the flag in their argument parser and advertised it in
+# their --help, and the case body was empty: the flag was accepted and the human
+# report printed instead. Nothing complained, which is why it survived six
+# releases. Exiting is louder than printing something that is not what --json
+# promised, and it does not pretend the flag is unknown: it will exist.
+_rcc_json_unimplemented() {
+	echo "rcc $1: --json is not implemented yet" >&2
+	echo "Exiting rather than printing the human report, which is not what --json promises." >&2
+	exit "$RCC_EX_USAGE"
+}
+
+# =====================================================================
 # Reading an lsof endpoint
 # =====================================================================
 
