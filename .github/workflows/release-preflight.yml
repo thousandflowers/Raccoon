@@ -1,0 +1,110 @@
+# Rehearses the two things that only fail at tag time, and publishes nothing.
+#
+# There is no tag push, no `gh release`, no formula commit here: the release
+# steps that write are not in this file at all, so running it cannot ship
+# anything by accident. Run it as many times as you like.
+#
+# It answers the two questions release.yml cannot answer until it is too late:
+# what the release notes will actually say, and whether the tap token can push.
+name: Release preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to preview notes for (blank = the VERSION file)"
+        required: false
+        default: ""
+
+env:
+  TAP_REPO: thousandflowers/homebrew-raccoon
+  FORMULA_PATH: Formula/rcc.rb
+
+jobs:
+  notes:
+    name: Release notes preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Extract the notes this version would ship
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [[ -z "$VERSION" ]]; then
+            VERSION="$(cat VERSION)"
+            echo "No version given, using the VERSION file: $VERSION"
+          fi
+
+          # The same script release.yml calls. If this preview and the release
+          # ever disagree, it is because someone gave them different code.
+          ./tools/changelog-section.sh "$VERSION" > notes.md
+
+          echo "----- release notes for $VERSION, $(wc -l < notes.md) lines -----"
+          cat notes.md
+          echo "----- end -----"
+
+          # Also into the run summary, where it renders as the release page will.
+          {
+            echo "## Release notes preview: \`$VERSION\`"
+            echo ""
+            cat notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  tap-token:
+    name: Tap token write access
+    runs-on: ubuntu-latest
+    steps:
+      - name: Can RACCOONTAPPUSH actually push to the tap?
+        env:
+          GH_TOKEN: ${{ secrets.RACCOONTAPPUSH }}
+        run: |
+          if [[ -z "${GH_TOKEN}" ]]; then
+            echo "::error::RACCOONTAPPUSH is empty or not set. Settings -> Secrets and variables -> Actions -> Repository secrets."
+            exit 1
+          fi
+          echo "Secret is present and non-empty."
+
+          # Which account the token belongs to, and whether it is still alive.
+          # 401 is expired or revoked; anything else is a live token, and the
+          # login tells you whether it is the account you meant.
+          code=$(curl -sS -o whoami.json -w '%{http_code}' \
+            -H "Authorization: token ${GH_TOKEN}" https://api.github.com/user || echo 000)
+          if [[ "$code" == "401" ]]; then
+            echo "::error::Token is rejected by the API (401): expired or revoked."
+            exit 1
+          fi
+          if [[ "$code" != "200" ]]; then
+            echo "::warning::api.github.com/user answered $code; continuing to the push test."
+          else
+            echo "Token belongs to: $(grep -o '"login"[^,]*' whoami.json | head -1)"
+          fi
+
+          # The tap is public, so a clone succeeds with any token, an expired
+          # one included. Cloning proves nothing; only a push does.
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${TAP_REPO}.git" tap
+          cd tap
+          echo "Cloned ${TAP_REPO} (this alone proves nothing: the repo is public)."
+
+          if [[ ! -f "${FORMULA_PATH}" ]]; then
+            echo "::error::${FORMULA_PATH} is missing from ${TAP_REPO}; the release would fail after publishing."
+            exit 1
+          fi
+          echo "Formula present: ${FORMULA_PATH}"
+
+          # An empty commit that is never sent: --dry-run authenticates and asks
+          # the server whether the update would be accepted, then stops before
+          # writing a ref.
+          git -c user.name="Raccoon Preflight" \
+              -c user.email="actions@github.com" \
+              commit --allow-empty -q -m "preflight: never pushed"
+          branch=$(git rev-parse --abbrev-ref HEAD)
+
+          if git push --dry-run origin "HEAD:refs/heads/${branch}" 2> push.err; then
+            echo "Push would be accepted on branch '${branch}'. Nothing was written."
+          else
+            echo "::error::The token cannot push to ${TAP_REPO}. A release would create the tag and the GitHub release, then fail here, leaving the tap behind."
+            echo "--- git said ---"
+            cat push.err
+            echo "--- Fix: the token needs 'repo' (classic) or Contents: Read and write on ${TAP_REPO} (fine-grained), and must not be expired."
+            exit 1
+          fi

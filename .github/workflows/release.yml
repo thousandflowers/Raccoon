@@ -67,36 +67,17 @@ jobs:
 
       - name: Release notes from the CHANGELOG
         run: |
-          # The notes are the CHANGELOG section for this exact version, not a
-          # list of commit subjects: 0.17.0 was 42 commits, and a reader wants
-          # what changed rather than how it was typed. Nothing here names a
-          # version, so no future release has to edit this step.
+          # The notes are the CHANGELOG section for this version, not a list of
+          # commit subjects: 0.17.0 was 42 commits, and a reader wants what
+          # changed rather than how it was typed. The extraction lives in
+          # tools/changelog-section.sh so that release-preflight.yml previews
+          # these exact notes with this exact code.
           #
-          # The heading is matched as a literal prefix rather than a regex,
-          # because a version is full of dots and "0.17.0" as a pattern also
-          # matches "0917.0". The section runs to the next "## " heading.
-          VERSION="${{ steps.version.outputs.version }}"
-          awk -v v="$VERSION" '
-            index($0, "## [" v "]") == 1 { found = 1; next }
-            found && index($0, "## ") == 1 { exit }
-            found { print }
-          ' CHANGELOG.md > /tmp/section.md
-
-          # Trim the blank lines the split leaves at both ends.
-          awk 'NF { p = 1 } p' /tmp/section.md |
-            awk '{ a[NR] = $0 } END { n = NR
-                   while (n > 0 && a[n] == "") n--
-                   for (i = 1; i <= n; i++) print a[i] }' > /tmp/release-notes.md
-
-          # Fail before the release exists rather than publish empty notes: at
-          # this point the tag is public but nothing else is, and a deleted tag
-          # is the whole cost.
-          if [[ ! -s /tmp/release-notes.md ]]; then
-            echo "ERROR: CHANGELOG.md has no '## [$VERSION]' section"
-            echo "Sections found:"
-            grep '^## ' CHANGELOG.md || true
-            exit 1
-          fi
+          # It fails when the section is missing, and it fails here: at this
+          # point the tag is public but nothing else is, so a deleted tag is
+          # the whole cost.
+          ./tools/changelog-section.sh "${{ steps.version.outputs.version }}" \
+            > /tmp/release-notes.md
           echo "Release notes: $(wc -l < /tmp/release-notes.md) lines from CHANGELOG.md"
 
       - name: Build standalone single-file rcc

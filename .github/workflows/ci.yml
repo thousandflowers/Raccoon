@@ -28,6 +28,7 @@ jobs:
             lib/core/report.sh \
             lib/audit/checks.sh \
             bin/*.sh \
+            tools/*.sh \
             completions/bash/rcc
 
   go-build:
