@@ -213,3 +213,96 @@ func TestSearchNeverReturnsAHeading(t *testing.T) {
 		}
 	}
 }
+
+// bashMenuRows reads the menu out of lib/core/commands.sh: the rows RCC_ENTRIES
+// marks for the menu, in the order it lists them. Headings keep their "== "
+// prefix so a heading can never be mistaken for a command with that name.
+func bashMenuRows(t *testing.T) []string {
+	t.Helper()
+	src, err := os.ReadFile("../lib/core/commands.sh")
+	if err != nil {
+		t.Fatalf("cannot read lib/core/commands.sh: %v", err)
+	}
+	block := regexp.MustCompile(`(?s)RCC_ENTRIES=\((.*?)\n\)`).FindSubmatch(src)
+	if block == nil {
+		t.Fatal("cannot find RCC_ENTRIES — did the array move or get renamed?")
+	}
+	var rows []string
+	for _, m := range regexp.MustCompile(`(?m)^\s*"([^":]*(?::[^":]*)?):([a-z]+):`).FindAllSubmatch(block[1], -1) {
+		name, where := string(m[1]), string(m[2])
+		if where == "both" || where == "menu" {
+			rows = append(rows, name)
+		}
+	}
+	if len(rows) == 0 {
+		t.Fatal("read no menu rows out of RCC_ENTRIES")
+	}
+	return rows
+}
+
+// goMenuRows is the same sequence from items(), spelled the same way.
+func goMenuRows() []string {
+	var rows []string
+	for _, it := range items() {
+		if it.isHeading() {
+			rows = append(rows, "== "+it.title)
+			continue
+		}
+		rows = append(rows, it.title)
+	}
+	return rows
+}
+
+// The two menus are one menu written twice, in two languages. Checking each
+// against bin/ catches a command nobody listed — which is how wifi went missing
+// from one of them for its whole life — but it cannot catch the two of them
+// disagreeing about order or about which category something belongs to, because
+// bin/ has no opinion on either. This is the check for that, and it is why the
+// headings are compared too: a category is only its position in this sequence.
+func TestTheTwoMenusAgree(t *testing.T) {
+	bash, goRows := bashMenuRows(t), goMenuRows()
+
+	for i := 0; i < len(bash) && i < len(goRows); i++ {
+		if bash[i] != goRows[i] {
+			t.Errorf("row %d: commands.sh has %q, items() has %q", i+1, bash[i], goRows[i])
+		}
+	}
+	if len(bash) != len(goRows) {
+		t.Errorf("commands.sh has %d menu rows, items() has %d", len(bash), len(goRows))
+		for _, extra := range bash[min(len(bash), len(goRows)):] {
+			t.Errorf("  only in commands.sh: %q", extra)
+		}
+		for _, extra := range goRows[min(len(bash), len(goRows)):] {
+			t.Errorf("  only in items(): %q", extra)
+		}
+	}
+}
+
+func TestTheTwoMenusAgreeOnCategories(t *testing.T) {
+	// Which category a command is in is where it sits between two headings, so
+	// the same sequence read as a map catches a command that moved groups even
+	// if the totals still match.
+	category := func(rows []string) map[string]string {
+		out, current := map[string]string{}, ""
+		for _, row := range rows {
+			if after, ok := strings.CutPrefix(row, "== "); ok {
+				current = after
+				continue
+			}
+			out[row] = current
+		}
+		return out
+	}
+	bash, goCats := category(bashMenuRows(t)), category(goMenuRows())
+	for _, name := range sortedKeys(bash) {
+		if goCats[name] != bash[name] {
+			t.Errorf("%q is under %q in commands.sh and %q in items()",
+				name, bash[name], goCats[name])
+		}
+	}
+	for _, name := range sortedKeys(goCats) {
+		if _, ok := bash[name]; !ok {
+			t.Errorf("%q is in items() and not in commands.sh", name)
+		}
+	}
+}
