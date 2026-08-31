@@ -5,6 +5,22 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 
 ## [Unreleased]
 
+### Fixed
+
+- `rcc audit` stopped at the end to ask "Fix N issue(s) automatically? [y/N]" and
+  read stdin with nothing checking whether there was anyone to answer, so every
+  text-mode run — a bare `rcc audit`, `--dry-run`, `--explain` — waited forever
+  wherever stdin does not close. Under cron it never returned; in the test suite
+  it held one test for eleven minutes before it was killed. `--dry-run` reaching
+  it was its own contradiction: a run that promises to change nothing stopping to
+  ask permission to change something. The question is now asked only behind
+  `[[ -t 0 ]]`, the guard already used forty lines earlier in the same file, and
+  not behind a timeout, which would have spent that wait on every non-interactive
+  run for good. The guard sits on the question, not on the block: a script still
+  reads how many fixes are available and how to apply them, and loses only the
+  question it could not answer. Machine formats never reached the prompt and are
+  unchanged.
+
 ### Known defects
 
 - `rcc audit --csv` still prints the boxed report and then appends the CSV to
@@ -13,25 +29,15 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
   that made `--json` clean, in `bin/audit.sh`; it is left undone deliberately,
   because it is a second visible change of behaviour and nobody has asked for
   it yet.
-- **`rcc audit` asks for confirmation with no way to say no.** When the audit has
-  queued fixes, `bin/audit.sh:1531` prints "Fix N issue(s) automatically? [y/N]"
-  and reads stdin, with nothing checking whether there is anyone to answer. Every
-  text-mode invocation reaches it — a bare `rcc audit`, `--dry-run`, `--explain` —
-  and `--dry-run` reaching it is its own contradiction: a run that promises to
-  change nothing stops to ask permission to change something. Under cron or CI,
-  where stdin never closes, the command waits forever. Machine formats are safe:
-  `--json`, `--csv` and `--quiet` are excluded by the condition and were checked.
-  The guard the repository already uses elsewhere is `[[ -t 0 ]]`, in
-  `bin/fleet.sh:501`, `bin/fleet.sh:862`, `bin/upgrade.sh:655` and — in the same
-  file, forty lines from the defect — `bin/audit.sh:671`. Two more audit prompts
-  are missing it too, `bin/audit.sh:622` and `:716`, and so are
-  `bin/startup.sh:104` and `:129`. Eight prompts in all: four guarded, five not.
-- The test `audit: flag --dry-run exits 0 or 1`, `tests/test_audit_detail.bats:16`,
-  hangs the suite as a consequence of the defect above. Observed at eleven minutes
-  on a single test before it was killed; with stdin on `/dev/null` the read gets
-  EOF and the same command finishes in ten seconds, which is why CI has not caught
-  it. It only happens when the machine has something fixable, so a clean Mac never
-  sees it. The test is the victim; nothing about it needs changing.
+- Four confirmation prompts still read stdin with nothing checking whether anyone
+  can answer: `bin/audit.sh:622` ("Remove the baseline?"), `bin/audit.sh:716`
+  ("Remove profile 'X'?"), and `bin/startup.sh:104` and `:129` (removing orphan
+  launch agents). Under cron or CI they wait forever. The guard is `[[ -t 0 ]]`,
+  which this repository already uses five times — `bin/fleet.sh:501` and `:862`,
+  `bin/upgrade.sh:655`, and twice in `bin/audit.sh` — but it is not a mechanical
+  edit: at the audit fix prompt, not asking meant not fixing, which is what
+  already happened; at `startup.sh` not asking means deciding whether to delete a
+  plist, and that decision belongs to whoever makes it, one prompt at a time.
 - `rcc audit` shells out to `softwareupdate -l` (`lib/audit/checks.sh:62`) for the
   Software Updates check, so how long an audit takes depends on what the machine
   is doing rather than on the audit. Seven seconds here; minutes elsewhere. Every
