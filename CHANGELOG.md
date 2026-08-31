@@ -3,6 +3,22 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [Unreleased]
+
+### Known defects
+
+- `rcc audit --csv` still prints the boxed report and then appends the CSV to
+  the same stdout, which is what `--json` did until this release. A reader has
+  to be told which line to start at. The fix is one token in the same condition
+  that made `--json` clean, in `bin/audit.sh`; it is left undone deliberately,
+  because it is a second visible change of behaviour and nobody has asked for
+  it yet.
+- Eight commands — `certs`, `disk`, `docker`, `fonts`, `history`, `network`,
+  `startup`, `xcode` — have no machine-readable output at all. They refuse
+  `--json` with exit 64 rather than pretending, but the flag is still unwritten.
+  Implementing them is 0.18.0 work, and the shape it should take is worth
+  learning from the first consumer that exists.
+
 ## [0.16.0] - 2026-08-31
 
 ### Added
