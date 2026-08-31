@@ -153,3 +153,23 @@ test("a machine with nothing to fix reports zero, not an error", () => {
 		1,
 	);
 });
+
+test("a skipped check is not counted among the fixable", () => {
+	// rcc audit --fix skips it, so counting it would promise a fix that is not
+	// coming and put a wrong number on the screen-level action.
+	const parsed = parseAuditReport(
+		report([
+			check({ name: "Firewall", fix_available: true }),
+			check({ name: "Stealth Mode", fix_available: true }),
+			check({ name: "Gatekeeper", fix_available: false }),
+		]),
+	);
+	assert.equal(fixableCount(parsed), 2);
+	assert.equal(fixableCount(parsed, new Set(["Firewall"])), 1);
+	assert.equal(
+		fixableCount(parsed, new Set(["Firewall", "Stealth Mode"])),
+		0,
+	);
+	// A name in the list that no check carries changes nothing.
+	assert.equal(fixableCount(parsed, new Set(["Nonesuch"])), 2);
+});

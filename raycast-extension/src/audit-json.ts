@@ -133,7 +133,19 @@ export function countByStatus(
 	return counts;
 }
 
-/** How many checks can be fixed right now. Zero is the ordinary case. */
-export function fixableCount(report: AuditReport): number {
-	return report.results.filter((check) => check.fix_available).length;
+/**
+ * How many checks `rcc audit --fix` would actually change. Zero is the ordinary
+ * case, and so is a fix that exists but will never be applied: a check listed in
+ * audit.conf is skipped before anything is queued, so counting it would promise
+ * a fix that is not coming. The list is passed in because the JSON does not
+ * carry it — fix_available is recorded before the opt-out is consulted, which is
+ * what lets a consumer see the skipped ones at all.
+ */
+export function fixableCount(
+	report: AuditReport,
+	skipped: ReadonlySet<string> = new Set(),
+): number {
+	return report.results.filter(
+		(check) => check.fix_available && !skipped.has(check.name),
+	).length;
 }

@@ -12,8 +12,9 @@ import {
 	Toast,
 	useNavigation,
 } from "@raycast/api";
-import { showFailureToast, useExec } from "@raycast/utils";
-import { AUDIT_CONF, skipCheck } from "./audit-conf";
+import { showFailureToast, useExec, usePromise } from "@raycast/utils";
+import { useMemo } from "react";
+import { AUDIT_CONF, readSkipList, skipCheck } from "./audit-conf";
 import {
 	type AuditCheck,
 	type AuditStatus,
@@ -57,7 +58,13 @@ const LABEL: Record<AuditStatus, string> = {
 	fail: "Fail",
 };
 
-function CheckDetail({ check }: { check: AuditCheck }) {
+function CheckDetail({
+	check,
+	skipped,
+}: {
+	check: AuditCheck;
+	skipped: boolean;
+}) {
 	return (
 		<List.Item.Detail
 			metadata={
@@ -89,14 +96,23 @@ function CheckDetail({ check }: { check: AuditCheck }) {
 					/>
 					<List.Item.Detail.Metadata.Label
 						title="Fix available"
-						text={check.fix_available ? "Yes" : "No"}
+						text={
+							!check.fix_available
+								? "No"
+								: skipped
+									? "Yes, but skipped in audit.conf"
+									: "Yes"
+						}
 						icon={{
-							source: check.fix_available
-								? Icon.Hammer
-								: Icon.Minus,
-							tintColor: check.fix_available
-								? Color.Orange
-								: Color.SecondaryText,
+							source: !check.fix_available
+								? Icon.Minus
+								: skipped
+									? Icon.MinusCircle
+									: Icon.Hammer,
+							tintColor:
+								check.fix_available && !skipped
+									? Color.Orange
+									: Color.SecondaryText,
 						}}
 					/>
 				</List.Item.Detail.Metadata>
@@ -118,6 +134,14 @@ export default function Command() {
 	} catch (error) {
 		resolveError = error;
 	}
+
+	// audit.conf is the user's file, not a product of the audit, so it is read
+	// from where it is written rather than waited for in the report: the JSON
+	// cannot say which checks are skipped, because fix_available is recorded
+	// before the opt-out is consulted.
+	const { data: skipList, revalidate: revalidateSkipList } =
+		usePromise(readSkipList);
+	const skipped = useMemo(() => new Set(skipList ?? []), [skipList]);
 
 	const { isLoading, data, error, revalidate } = useExec(
 		rccPath ?? "rcc",
@@ -177,7 +201,7 @@ export default function Command() {
 	}
 
 	const counts = data ? countByStatus(data) : undefined;
-	const fixable = data ? fixableCount(data) : 0;
+	const fixable = data ? fixableCount(data, skipped) : 0;
 
 	const applyAllFixes = async () => {
 		const confirmed = await confirmAlert({
@@ -218,7 +242,9 @@ export default function Command() {
 						: `${check.name} was already on the list`,
 				message: AUDIT_CONF,
 			});
-			if (outcome === "added") revalidate();
+			// Only the skip list changed. Re-running the audit would spend seven
+			// seconds to be told the same thing: the JSON is identical either way.
+			if (outcome === "added") revalidateSkipList();
 		} catch (error) {
 			await showFailureToast(error, {
 				title: `Could not add ${check.name} to audit.conf`,
@@ -263,7 +289,9 @@ export default function Command() {
 	return (
 		<List
 			isLoading={isLoading}
-			isShowingDetail={!isLoading && (data?.results.length ?? 0) > 0}
+			// Not gated on isLoading: data survives a revalidate, so gating on it
+			// collapsed the panel being read for the seven seconds of a reload.
+			isShowingDetail={(data?.results.length ?? 0) > 0}
 			navigationTitle={
 				counts
 					? `Security Audit — ${counts.pass} pass, ${counts.warn} warn, ${counts.fail} fail`
@@ -283,54 +311,82 @@ export default function Command() {
 						: undefined
 				}
 			/>
-			{(data?.results ?? []).map((check, index) => (
-				<List.Item
-					key={`${check.category}/${check.name}/${index}`}
-					icon={{
-						source: ICON[check.status],
-						tintColor: TINT[check.status],
-					}}
-					title={check.name}
-					keywords={[check.category, check.value]}
-					accessories={[
-						{
-							tag: {
-								value: LABEL[check.status],
-								color: TINT[check.status],
+			{(data?.results ?? []).map((check, index) => {
+				const isSkipped = skipped.has(check.name);
+				return (
+					<List.Item
+						key={`${check.category}/${check.name}/${index}`}
+						// The icon keeps the status colour when a check is skipped.
+						// Skipping fixes nothing — the check still found what it found —
+						// and greying it out would say "handled", which is not what was
+						// asked for. The extra grey tag is what says "skipped".
+						icon={{
+							source: ICON[check.status],
+							tintColor: TINT[check.status],
+						}}
+						title={check.name}
+						keywords={[
+							check.category,
+							check.value,
+							...(isSkipped ? ["skipped"] : []),
+						]}
+						accessories={[
+							...(isSkipped
+								? [
+										{
+											tag: {
+												value: "Skipped",
+												color: Color.SecondaryText,
+											},
+										},
+									]
+								: []),
+							{
+								tag: {
+									value: LABEL[check.status],
+									color: TINT[check.status],
+								},
 							},
-						},
-					]}
-					detail={<CheckDetail check={check} />}
-					actions={
-						<ActionPanel>
-							<ActionPanel.Section title={check.name}>
-								<Action.CopyToClipboard
-									title="Copy Verification Command"
-									content={check.command}
-									shortcut={{ modifiers: ["cmd"], key: "c" }}
-								/>
-								{check.cis ? (
+						]}
+						detail={
+							<CheckDetail check={check} skipped={isSkipped} />
+						}
+						actions={
+							<ActionPanel>
+								<ActionPanel.Section title={check.name}>
 									<Action.CopyToClipboard
-										title="Copy CIS Reference"
-										content={check.cis}
-										shortcut={Keyboard.Shortcut.Common.Copy}
+										title="Copy Verification Command"
+										content={check.command}
+										shortcut={{
+											modifiers: ["cmd"],
+											key: "c",
+										}}
 									/>
-								) : null}
-								{check.fix_available ? (
-									<Action
-										title="Never Offer to Fix This"
-										icon={Icon.MinusCircle}
-										onAction={() => skip(check)}
-									/>
-								) : null}
-							</ActionPanel.Section>
-							<ActionPanel.Section>
-								{screenActions}
-							</ActionPanel.Section>
-						</ActionPanel>
-					}
-				/>
-			))}
+									{check.cis ? (
+										<Action.CopyToClipboard
+											title="Copy CIS Reference"
+											content={check.cis}
+											shortcut={
+												Keyboard.Shortcut.Common.Copy
+											}
+										/>
+									) : null}
+									{check.fix_available && !isSkipped ? (
+										<Action
+											title="Never Offer to Fix This"
+											icon={Icon.MinusCircle}
+											onAction={() => skip(check)}
+										/>
+									) : null}
+								</ActionPanel.Section>
+								<ActionPanel.Section>
+									{screenActions}
+								</ActionPanel.Section>
+							</ActionPanel>
+						}
+					/>
+				);
+			})}
 		</List>
 	);
 }

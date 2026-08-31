@@ -32,6 +32,28 @@ export function isListed(contents: string, name: string): boolean {
 }
 
 /**
+ * The names currently opted out, read the way audit.sh reads them: comment and
+ * blank lines dropped, everything else kept verbatim because the match is
+ * whole-line. A file that is not there yet is an empty list, not an error —
+ * most machines never write one.
+ */
+export async function readSkipList(
+	path: string = AUDIT_CONF,
+): Promise<string[]> {
+	let contents: string;
+	try {
+		contents = await readFile(path, "utf8");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+		throw error;
+	}
+	return contents.split("\n").filter((line) => {
+		const trimmed = line.trim();
+		return trimmed !== "" && !trimmed.startsWith("#");
+	});
+}
+
+/**
  * Add NAME to the opt-out list.
  *
  * Appends; never rewrites. The file belongs to whoever wrote it, and rewriting

@@ -4,7 +4,7 @@ import { mkdtemp, readFile, writeFile, chmod, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { isListed, skipCheck } from "./audit-conf.ts";
+import { isListed, readSkipList, skipCheck } from "./audit-conf.ts";
 
 async function scratch(): Promise<string> {
 	const dir = await mkdtemp(join(tmpdir(), "rcc-audit-conf-"));
@@ -90,4 +90,44 @@ test("something that is not a check name is refused", async () => {
 	const path = await scratch();
 	await assert.rejects(() => skipCheck("", path), /Not a check name/);
 	await assert.rejects(() => skipCheck("a\nb", path), /Not a check name/);
+});
+
+// --- reading the list back --------------------------------------------------
+//
+// The JSON cannot say which checks are skipped: fix_available is recorded before
+// the opt-out is consulted, deliberately, so that a consumer can see the skipped
+// ones at all. Which means the consumer has to read the file, from where the
+// file is written.
+
+test("a file that is not there is an empty list, not an error", async () => {
+	const path = await scratch();
+	assert.deepEqual(await readSkipList(path), []);
+});
+
+test("comments and blank lines are not check names", async () => {
+	const path = await scratch();
+	await writeFile(
+		path,
+		"# a note\n\nFirewall\n   \n# another\nStealth Mode\n",
+	);
+	assert.deepEqual(await readSkipList(path), ["Firewall", "Stealth Mode"]);
+});
+
+test("what is read back is what isListed matches", async () => {
+	const path = await scratch();
+	await skipCheck("Firewall", path);
+	await skipCheck("Stealth Mode", path);
+	const listed = await readSkipList(path);
+	assert.deepEqual(listed, ["Firewall", "Stealth Mode"]);
+	const contents = await readFile(path, "utf8");
+	for (const name of listed) assert.equal(isListed(contents, name), true);
+});
+
+test("a name with leading space is read verbatim, and matches nothing", async () => {
+	// grep -Fxq compares whole lines: " Firewall" is not "Firewall", and the
+	// reader must not quietly trim it into one.
+	const path = await scratch();
+	await writeFile(path, " Firewall\n");
+	assert.deepEqual(await readSkipList(path), [" Firewall"]);
+	assert.equal(isListed(await readFile(path, "utf8"), "Firewall"), false);
 });
