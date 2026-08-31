@@ -43,6 +43,19 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
   is doing rather than on the audit. Seven seconds here; minutes elsewhere. Every
   test that runs a full audit inherits that, which makes the audit files the slow
   half of the suite. Independent of the two entries above.
+- The Raycast audit list shows no time. Everything on that screen describes an
+  instant — `fix_available` turns false the moment the thing is fixed — and a
+  window left open shows a photograph with no date on it. The report carries a
+  `timestamp` and the list drops it. It is not done because all three places it
+  could go require moving something else first: `navigationTitle` already holds
+  the three counts and would have to give them up; `searchBarAccessory` is a
+  dropdown, not a label; and a pinned first row costs one of the fifteen visible
+  lines and brings back the non-selectable-row problem. There is a fourth
+  obstacle that is not about placement: `useExec` keeps the previous data across
+  a revalidate, so during a reload the screen would show the *old* time next to a
+  loading indicator, and a stale clock beside a spinner is worse than no clock.
+  When every option asks for something else to move, the thing is not ready.
+
 - `docs/audit.gif`, `docs/interactive-menu.gif` and `docs/progress-bar.gif` are
   orphans: 1.4 MB between them, referenced by nothing — not the README, not any
   other file under `docs/` — and they still show the old cat face. Either they
