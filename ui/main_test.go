@@ -769,7 +769,7 @@ func TestReadRepos(t *testing.T) {
 	lines := []string{
 		"| Repository                               | Issues               |",
 		"| ---------------------------------------- | -------------------- |",
-		"| eugeniozamengopontrelli                  | 416 uncommitted, 1 stashed, 4 no upstream |",
+		"| dotfiles                                 | 416 uncommitted, 1 stashed, 4 no upstream |",
 		"| MenuSwipe                                | 2 unpushed,          |",
 		"| canary                                   | 1 no upstream        |",
 	}
@@ -1117,13 +1117,13 @@ func TestTrashItemsAndSize(t *testing.T) {
 		"| Item                                     |",
 		"| ---------------------------------------- |",
 		"| archivio-littlesnitch-20260828           |",
-		"| BarBeR_Dataset.zip                       |",
+		"| archive.zip                       |",
 	}
 	if got := trashGB(lines); got != 6 {
 		t.Errorf("size = %v, want 6", got)
 	}
 	items := trashItems(lines)
-	if len(items) != 2 || items[1] != "BarBeR_Dataset.zip" {
+	if len(items) != 2 || items[1] != "archive.zip" {
 		t.Errorf("items = %v", items)
 	}
 	if got := trashFace(6); got != ">.<" {
@@ -1320,7 +1320,7 @@ func TestReadWifi(t *testing.T) {
 		"| Not connected        |",
 		"-- Known Networks",
 		"| iPhone               |",
-		"| Pontrelli            |",
+		"| Homenet            |",
 		"| AIR CHINA            |",
 	}
 	nets, active := readWifi(lines)
@@ -1332,24 +1332,24 @@ func TestReadWifi(t *testing.T) {
 	}
 	joined := []string{
 		"-- Active Connection",
-		"| Pontrelli            |",
+		"| Homenet            |",
 		"-- Known Networks",
-		"| Pontrelli            |",
+		"| Homenet            |",
 		"| iPhone               |",
 	}
-	if _, a := readWifi(joined); a != "Pontrelli" {
-		t.Errorf("active = %q, want Pontrelli", a)
+	if _, a := readWifi(joined); a != "Homenet" {
+		t.Errorf("active = %q, want Homenet", a)
 	}
 }
 
 // The field is always four rows, never wider than it was given, and the name is
 // set into the waves rather than replacing the row it crosses.
 func TestWifiFieldKeepsItsShape(t *testing.T) {
-	nets := []string{"Pontrelli", "iPhone", "AIR CHINA"}
+	nets := []string{"Homenet", "iPhone", "AIR CHINA"}
 	const width = 38
 	sawName, sawArcsBothSides := false, false
 	for tick := -5; tick < 60; tick++ {
-		rows := wifiField(tick, width, nets, "Pontrelli")
+		rows := wifiField(tick, width, nets, "Homenet")
 		if len(rows) != wifiRows {
 			t.Fatalf("tick %d: %d rows, want %d", tick, len(rows), wifiRows)
 		}
@@ -1379,7 +1379,7 @@ func TestWifiFieldKeepsItsShape(t *testing.T) {
 	// The joined network is marked, and an empty list still gives a moving field.
 	found := false
 	for tick := 0; tick < 60 && !found; tick++ {
-		if strings.Contains(wifiField(tick, width, nets, "Pontrelli")[wifiRows/2], "[Pontrelli]") {
+		if strings.Contains(wifiField(tick, width, nets, "Homenet")[wifiRows/2], "[Homenet]") {
 			found = true
 		}
 	}
@@ -1459,8 +1459,8 @@ func TestReadFleetHosts(t *testing.T) {
 	lines := []string{
 		"┌────────────────────────────┐",
 		"│ Fleet Audit — 2026-08-29   │",
-		"  ✓ lampone                          12 pass   2 warn   0 fail",
-		"  ⚠ quetzalcoatl-2                    5 pass   3 warn   1 fail",
+		"  ✓ desktop                          12 pass   2 warn   0 fail",
+		"  ⚠ workstation-02                    5 pass   3 warn   1 fail",
 		"  ✗ oldmini                          UNREACHABLE (TIMEOUT)",
 		"  Total: 2/3 hosts reached",
 	}
@@ -1468,7 +1468,7 @@ func TestReadFleetHosts(t *testing.T) {
 	if len(hosts) != 3 {
 		t.Fatalf("got %d hosts, want 3: %v", len(hosts), hosts)
 	}
-	if hosts[0].name != "lampone" || hosts[0].status != 'o' {
+	if hosts[0].name != "desktop" || hosts[0].status != 'o' {
 		t.Errorf("host 0 = %v", hosts[0])
 	}
 	if hosts[1].status != '!' {
@@ -1493,7 +1493,7 @@ func TestReadFleetHosts(t *testing.T) {
 // the one that never answered — has to appear as a vision, or the audit would
 // look complete when it is not.
 func TestFleetVisionLeavesTheBodyEmpty(t *testing.T) {
-	hosts := []fleetHost{{"lampone", 'o'}, {"quetzal", '!'}, {"oldmini", 'x'}}
+	hosts := []fleetHost{{"desktop", 'o'}, {"laptop", '!'}, {"oldmini", 'x'}}
 	sawEmpty, sawTrance, sawDead := false, false, false
 	faces := map[string]bool{}
 	for tick := -6; tick < 24; tick++ {

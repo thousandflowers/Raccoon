@@ -11,8 +11,8 @@ harness at all - nothing here regenerates it.
 
 Only one of them is urgent. The fixtures are synthetic and clean; `hero.gif`
 is the only *published image* that carries real data. It is recaptured first,
-for that reason and no other. See the correction under "Why `hero` goes first"
-for the two source files that also carry real names.
+for that reason and no other. It was not, however, the only file: see the
+correction under "Why `hero` goes first".
 
 ---
 
@@ -74,22 +74,27 @@ the full home path of the machine it was recorded on, and two personal tap
 names, one of them a proxy client. It sits at the top of the README, above the
 title, and every reader sees it before anything else.
 
-A correction to an earlier draft of this note, which claimed hero was the only
-file of any kind: a `git grep` for the real username afterwards found three
-occurrences, not one.
+An earlier draft of this note said hero was the only file of any kind carrying
+real data. That was true only because nobody had looked anywhere else. A
+`git grep` for the username, then for the machine names, found six places:
 
-| file | what |
-|---|---|
-| `docs/tapes/example.tape:60` | `Output /Users/<real user>/Raccoon/docs/tapes/example.gif` - removed with the tapes in Step 0 |
-| `ui/main_test.go:772` | the real GitHub account name as a row in a `readRepos` test table |
-| `ui/main_test.go:1462-1496`, `ui/render_test.go:37` | the real machine names `lampone` and `quetzalcoatl-2` in fleet test tables |
+| file | what | now |
+|---|---|---|
+| `docs/tapes/example.tape:60` | `Output /Users/<real user>/Raccoon/...` | removed with the tapes in Step 0 |
+| `ui/main_test.go:772` | the real GitHub account name as a repo row | `dotfiles` |
+| `ui/main_test.go:1462-1496`, `ui/render_test.go:37` | the real machine names | `desktop`, `workstation-02`, `laptop` |
+| `ui/render_test.go:35` | the real Wi-Fi SSID, which is a surname | `Homenet` |
+| `ui/render_test.go:31` | a real filename from the Trash | `archive.zip` |
+| `docs/gifs/hero.gif` | the home path and two personal taps, on screen | reshot |
 
-The two test files are a smaller problem than hero and a different one: they
-are source, not a rendered image, and a reader has to open a test to find them.
-They are still real host and account names in a public repository, and the
-synthetic-fixture rule that the Remotion harness follows should apply to them
-too. They are left as they are for now, deliberately, rather than changed
-without asking.
+All six are done. What is deliberately left: project names that are public
+repositories anyway (`canary`, `MenuSwipe`, `mailbrief`) and tool names
+(`claude`, `jq`). Those say what the author works on, not who or where they
+are, and the fixtures would stop looking like real output without them.
+
+The lesson worth keeping is the order of operations: the claim "this is the
+only one" was made from a single file's provenance, and it took a `git grep`
+over the whole tree to find out it was wrong. Search before asserting scope.
 
 That makes it the first thing to fix, before any cosmetic work. Everything else
 in this session is staleness - screens showing an old face, an old menu, an old

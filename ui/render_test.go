@@ -28,13 +28,13 @@ func TestRunningViewRendersEveryScript(t *testing.T) {
 		"xcode.sh":   {"| Size | 12G |"},
 		"env.sh":     {"-- PATH Entries", "| /usr/bin | OK |", "| /gone | MISSING |"},
 		"startup.sh": {"[1/6] User LaunchAgents...", "| ✓ mailbrief | |", "[2/6] System LaunchAgents...", "| /Library/LaunchAgents/ | 7 |"},
-		"trash.sh":   {"| Size | 6.0G |", "[3/3] Recent Items (Last 10)...", "| BarBeR_Dataset.zip |"},
+		"trash.sh":   {"| Size | 6.0G |", "[3/3] Recent Items (Last 10)...", "| archive.zip |"},
 		"fonts.sh":   {"| Duplicates | 12 families |", "| Corrupted fonts | 0 |"},
 		"history.sh": {"| Total | 2195 |", "[2/2] Recent Commands...", "| claude |"},
 		"certs.sh":   {"Total Valid Expiring Expired Self-Signed", "42 26 2 14 8"},
-		"wifi.sh":    {"-- Known Networks", "| Pontrelli |", "| iPhone |"},
+		"wifi.sh":    {"-- Known Networks", "| Homenet |", "| iPhone |"},
 		"overlap.sh": {"| jq | /opt/homebrew/bin/jq | x | brew |", "| jq | /usr/bin/jq | x | system |"},
-		"fleet.sh":   {"  ✓ lampone 12 pass 2 warn 0 fail", "  ✗ oldmini UNREACHABLE (TIMEOUT)"},
+		"fleet.sh":   {"  ✓ desktop 12 pass 2 warn 0 fail", "  ✗ oldmini UNREACHABLE (TIMEOUT)"},
 	}
 
 	if len(samples) != len(scriptFrames) {
