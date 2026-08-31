@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 
 ## [Unreleased]
 
+### Changed
+
+- `rcc fleet` with no subcommand now prints its subcommands instead of running an audit. The default was `audit`, so the shortest thing anyone could type opened SSH connections to every host in `~/.raccoon/fleet.conf` — the most invasive thing the command can do, reached by typing the least. **This is a visible change of behaviour**: a script with a bare `rcc fleet` in it will get the help text and do nothing. `rcc fleet audit` is unchanged and is how the audit is run. Every other command was checked for the same shape; the only other subcommand default is `rcc fleet group`, which falls back to `list` and reads nothing but a text file.
+- The menu is four categories — Maintenance, System, Network, Development — and lists commands, not ways of launching them. The six flag forms of audit (`deep`, `quiet`, `fix`, `json`, `history`, `watch`) are out of it: a flag's place is `rcc audit --help` and the man page, where all six already were. `fleet` is one row that opens its five subcommands in place rather than five rows of the twenty-five, which is what made the first screen read as a fleet manager. `wifi` is in the menu at last: it has had a script since the beginning, its own animation since 0.16.0, and no way into the interface. Twenty-two rows, one per script in `bin/`, and the tests now check each list against the scripts that exist rather than against each other — comparing the two menus to one another is what let both of them go on missing `wifi`.
+- `rcc --help` lists the same twenty-eight commands in the new order. The order is one editorial decision, not two, so it follows the menu; the format is unchanged, two columns and no category rows, which is what `raycast/generate.sh` parses. Regenerating produces the same twenty-eight script commands byte for byte.
+
 ### Fixed
 
 - `rcc audit` stopped at the end to ask "Fix N issue(s) automatically? [y/N]" and
@@ -20,6 +26,7 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
   reads how many fixes are available and how to apply them, and loses only the
   question it could not answer. Machine formats never reached the prompt and are
   unchanged.
+- `MENU_ITEMS` was three things at once: the menu, the source of `rcc --help`, and through that help the source of the Raycast extension. Three consumers reading one array shaped for the first of them is why the two menus drifted apart — the bash one grew the audit flags as rows, the Go one grew five fleet subcommands instead, and twenty of the twenty-eight entries they shared were in a different order. There is one array now, and each entry says where it appears.
 
 ### Known defects
 

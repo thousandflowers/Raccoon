@@ -2445,13 +2445,24 @@ var (
 
 // ─── Item ──────────────────────────────────────────────────
 
+// item is one row of the menu. Three kinds share the type, told apart by which
+// fields are set rather than by a kind field:
+//
+//	a command   script is set, and Enter runs it
+//	a heading   script is empty, so Enter is already a no-op; the cursor skips it
+//	a parent    children is non-empty, and Enter opens it in place
 type item struct {
 	title       string
 	script      string
 	args        []string // extra argv passed to the script (e.g. fleet subcommand)
 	description string
-	needsSudo   bool // authenticate before starting: the script touches system paths
+	needsSudo   bool   // authenticate before starting: the script touches system paths
+	children    []item // subcommands shown under this row when it is open
+	indent      bool   // drawn as a child of the row above it
 }
+
+// isHeading reports a category label: a row with nothing to run.
+func (it item) isHeading() bool { return it.script == "" && len(it.children) == 0 }
 
 type modelState int
 
@@ -2471,6 +2482,12 @@ type model struct {
 	binPath     string
 	width       int
 	height      int
+
+	// fleet is the one command with subcommands worth reaching from a menu, and
+	// it opens in place rather than pushing a second screen: menuWindow keeps
+	// working on whatever length filtered() returns, and nothing has to remember
+	// how to come back.
+	fleetExpanded bool
 
 	// Streaming
 	cmd           *exec.Cmd // stored from message for kill signal
@@ -2522,47 +2539,89 @@ func resolveBinPath() string {
 
 func items() []item {
 	return []item{
+		{title: "Maintenance"},
+		{title: "audit", script: "audit.sh", description: "Security audit + fix", needsSudo: true},
 		{title: "upgrade", script: "upgrade.sh", description: "Update packages (brew, pip, npm, gem)", needsSudo: true},
 		{title: "apps", script: "apps.sh", description: "Update GUI apps (App Store + casks)", needsSudo: true},
-		{title: "audit", script: "audit.sh", description: "Security audit + fix", needsSudo: true},
-		{title: "network", script: "network.sh", description: "Interfaces, Wi-Fi, DNS, routing"},
-		{title: "fleet scan", script: "fleet.sh", args: []string{"scan"}, description: "Discover Macs on the LAN (Bonjour + ping)"},
-		{title: "fleet audit", script: "fleet.sh", args: []string{"audit"}, description: "Security audit across Macs over SSH"},
-		{title: "fleet status", script: "fleet.sh", args: []string{"status"}, description: "SSH reachability of configured hosts"},
-		{title: "fleet list", script: "fleet.sh", args: []string{"list"}, description: "List configured fleet hosts"},
-		{title: "fleet groups", script: "fleet.sh", args: []string{"group", "list"}, description: "List fleet host groups"},
+		{title: "backup", script: "backup.sh", description: "Time Machine status"},
+		{title: "trash", script: "trash.sh", description: "Trash size + contents"},
+
+		{title: "System"},
 		{title: "disk", script: "disk.sh", description: "Disk space, APFS, SMART status"},
 		{title: "memory", script: "memory.sh", description: "Processes sorted by RAM usage"},
-		{title: "ports", script: "ports.sh", description: "Open ports and listeners"},
 		{title: "battery", script: "battery.sh", description: "Health, cycles, charging"},
-		{title: "backup", script: "backup.sh", description: "Time Machine status"},
+		{title: "startup", script: "startup.sh", description: "Launch agents, login items"},
+		{title: "fonts", script: "fonts.sh", description: "Dupes, corrupted, catalog"},
+
+		{title: "Network"},
+		{title: "network", script: "network.sh", description: "Interfaces, Wi-Fi, DNS, routing"},
+		{title: "wifi", script: "wifi.sh", description: "Wi-Fi and saved passwords"},
+		{title: "ports", script: "ports.sh", description: "Open ports and listeners"},
+		{title: "certs", script: "certs.sh", description: "SSL certificate overview"},
 		{title: "ssh", script: "ssh.sh", description: "SSH key management"},
+		// add, remove and run are left out on purpose: they take arguments, and
+		// a menu row has no way to supply them.
+		{title: "fleet", description: "Audit Mac fleet over SSH", children: []item{
+			{title: "scan", script: "fleet.sh", args: []string{"scan"}, description: "Discover Macs on the LAN (Bonjour + ping)", indent: true},
+			{title: "audit", script: "fleet.sh", args: []string{"audit"}, description: "Security audit across Macs over SSH", indent: true},
+			{title: "status", script: "fleet.sh", args: []string{"status"}, description: "SSH reachability of configured hosts", indent: true},
+			{title: "list", script: "fleet.sh", args: []string{"list"}, description: "List configured fleet hosts", indent: true},
+			{title: "groups", script: "fleet.sh", args: []string{"group", "list"}, description: "List fleet host groups", indent: true},
+		}},
+
+		{title: "Development"},
 		{title: "git", script: "git.sh", description: "Repo scan, branches, stash"},
 		{title: "docker", script: "docker.sh", description: "Images, containers, volumes"},
 		{title: "xcode", script: "xcode.sh", description: "Simulators, derived data, SPM"},
 		{title: "env", script: "env.sh", description: "PATH, symlinks, tool versions"},
 		{title: "overlap", script: "overlap.sh", description: "Which manager is behind each PATH entry"},
-		{title: "startup", script: "startup.sh", description: "Launch agents, login items"},
-		{title: "trash", script: "trash.sh", description: "Trash size + contents"},
-		{title: "fonts", script: "fonts.sh", description: "Dupes, corrupted, catalog"},
 		{title: "history", script: "history.sh", description: "Shell history analysis"},
-		{title: "certs", script: "certs.sh", description: "SSL certificate overview"},
 	}
 }
 
 func (m *model) filtered() []item {
+	// The list as drawn: every row, plus the children of a parent that is open.
+	rows := make([]item, 0, len(m.items)+8)
+	for _, it := range m.items {
+		rows = append(rows, it)
+		if len(it.children) > 0 && m.fleetExpanded {
+			rows = append(rows, it.children...)
+		}
+	}
 	if m.searchQuery == "" {
-		return m.items
+		return rows
 	}
 	q := strings.ToLower(m.searchQuery)
 	var f []item
-	for _, it := range m.items {
+	for _, it := range rows {
+		// A heading is a label, not a result: searching should never land on one.
+		if it.isHeading() {
+			continue
+		}
 		if strings.Contains(strings.ToLower(it.title), q) ||
 			strings.Contains(strings.ToLower(it.description), q) {
 			f = append(f, it)
 		}
 	}
 	return f
+}
+
+// skipHeadings walks the selection off a heading in the direction it was moving,
+// so the cursor never rests on a row that Enter cannot act on. Falls back to the
+// other direction at the ends of the list.
+func (m *model) skipHeadings(step int) {
+	f := m.filtered()
+	for i := 0; i < len(f); i++ {
+		if m.selected < 0 || m.selected >= len(f) || !f[m.selected].isHeading() {
+			return
+		}
+		m.selected += step
+		if m.selected < 0 || m.selected >= len(f) {
+			m.selected -= step
+			step = -step
+			m.selected += step
+		}
+	}
 }
 
 func (m *model) clamp() {
@@ -2844,6 +2903,17 @@ func (m model) menuWindow(total int) (int, int) {
 	return start, start + visible
 }
 
+// headingRule is a category label followed by a rule out to the width the
+// separators already use, so four groups cost four rows and read as groups.
+func (m model) headingRule(label string) string {
+	width := m.sepWidth()
+	fill := width - len(label) - 4
+	if fill < 0 {
+		fill = 0
+	}
+	return "── " + label + " " + strings.Repeat("─", fill)
+}
+
 func (m model) menuView() string {
 	var b strings.Builder
 
@@ -2860,10 +2930,27 @@ func (m model) menuView() string {
 		start, end := m.menuWindow(len(f))
 		for i := start; i < end; i++ {
 			it := f[i]
+			if it.isHeading() {
+				b.WriteString(styleMuted.Render(m.headingRule(it.title)) + "\n")
+				continue
+			}
+			// The marker sits after the name, not before it, so opening a row
+			// does not shift every name in the list by one column.
+			title := it.title
+			if it.indent {
+				title = "  " + title
+			}
+			if len(it.children) > 0 {
+				if m.fleetExpanded {
+					title += " ▾"
+				} else {
+					title += " ▸"
+				}
+			}
 			if i == m.selected {
-				b.WriteString(styleSelected.Render(it.title) + "  " + styleDesc.Render(it.description) + "\n")
+				b.WriteString(styleSelected.Render(title) + "  " + styleDesc.Render(it.description) + "\n")
 			} else {
-				b.WriteString(styleDesc.Render(it.title) + "  " + styleMuted.Render(it.description) + "\n")
+				b.WriteString(styleDesc.Render(title) + "  " + styleMuted.Render(it.description) + "\n")
 			}
 		}
 	}
@@ -3368,19 +3455,36 @@ func (m *model) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		if m.selected > 0 {
 			m.selected--
+			m.skipHeadings(-1)
 		}
 	case "down", "j":
 		if m.selected < len(f)-1 {
 			m.selected++
+			m.skipHeadings(1)
 		}
 	case "enter", " ":
-		if m.selected < len(f) && f[m.selected].script != "" {
+		if m.selected >= len(f) {
+			return m, nil
+		}
+		// A parent opens in place instead of running; a heading runs nothing.
+		if len(f[m.selected].children) > 0 {
+			m.fleetExpanded = !m.fleetExpanded
+			return m, nil
+		}
+		if f[m.selected].script != "" {
 			return m, m.launch(f[m.selected])
 		}
+	case "esc", "left", "h":
+		// Esc did nothing in the menu, so closing an open row is all it means.
+		m.fleetExpanded = false
+		m.clamp()
+		m.skipHeadings(1)
 	case "g":
 		m.selected = 0
+		m.skipHeadings(1)
 	case "G":
 		m.selected = len(f) - 1
+		m.skipHeadings(-1)
 	}
 	return m, nil
 }

@@ -23,38 +23,92 @@ reset_terminal() {
     tput reset 2>/dev/null || printf '\033[?25h\033[0m\033[2J\033[H'
 }
 
-MENU_ITEMS=(
-    "upgrade:Update packages"
-    "apps:Update GUI apps (App Store + casks)"
-    "audit:Security audit (quick)"
-    "audit deep:Security audit (full)"
-    "network:Network info"
-    "wifi:Wi-Fi and passwords"
-    "disk:Disk space"
-    "memory:Memory usage"
-    "---"
-    "audit quiet:audit --quiet"
-    "audit fix:audit --fix"
-    "audit json:audit --json"
-    "audit history:audit --history"
-    "audit watch:audit --watch"
-    "fleet:Audit Mac fleet via SSH"
-    "---"
-    "ssh:SSH keys"
-    "git:Git repos"
-    "ports:Open ports"
-    "battery:Battery health"
-    "backup:Time Machine"
-    "env:Environment"
-    "overlap:PATH package-manager map"
-    "startup:Launch agents"
-    "trash:Trash"
-    "fonts:Fonts"
-    "history:Shell history"
-    "certs:SSL certificates"
-    "docker:Docker"
-    "xcode:Xcode"
+# Everything rcc can be asked to do, in one array, because three consumers read
+# this list and want different things from it: the interactive menu, `rcc --help`
+# via show_help, and raycast/generate.sh, which parses that help. They used to
+# share a single array shaped for the menu, which is how the two menus drifted
+# apart and how the generator broke. The split is a field, not a second array:
+# two lists of the same commands is the problem, not the fix.
+#
+#   name : where : description
+#
+#   where = both   a command. Menu and `rcc --help`.
+#           help   a way of launching a command, not a command. `rcc --help`
+#                  and the man page only, because a menu lists commands, not
+#                  flags. The flags themselves are documented in
+#                  `rcc audit --help`.
+#           menu   the category headings. They never reach `rcc --help`, so its
+#                  two-column format stays exactly what generate.sh parses and
+#                  the generator needs to learn nothing.
+#
+# The order is the menu's, and `rcc --help` follows it: it is one editorial
+# decision, not two. Within a category the first entry is that category's
+# principal command, so the order is deliberately not alphabetical.
+RCC_ENTRIES=(
+    "== Maintenance:menu:"
+    "audit:both:Security audit (quick)"
+    "audit deep:help:Security audit (full)"
+    "audit quiet:help:audit --quiet"
+    "audit fix:help:audit --fix"
+    "audit json:help:audit --json"
+    "audit history:help:audit --history"
+    "audit watch:help:audit --watch"
+    "upgrade:both:Update packages"
+    "apps:both:Update GUI apps (App Store + casks)"
+    "backup:both:Time Machine"
+    "trash:both:Trash"
+    "== System:menu:"
+    "disk:both:Disk space"
+    "memory:both:Memory usage"
+    "battery:both:Battery health"
+    "startup:both:Launch agents"
+    "fonts:both:Fonts"
+    "== Network:menu:"
+    "network:both:Network info"
+    "wifi:both:Wi-Fi and passwords"
+    "ports:both:Open ports"
+    "certs:both:SSL certificates"
+    "ssh:both:SSH keys"
+    "fleet:both:Audit Mac fleet via SSH"
+    "== Development:menu:"
+    "git:both:Git repos"
+    "docker:both:Docker"
+    "xcode:both:Xcode"
+    "env:both:Environment"
+    "overlap:both:PATH package-manager map"
+    "history:both:Shell history"
 )
+
+# Derived, never written by hand, and both keep the "name:description" shape
+# every existing consumer already parses. MENU_ITEMS additionally carries the
+# "== Label" heading rows, which show_menu renders as a rule and run_cmd and
+# _filter_menu_items skip, the way they already skipped "---".
+#
+# The menu has no second level: `fleet` is one row that runs `rcc fleet`, whose
+# default prints its eight subcommands. The Go TUI expands fleet in place
+# instead. The asymmetry is deliberate — the bash menu indexes MENU_ITEMS
+# positionally in three functions, and a second index space there is not worth
+# it for one command in the fallback interface.
+MENU_ITEMS=()
+RCC_HELP_ITEMS=()
+_rcc_build_lists() {
+    local entry name rest where desc
+    for entry in "${RCC_ENTRIES[@]}"; do
+        name="${entry%%:*}"
+        rest="${entry#*:}"
+        where="${rest%%:*}"
+        desc="${rest#*:}"
+        case "$where" in
+            both)
+                MENU_ITEMS+=("${name}:${desc}")
+                RCC_HELP_ITEMS+=("${name}:${desc}")
+                ;;
+            help) RCC_HELP_ITEMS+=("${name}:${desc}") ;;
+            menu) MENU_ITEMS+=("$name") ;;
+        esac
+    done
+}
+_rcc_build_lists
 
 TOTAL_OPTIONS=${#MENU_ITEMS[@]}
 
@@ -63,13 +117,15 @@ show_version() {
     echo "macOS companion toolkit"
 }
 
-# MENU_ITEMS entries are "name:description"; printing them raw put the colon in
-# front of the user. Split on the first one and pad the names to the longest,
+# RCC_HELP_ITEMS entries are "name:description"; printing them raw put the colon
+# in front of the user. Split on the first one and pad the names to the longest,
 # computed rather than fixed so a new command can never break the column.
+#
+# Two columns, no headings: raycast/generate.sh parses this output, and keeping
+# the category rows out of it means the generator needs to learn nothing.
 show_help() {
     local item name width=0
-    for item in "${MENU_ITEMS[@]}"; do
-        [[ "$item" == "---" ]] && continue
+    for item in "${RCC_HELP_ITEMS[@]}"; do
         name="${item%%:*}"
         if (( ${#name} > width )); then width=${#name}; fi
     done
@@ -77,8 +133,7 @@ show_help() {
     show_version
     echo ""
     echo "Commands:"
-    for item in "${MENU_ITEMS[@]}"; do
-        [[ "$item" == "---" ]] && continue
+    for item in "${RCC_HELP_ITEMS[@]}"; do
         printf '  rcc %-*s  %s\n' "$width" "${item%%:*}" "${item#*:}"
     done
     echo ""
@@ -154,10 +209,19 @@ run_cmd() {
     # run it through the rcc dispatcher. Inserting/removing menu items needs no
     # change here, and "---" separators carry no command.
     local item="${MENU_ITEMS[$(($1 - 1))]:-}"
-    [[ -z "$item" || "$item" == "---" ]] && return 0
+    [[ -z "$item" || "$item" == "---" || "$item" == "== "* ]] && return 0
     local cmd="${item%%:*}"
     # shellcheck disable=SC2086  # intentional word split: "audit deep" -> 2 args
     exec "${SCRIPT_DIR}/rcc" $cmd
+}
+
+# A category heading: the label, then a rule of dashes out to a fixed width, so
+# the four groups read as groups without costing more than one row each.
+_rcc_menu_heading() {
+    local label="$1" width=32 fill
+    fill=$(( width - ${#label} - 4 ))
+    (( fill < 0 )) && fill=0
+    printf '%b-- %s %s%b\n' "${GRAY}" "$label" "$(printf '%*s' "$fill" '' | tr ' ' '-')" "${NC}"
 }
 
 show_menu() {
@@ -169,6 +233,8 @@ show_menu() {
         
         if [[ "$item" == "---" ]]; then
             echo -e "${GRAY}--------------------------------${NC}"
+        elif [[ "$item" == "== "* ]]; then
+            _rcc_menu_heading "${item#== }"
         else
             if [[ $n -eq $sel ]]; then
                 echo -e "${GREEN}▶ $n. $item${NC}"
@@ -192,7 +258,7 @@ _filter_menu_items() {
     local n=1
     while [[ $n -le $TOTAL_OPTIONS ]]; do
         local item="${MENU_ITEMS[$((n-1))]}"
-        if [[ "$item" != "---" ]]; then
+        if [[ "$item" != "---" && "$item" != "== "* ]]; then
             local lower_item
             lower_item=$(echo "$item" | tr '[:upper:]' '[:lower:]')
             if [[ "$lower_item" == *"$lower_query"* ]]; then
