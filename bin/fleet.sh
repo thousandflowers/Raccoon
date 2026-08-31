@@ -854,7 +854,11 @@ _scan_print_json() {
 }
 
 main() {
-	local sub="${1:-audit}"
+	# No subcommand prints the list of subcommands. The default used to be
+	# `audit`, so a bare `rcc fleet` opened SSH connections to every configured
+	# host: the most invasive thing this command can do, reached by typing the
+	# least. `rcc fleet audit` is still how the audit is run.
+	local sub="${1:-help}"
 	[[ $# -gt 0 ]] && shift
 	case "$sub" in
 		audit) cmd_audit "$@" ;;
