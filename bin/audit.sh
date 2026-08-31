@@ -26,6 +26,13 @@ REPORT_SHOP=""
 REPORT_TECH=""
 declare -a FIX_QUEUE=()
 
+# Names of the checks that offered a fix during this run. fix_issue is the only
+# thing that knows: a check calls it when, as things stand right now, there is
+# something to change. Recorded before the audit.conf opt-out is consulted, so
+# the field means "a fix exists", not "a fix would be applied" — a consumer that
+# wants to offer the opt-out needs to know about the ones already opted out too.
+declare -a FIX_AVAILABLE=()
+
 # Fixes that mutate user data snapshot the original here first, so a wrong
 # auto-fix is recoverable. Created lazily (only when a fix actually runs).
 FIX_BACKUP_DIR="$HOME/.raccoon/fix-backups/$(date +%Y%m%d-%H%M%S)"
@@ -554,10 +561,13 @@ _results_json() {
 			val=""
 		fi
 		if [[ $first -eq 1 ]]; then first=0; else printf ','; fi
-		printf '\n    {"status": "%s", "category": "%s", "name": "%s", "value": "%s", "cis": "%s", "command": "%s"}' \
+		local fixable
+		_fix_available "$nm" && fixable=true || fixable=false
+		printf '\n    {"status": "%s", "category": "%s", "name": "%s", "value": "%s", "cis": "%s", "command": "%s", "fixable": %s}' \
 			"$(_json_escape "$st")" "$(_json_escape "$cat_")" \
 			"$(_json_escape "$nm")" "$(_json_escape "$val")" \
-			"$(_json_escape "$(_check_cis "$nm")")" "$(_json_escape "$(_check_command "$nm")")"
+			"$(_json_escape "$(_check_cis "$nm")")" "$(_json_escape "$(_check_command "$nm")")" \
+			"$fixable"
 	done
 	printf '\n  '
 }
@@ -1080,6 +1090,15 @@ load_fix_skips() {
 	FIX_SKIP="$(grep -v '^[[:space:]]*#' "$conf" | grep -v '^[[:space:]]*$' || true)"
 }
 
+# True when a fix was offered for CHECK_NAME during this run.
+_fix_available() {
+	local n
+	for n in ${FIX_AVAILABLE[@]+"${FIX_AVAILABLE[@]}"}; do
+		[[ "$n" == "$1" ]] && return 0
+	done
+	return 1
+}
+
 # True when CHECK_NAME is opted out of auto-fix by ~/.raccoon/audit.conf.
 # ponytail: exact-name skip list. Add per-value baselines (expected DNS, etc.)
 # only if someone actually needs finer control than "fix this / don't".
@@ -1090,6 +1109,8 @@ _fix_skipped() {
 fix_issue() {
 	local check_name="$1"
 	local fix_cmd="$2"
+
+	FIX_AVAILABLE+=("$check_name")
 
 	# Per-machine opt-out wins over everything: never queue, never apply.
 	if _fix_skipped "$check_name"; then
@@ -1498,7 +1519,12 @@ main() {
 		fi
 	fi
 
-	if [[ "$QUIET_MODE" == "true" ]]; then
+	# A machine format takes the quiet path whether or not --quiet was asked for.
+	# It used to require it: bare --json printed the boxed report and then glued
+	# the JSON to the end of the same stdout, so a reader had to know which line
+	# to start at. --csv still does that; it is one token away from fixed here,
+	# and left alone on purpose until someone decides it.
+	if [[ "$QUIET_MODE" == "true" || "$OUTPUT_FORMAT" == "json" ]]; then
 		_run_checks_quiet
 		_redact_audit_results   # scrub secrets before any machine format is emitted
 		case "$OUTPUT_FORMAT" in

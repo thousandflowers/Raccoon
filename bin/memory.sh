@@ -43,6 +43,21 @@ while [[ $# -gt 0 ]]; do
 done
 
 main() {
+	# --json returns before anything human is printed. It used to sit after the
+	# summary table, so stdout was a report with a JSON array glued to the end
+	# and no parser could read it without being told which line to start at.
+	if [[ "$JSON_OUTPUT" == "true" ]]; then
+		local tmpf
+		tmpf=$(mktemp)
+		# Expand $tmpf now to capture path (intentional SC2064)
+	# shellcheck disable=SC2064
+	trap "rm -f '$tmpf'" EXIT
+		ps aux -m | awk -v top="$TOP_N" 'NR>1 && NR<=top+1 {printf "{\"pid\": %s, \"rss\": %s, \"command\": \"%s\"}\n", $2, $6, $11}' > "$tmpf"
+		awk 'BEGIN{print "["} {if(NR>1) printf ",\n"; printf "  %s", $0} END{print "\n]"}' "$tmpf"
+		rm "$tmpf"
+		return 0
+	fi
+
 	print_section_header "Memory Usage"
 
 	# ponytail: system memory from vm_stat + sysctl, not parsing every vm_stat field
@@ -89,18 +104,6 @@ main() {
 			print_table_row "Swap Free|${swap_avail} MB" 25 15
 		fi
 		echo ""
-	fi
-
-	if [[ "$JSON_OUTPUT" == "true" ]]; then
-		local tmpf
-		tmpf=$(mktemp)
-		# Expand $tmpf now to capture path (intentional SC2064)
-	# shellcheck disable=SC2064
-	trap "rm -f '$tmpf'" EXIT
-		ps aux -m | awk -v top="$TOP_N" 'NR>1 && NR<=top+1 {printf "{\"pid\": %s, \"rss\": %s, \"command\": \"%s\"}\n", $2, $6, $11}' > "$tmpf"
-		awk 'BEGIN{print "["} {if(NR>1) printf ",\n"; printf "  %s", $0} END{print "\n]"}' "$tmpf"
-		rm "$tmpf"
-		return 0
 	fi
 
 	print_table_header "PID|COMMAND|RSS (MB)" 8 30 10
