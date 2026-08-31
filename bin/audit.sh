@@ -561,13 +561,13 @@ _results_json() {
 			val=""
 		fi
 		if [[ $first -eq 1 ]]; then first=0; else printf ','; fi
-		local fixable
-		_fix_available "$nm" && fixable=true || fixable=false
-		printf '\n    {"status": "%s", "category": "%s", "name": "%s", "value": "%s", "cis": "%s", "command": "%s", "fixable": %s}' \
+		local fix_available
+		_fix_available "$nm" && fix_available=true || fix_available=false
+		printf '\n    {"status": "%s", "category": "%s", "name": "%s", "value": "%s", "cis": "%s", "command": "%s", "fix_available": %s}' \
 			"$(_json_escape "$st")" "$(_json_escape "$cat_")" \
 			"$(_json_escape "$nm")" "$(_json_escape "$val")" \
 			"$(_json_escape "$(_check_cis "$nm")")" "$(_json_escape "$(_check_command "$nm")")" \
-			"$fixable"
+			"$fix_available"
 	done
 	printf '\n  '
 }
