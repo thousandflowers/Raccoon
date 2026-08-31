@@ -9,6 +9,10 @@ fixtures were captured on 2026-06-22 and show 0.11.0-era output. `hero.gif`,
 the first image in the README, is older still and is not produced by the
 harness at all - nothing here regenerates it.
 
+Only one of them is urgent. The fixtures are synthetic and clean; `hero.gif` is
+the single file in the repository that carries real data. It is recaptured
+first, for that reason and no other.
+
 ---
 
 ## Step 0 - resolve the `rcc-menu.gif` collision first
@@ -36,18 +40,37 @@ tooling that still works. `vhs`, `asciinema` and `agg` are all installed.
 
 ## Recapture order
 
-1. **`menu.txt`** - hand-written, see below.
-2. **The eleven safe ones**: `disk`, `memory`, `ports`, `battery`, `backup`,
+0. **Resolve the `rcc-menu.gif` collision** - above.
+1. **`hero.gif`** - reshoot, see below.
+2. **`menu.txt`** - hand-written, see below.
+3. **The eleven safe ones**: `disk`, `memory`, `ports`, `battery`, `backup`,
    `docker`, `git`, `xcode`, `ssh`, `startup`, `history`.
-3. **The six that need scrubbing after capture**: `audit`, `network`, `certs`,
+4. **The six that need scrubbing after capture**: `audit`, `network`, `certs`,
    `env`, `trash`, `fonts`.
 
-**Why `menu` goes first.** It is the only fixture where the raccoon face
+**Why `hero` goes first.** Checking the fixtures for this note turned up
+something that reorders the whole session. The twenty fixtures are synthetic
+and clean: `/Users/alex` is invented, there is no real username and no real
+hostname anywhere in them. `50fd94d` did the sanitisation properly and it has
+held.
+
+Which leaves `hero.gif` as **the only file in the repository carrying real
+data** - the full home path of the machine it was recorded on, and two personal
+tap names, one of them a proxy client. Not one defect among seven: the only
+one of its kind in the whole project, and it sits at the top of the README,
+above the title.
+
+That makes it the first thing to fix, before any cosmetic work. Everything else
+in this session is staleness - screens showing an old face, an old menu, an old
+version number. hero is the only item that is a disclosure, and it stays a
+disclosure for exactly as long as it takes to replace it.
+
+**Why `menu` comes next.** It is the only fixture where the raccoon face
 appears - the other nineteen are reports, and the face neither is nor should be
 in them. It is also the only fixture that depends on the menu reorganisation
-done in 0.17.0. If the session stops halfway, it has to have stopped *after*
-`menu`, not before: a half-finished pass that skipped it leaves the one screen
-that actually changed still showing the old flat list and the old cat face.
+done in 0.17.0. If the session stops after hero, it has to have stopped after
+`menu` too: a pass that skipped it leaves the one screen that actually changed
+still showing the old flat list and the old cat face.
 
 ---
 
@@ -166,12 +189,13 @@ is the recipe - subject to Step 0.
 
 1. **The first image of the project is Raccoon failing to upgrade itself**,
    showing the `rcc-ui` build error and an invitation to open an issue.
-2. **It leaks machine data.** The full home path `/Users/<real username>/` is
-   on screen, and so are two personal taps, `steipete/tap` and `v2raya/v2raya`
-   - `v2raya` being a proxy client. This is a data problem, not a stale-content
-   problem: recapturing it for looks would still ship the paths and the tap
-   names unless they are removed deliberately. Say it out loud so it does not
-   get filed as cosmetic.
+2. **It is the only file in the repository carrying real data.** The full home
+   path `/Users/<real username>/` is on screen, and so are two personal taps,
+   `steipete/tap` and `v2raya/v2raya` - `v2raya` being a proxy client. Every
+   fixture around it is synthetic; this one is not. It is a data problem, not a
+   stale-content problem: recapturing it for looks would still ship the paths
+   and the tap names unless they are removed deliberately. Say it out loud so
+   it does not get filed as cosmetic. This is why hero is recaptured first.
 3. Old face and flat menu - both changed in 0.17.0.
 4. It shows `rcc 0.8.0 -> 0.9.1`. Current is 0.17.0.
 5. 640 px clips text on every right edge: `brew: up`, `Hom`, `thousan`,
