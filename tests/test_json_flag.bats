@@ -54,8 +54,12 @@ IMPLEMENTED="battery overlap ports trash wifi"
 	command -v python3 > /dev/null || skip "python3 not available"
 	local c out
 	for c in $IMPLEMENTED; do
-		out="$(RCC_NO_PROMPT=1 bash "$SCRIPT_DIR/bin/$c.sh" --json 2>/dev/null)"
-		[[ $? -eq 0 ]] || { echo "$c exited non-zero" >&2; false; }
+		# The || is what makes this loop able to name the command that broke.
+		# Written as a bare assignment, set -e aborts on the failing command
+		# substitution and the check on the next line never runs, so the failure
+		# reads as "line 57" and the log never says which of the five it was.
+		out="$(RCC_NO_PROMPT=1 bash "$SCRIPT_DIR/bin/$c.sh" --json 2>/dev/null)" ||
+			{ echo "$c exited non-zero" >&2; false; }
 		printf '%s' "$out" | python3 -m json.tool > /dev/null ||
 			{ echo "$c did not print valid JSON" >&2; false; }
 	done
