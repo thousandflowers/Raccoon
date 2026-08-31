@@ -11,9 +11,15 @@ const TYPE = 2, PAD = 6, REVEAL = 4, HOLD = 40;
 // scrolled off its own first line: the menu is 32 lines and used to end on
 // the last category with the raccoon already gone. Past the cap, long reports
 // scroll as before - env is 88 lines and is meant to.
-const HEADER_H = 96, LH = 30, CHROME = 96, MAX_H = 1180, MIN_H = 620;
-const heightFor = (lines: number) =>
-  Math.min(MAX_H, Math.max(MIN_H, HEADER_H + CHROME + lines * LH));
+const HEADER_H = 96, LH = 30, CHROME = 96, MAX_H = 1250, MIN_H = 620;
+const heightFor = (lines: number) => {
+  const needed = HEADER_H + CHROME + lines * LH;
+  // Grow only when growing buys something. A fixture past the cap scrolls at
+  // any height, so paying for the extra pixels just makes the GIF heavier:
+  // env and upgrade went to 9 MB each that way, on a repo that was
+  // deliberately shrunk one release ago.
+  return needed <= MAX_H ? Math.max(MIN_H, needed) : MIN_H;
+};
 
 type Item = {id: string; cmd: string; lines: string[]};
 
