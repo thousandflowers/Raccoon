@@ -68,3 +68,45 @@ teardown() {
 	[[ -d "$dir" ]]
 	[[ "$dir" == "$HOME/.raccoon/fix-backups/"* ]]
 }
+
+# --- regression: a non-interactive audit must not stop to ask ----------------
+#
+# `rcc audit` used to end by asking "Fix N issue(s) automatically? [y/N]" and
+# reading stdin with nothing checking whether anyone could answer. Under cron or
+# CI, where stdin never closes, it waited forever — and `--dry-run` reaching the
+# same prompt stopped to ask permission to act, which is the one thing that flag
+# promises not to do. Eleven minutes on a single test is how it was found.
+#
+# `run` gives these tests a stdin that is not a terminal, which is the case that
+# used to hang.
+
+@test "audit: a non-interactive run never asks the fix question" {
+	run bash "$SCRIPT_DIR/bin/audit.sh"
+	assert_audit_exit
+	[[ "$output" != *"automatically? [y/N]"* ]]
+}
+
+@test "audit: --dry-run never asks either" {
+	run bash "$SCRIPT_DIR/bin/audit.sh" --dry-run
+	assert_audit_exit
+	[[ "$output" != *"automatically? [y/N]"* ]]
+}
+
+@test "audit: a non-interactive run still says how many fixes are available" {
+	# The count is information: someone running this from a script loses the
+	# question, not the answer to "is there anything to fix here". Skipped on a
+	# machine with nothing to fix, which is the other half of the same rule.
+	run bash "$SCRIPT_DIR/bin/audit.sh"
+	assert_audit_exit
+	[[ "$output" == *"can be fixed automatically"* ]] || skip "nothing fixable on this machine"
+	assert_output_contains "Run: rcc audit --fix"
+}
+
+@test "audit: a non-interactive run fixes nothing" {
+	run bash "$SCRIPT_DIR/bin/audit.sh"
+	assert_audit_exit
+	# The lines the apply path prints. None may appear without --fix.
+	[[ "$output" != *"Applying fixes"* ]]
+	[[ "$output" != *"→ Fix "* ]]
+	[[ "$output" != *"Fixed:"* ]]
+}

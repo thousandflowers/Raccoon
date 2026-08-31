@@ -1554,8 +1554,21 @@ main() {
 
 	if [[ ${#FIX_QUEUE[@]} -gt 0 && "$AUTO_FIX" != "true" && "$OUTPUT_FORMAT" == "text" && "$QUIET_MODE" != "true" ]]; then
 		echo ""
-		echo -n "Fix ${#FIX_QUEUE[@]} issue(s) automatically? [y/N] "
-		read -r answer || answer="n"
+		# The count is information and prints either way: someone running this from
+		# a script has to lose the question, not the answer to "is there anything to
+		# fix here". The question is only asked where there is somebody to answer it.
+		# Without a terminal on stdin the read waited for input that never came, so a
+		# bare `rcc audit` under cron or CI never returned — and `--dry-run` reaching
+		# it stopped to ask permission to act, which is the one thing that flag
+		# promises not to do. Same guard as line 671 of this file, not a timeout:
+		# a timeout would spend that wait on every non-interactive run forever.
+		if [[ -t 0 ]]; then
+			echo -n "Fix ${#FIX_QUEUE[@]} issue(s) automatically? [y/N] "
+			read -r answer || answer="n"
+		else
+			echo "${#FIX_QUEUE[@]} issue(s) can be fixed automatically. Run: rcc audit --fix"
+			answer="n"
+		fi
 		if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
 			echo ""
 			for item in "${FIX_QUEUE[@]}"; do
