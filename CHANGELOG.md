@@ -53,6 +53,18 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 
 ### Fixed
 
+- The demo GIFs named the software installed on the machine they were captured
+  on. `rcc-startup.gif` listed Notion, Raycast, AutoRaise and DockDoor,
+  `rcc-network.gif` named a VPN, `rcc-memory.gif` named a browser and a chat
+  client, and `rcc-env.gif` listed nine Claude Code plugins by name, one of
+  which is a health disclosure. None of it is a machine identifier, which is why
+  every check passed: `docs/gif-helpers/preflight.sh` looked for usernames,
+  hostnames and paths, and an inventory of installed software is none of those.
+  It now carries a list of third-party names as well, matched case-insensitively
+  and on word boundaries. `rcc-help.gif` also still printed `Raccoon version
+  0.16.0`, having been captured in the same commit that raised VERSION, one step
+  too early.
+
 - `rcc battery` exited 1 and printed nothing on any Mac without a battery: a
   mini, a Studio, an iMac, or a CI runner. `pmset` prints no percentage there,
   so `grep` exited 1, `pipefail` propagated it and `set -e` killed the script

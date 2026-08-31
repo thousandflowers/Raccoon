@@ -8,6 +8,7 @@
 | ------------ | --------------- | ------------------------------ |
 lo0          (Loopback):     ::1
 en0          (LAN):          192.168.1.42
+en0          (Other):        2001:db8::42
 ✓
 
 -- [2/10] Listening Ports
@@ -40,7 +41,7 @@ en0          (LAN):          192.168.1.42
 -- [6/10] VPNs (scutil --nc)...
 
   Configured:
-    - Tailscale
+    - Office VPN
   no active VPNs
 ✓
 
@@ -48,8 +49,8 @@ en0          (LAN):          192.168.1.42
 
 | Server                   | Label                          |
 | ------------------------ | ------------------------------ |
-8.8.4.4                  
-8.8.8.8                  
+192.168.1.1              
+fe80::1%en0 
 ✓
 
 -- [8/10] Firewall Status...
@@ -64,13 +65,13 @@ en0          (LAN):          192.168.1.42
 | ------------ | -------- | ---------- |
 Server       Latency  Status
 ────────────────────────────────────────
-8.8.8.8      12.431 ms ✓
-1.1.1.1      19.810 ms ✓
-Active:                  58 connections
+8.8.8.8      40.370 ms ✓
+1.1.1.1      25.279 ms ✓
+Active:                  120 connections
 ✓
 
 -- [10/10] Summary...
 
-  Status: Certain (10/10 scans)
+  Status: Certain (11/10 scans)
   Detected: Proxy,RemoteDesktop
 ✓ Completed

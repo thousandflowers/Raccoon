@@ -1,4 +1,4 @@
-Raccoon version 0.16.0
+Raccoon version 0.17.0
 macOS companion toolkit
 
 Commands:

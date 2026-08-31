@@ -33,7 +33,6 @@ add "$(scutil --get LocalHostName 2>/dev/null)"
 # than on its shape: a bare run of capitals matches ESTABLISHED.
 shapes=(
 	'[a-z0-9._-]+@[a-z0-9.-]+\.(local|lan|home)'
-	'fe80:[0-9a-f]*:[0-9a-f:]+'
 	'([0-9a-f]{2}:){5}[0-9a-f]{2}'
 	'[Ss]erial([ _-]?[Nn]umber)?[^A-Za-z0-9]+[A-Z0-9]{8,}'
 )
@@ -54,6 +53,38 @@ done
 while IFS= read -r line; do
 	[[ -n "$line" ]] && report "  real home path -> $line"
 done < <(printf '%s\n' "$body" | grep -nE '/Users/[A-Za-z0-9._-]+' | grep -vE '/Users/(alex|user|you)\b' || true)
+
+# A link-local address carries the MAC in its host half, so any of them is a
+# finding except the agreed placeholder - the same exemption /Users/alex has.
+while IFS= read -r line; do
+	[[ -n "$line" ]] && report "  link-local address -> $line"
+done < <(printf '%s\n' "$body" | grep -nE 'fe80:[0-9a-f]*:[0-9a-f:]+' | grep -vE 'fe80::1\b' || true)
+
+# Third-party software names. Not a machine identifier, but an inventory of
+# what this person chose to install, which is the hole that let Tailscale,
+# Raycast, Notion and a Claude Code plugin called i-have-adhd reach published
+# GIFs while every check above passed. This is a list, not detection: it holds
+# what has actually been found in a capture here, and it grows when the next
+# one turns something up. Apple's own names are deliberately absent, because a
+# process every Mac runs identifies nobody. Docker is absent for the same
+# reason from the other side: Raccoon has a `docker` subcommand, so the word is
+# part of the tool's own vocabulary, and flagging it on every run of `rcc
+# docker` would train a reader to ignore the check.
+third_party=(
+	AutoRaise Adobe Alfred Arc Chrome CleanMyMac Cursor Dia Discord DockDoor
+	Dropbox Figma Firefox Hammerspoon Karabiner Mullvad NordVPN Notion
+	Obsidian OrbStack Parallels Proton Raycast Rectangle Slack Spotify Steam
+	Tailscale Telegram VMware WhatsApp WireGuard Zoom iStat 1Password
+	i-have-adhd superpowers caveman ponytail impeccable skillreaper v2ray
+)
+for name in "${third_party[@]}"; do
+	while IFS= read -r line; do
+		[[ -n "$line" ]] && report "  third-party name '$name' -> $line"
+	# -i because startup prints Tailscale as io.tailscale.ipn.macsys, and -w
+	# because without it "Arc" matches "research-tool" and "Dia" matches
+	# "mediaanalysisd", which is how a check earns being ignored.
+	done < <(printf '%s\n' "$body" | grep -inwF -- "$name" || true)
+done
 
 for s in "${shapes[@]}"; do
 	while IFS= read -r line; do
