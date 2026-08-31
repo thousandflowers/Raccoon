@@ -45,25 +45,25 @@ type raccoonAnimation []string
 
 // Default fallback (5 basic frames)
 var raccoonFrames = raccoonAnimation{
-	`    _
-   / \_/\_
-  ( o.o )
+	`
+   n___n
+  [ o.o ]
    > ^ <`,
-	`    _
-   / \_/\_
-  ( -.- )
+	`
+   n___n
+  [ -.- ]
    > ^ <`,
-	`    _
-   / \_/\_
-  ( ^.^ )
+	`
+   n___n
+  [ ^.^ ]
    > ^ <`,
-	`    _
-   / \_/\_
-  ( *.* )
+	`
+   n___n
+  [ *.* ]
    > ^ <`,
-	`    _
-   / \_/\_
-  ( >.< )
+	`
+   n___n
+  [ >.< ]
    > ^ <`,
 }
 
@@ -75,21 +75,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// remembered network sailing through it. Not connected leaves the field
 	// moving and nothing joined, which is exactly what is happening.
 	"wifi.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -97,21 +97,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// below, and a mark on the one the PATH actually reaches first. env shows
 	// the trail's order; this shows what that order decides.
 	"overlap.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -121,21 +121,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// state — a host that never answered included, since an audit that skipped
 	// it proves nothing about it.
 	"fleet.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -149,99 +149,99 @@ var scriptFrames = map[string]raccoonAnimation{
 	"upgrade.sh": {
 		`                              *
 
-    _
-   / \_/\_
-  ( o.o ) [o]
+
+   n___n
+  [ o.o ] (o)
    > ^ <`,
 		`                            * ,
 
-    _
-   / \_/\_
-  ( o.o ) [o]
+
+   n___n
+  [ o.o ] (o)
    > ^ <`,
 		`                          * , ,
 
-    _
-   / \_/\_
-  ( -.- ) [o]
+
+   n___n
+  [ -.- ] (o)
    > ^ <`,
 		`                        * , , ,
 
-    _
-   / \_/\_
-  ( -.- ) [o]
+
+   n___n
+  [ -.- ] (o)
    > ^ <`,
 		`                      * , , ,
 
-    _
-   / \_/\_
-  ( o.o ) [o]
+
+   n___n
+  [ o.o ] (o)
    > ^ <`,
 		`                    * , , ,
 
-    _
-   / \_/\_
-  ( o.o ) [o]
+
+   n___n
+  [ o.o ] (o)
    > ^ <`,
 		`                  * , , ,
 
-    _
-   / \_/\_
-  ( *.* ) [o]
+
+   n___n
+  [ *.* ] (o)
    > ^ <`,
 		`                * , , ,
 
-    _
-   / \_/\_
-  ( *.* ) [o]
+
+   n___n
+  [ *.* ] (o)
    > ^ <`,
 		`              * , , ,
 
-    _
-   / \_/\_
-  ( o.o ) [o]
+
+   n___n
+  [ o.o ] (o)
    > ^ <`,
 		`              , , ,
             *
-    _
-   / \_/\_
-  ( o.o ) [o]
+
+   n___n
+  [ o.o ] (o)
    > ^ <`,
 		`              , ,
           * ,
-    _
-   / \_/\_
-  ( -.- ) [o]
+
+   n___n
+  [ -.- ] (o)
    > ^ <`,
 		`              ,
         * , ,
-    _
-   / \_/\_
-  ( o.o ) [o]
+
+   n___n
+  [ o.o ] (o)
    > ^ <`,
 		`
         * , ,
-    _
-   / \_/\_
-  ( ^.^ ) [o]
+
+   n___n
+  [ ^.^ ] (o)
    > ^ <`,
 		`
       * , ,
-    _
-   / \_/\_
-  ( o.o ) [o]
+
+   n___n
+  [ o.o ] (o)
    > ^ <`,
 		`
 
-    _
-   / \_/\_
-  ( ^.^ ) [o]
+
+   n___n
+  [ ^.^ ] (o)
    > ^ <`,
 		`
 
-    _
-   / \_/\_
-  ( o.o ) [o]
+
+   n___n
+  [ o.o ] (o)
    > ^ <`,
 	},
 
@@ -250,53 +250,53 @@ var scriptFrames = map[string]raccoonAnimation{
 	// lands. Only the raccoon is stored here; appsSky composes the two rows
 	// above it at render time, because the name is only known while running.
 	"apps.sh": {
-		`    _
-   / \_/\_
-  ( o.o ) [o]
+		`
+   n___n
+  [ o.o ] (o)
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o ) [o]
+		`
+   n___n
+  [ o.o ] (o)
    > ^ <`,
-		`    _
-   / \_/\_
-  ( -.- ) [o]
+		`
+   n___n
+  [ -.- ] (o)
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o ) [o]
+		`
+   n___n
+  [ o.o ] (o)
    > ^ <`,
-		`    _
-   / \_/\_
-  ( <.< ) [o]
+		`
+   n___n
+  [ <.< ] (o)
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o ) [o]
+		`
+   n___n
+  [ o.o ] (o)
    > ^ <`,
-		`    _
-   / \_/\_
-  ( >.> ) [o]
+		`
+   n___n
+  [ >.> ] (o)
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o ) [o]
+		`
+   n___n
+  [ o.o ] (o)
    > ^ <`,
-		`    _
-   / \_/\_
-  ( -.- ) [o]
+		`
+   n___n
+  [ -.- ] (o)
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o ) [o]
+		`
+   n___n
+  [ o.o ] (o)
    > ^ <`,
-		`    _
-   / \_/\_
-  ( *.* ) [o]
+		`
+   n___n
+  [ *.* ] (o)
    > ^ <`,
-		`    _
-   / \_/\_
-  ( ^.^ ) [o]
+		`
+   n___n
+  [ ^.^ ] (o)
    > ^ <`,
 	},
 
@@ -308,25 +308,25 @@ var scriptFrames = map[string]raccoonAnimation{
 	// the run has already turned up warnings or failures, so the face reports
 	// what was actually found rather than miming a fixed story.
 	"audit.sh": {
-		`    _
-   / \_/\_
-  ( o.o ) o
+		`
+   n___n
+  [ o.o ] o
    > ^ <`,
-		`    _
-   / \_/\_
-  ( <.< ) o-
+		`
+   n___n
+  [ <.< ] o-
    > ^ <`,
-		`    _
-   / \_/\_
-  ( >.> ) o--
+		`
+   n___n
+  [ >.> ] o--
    > ^ <`,
-		`    _
-   / \_/\_
-  ( *.* ) o--
+		`
+   n___n
+  [ *.* ] o--
    > ^ <`,
-		`    _
-   / \_/\_
-  ( ^.^ ) o-- ok
+		`
+   n___n
+  [ ^.^ ] o-- ok
    > ^ <`,
 	},
 
@@ -338,21 +338,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// The arcs' outer rows sit one column back, which is where the curve comes
 	// from; the silhouette itself is untouched.
 	"network.sh": {
-		`    _
-   / \_/\_ '
-  ( o.o )   )
+		`
+   n___n   '
+  [ o.o ]   )
    > ^ <   ,`,
-		`    _
-   / \_/\_ '  '
-  ( o.o )   )  )
+		`
+   n___n   '  '
+  [ o.o ]   )  )
    > ^ <   ,  ,`,
-		`    _
-   / \_/\_ '  '  '
-  ( o.o )   )  )  )
+		`
+   n___n   '  '  '
+  [ o.o ]   )  )  )
    > ^ <   ,  ,  ,`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -360,21 +360,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// progress bar cannot: how full each volume is. The gauges are hung beside
 	// the four lines at render time, since the numbers only exist while running.
 	"disk.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( -.- )
+		`
+   n___n
+  [ -.- ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -385,21 +385,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// These are the calm frames; memStateFor rewrites them once the table has
 	// been printed and the pressure is known.
 	"memory.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( <.< )
+		`
+   n___n
+  [ <.< ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( >.> )
+		`
+   n___n
+  [ >.> ]
    > ^ <`,
 	},
 
@@ -409,21 +409,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// The frames are bare: portsSlot hangs the door beside them at render time,
 	// because which doors exist is only known while running.
 	"ports.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -431,21 +431,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// already in the menu bar every second of the day; how far the battery has
 	// aged is the thing you open this command to find out.
 	"battery.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -453,21 +453,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// in a row and grow as the copying goes on. With no destination and no
 	// backup there is nothing behind him at all, which is the point.
 	"backup.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -475,21 +475,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// says whether it closes: o== locks, o-- has no passphrase, o=/ has file
 	// permissions anyone can read, o=? has nothing to match it.
 	"ssh.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -497,21 +497,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// On a clean repository the signal climbs away; where work is pending the
 	// symbols simply sit there, because this command only looks.
 	"git.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -519,21 +519,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// beat. Running ones at the bottom, stopped ones capping it: the base is what
 	// is working, the top is what someone forgot to turn off.
 	"docker.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -541,21 +541,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// That cache is the only reason to run this command: it grows to tens of
 	// gigabytes in silence and every grain of it can be thrown away today.
 	"xcode.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -563,21 +563,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// walks it too. Stones are directories that exist; the gaps are entries it
 	// searches and never finds.
 	"env.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -585,21 +585,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// there. The procession is the honest part: these are not events at boot,
 	// they are company for the rest of the session.
 	"startup.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -608,21 +608,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// name, because six gigabytes in two files is a different problem from six
 	// gigabytes in ten thousand.
 	"trash.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -630,42 +630,42 @@ var scriptFrames = map[string]raccoonAnimation{
 	// what wears him down: the same font installed twice is loaded twice by
 	// every application, for nothing.
 	"fonts.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
 	// history — the scroll unrolls a stretch per beat, each stretch carrying one
 	// of the commands you actually typed, and the round closes with the total.
 	"history.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 
@@ -673,21 +673,21 @@ var scriptFrames = map[string]raccoonAnimation{
 	// gap is one that has expired: the proportion of holes is readable without
 	// counting anything.
 	"certs.sh": {
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
-		`    _
-   / \_/\_
-  ( o.o )
+		`
+   n___n
+  [ o.o ]
    > ^ <`,
 	},
 }
@@ -1143,7 +1143,7 @@ func backupRow(eyes []string) []string {
 		grid[i] = []rune(strings.Repeat(" ", width))
 	}
 	for k := len(eyes) - 1; k >= 0; k-- {
-		art := []string{"    _", `   / \_/\_`, "  ( " + eyes[k] + " )", "   > ^ <"}
+		art := []string{"", "   n___n", "  [ " + eyes[k] + " ]", "   > ^ <"}
 		for i, l := range art {
 			for c, ch := range l {
 				if off := k*backupStep + c; off < width {
@@ -2296,7 +2296,7 @@ func fleetFace(hosts []fleetHost) string {
 
 // boxRegexp matches the package box beside the raccoon in the upgrade frames.
 // Always three characters, so swapping it can never shift the art.
-var boxRegexp = regexp.MustCompile(`\[.\]`)
+var boxRegexp = regexp.MustCompile(`\(.\)`)
 
 // phaseBox turns the phase a script declared into the box the raccoon holds.
 // upgrade and apps both announce the same vocabulary — checking, fetching,
@@ -2307,22 +2307,22 @@ var boxRegexp = regexp.MustCompile(`\[.\]`)
 func phaseBox(label string) (box, eyes string) {
 	switch {
 	case strings.Contains(label, "error"):
-		return "[!]", ">.<" // the only phase that overrides the frame's own eyes
+		return "(!)", ">.<" // the only phase that overrides the frame's own eyes
 	case strings.Contains(label, "fetching"), strings.Contains(label, "downloading"):
-		return "[.]", ""
+		return "(.)", ""
 	case strings.Contains(label, "installing"), strings.Contains(label, "updating"),
 		strings.Contains(label, "upgrading"):
-		return "[=]", ""
+		return "(=)", ""
 	case strings.Contains(label, "completed"), strings.Contains(label, "updated"):
-		return "[#]", ""
+		return "(#)", ""
 	}
-	return "[ ]", ""
+	return "( )", ""
 }
 
 // eyeRegexp matches the raccoon's eye field: the three characters between the
-// parentheses. Only that field is ever rewritten, so the silhouette — ears,
+// square brackets. Only that field is ever rewritten, so the silhouette — ears,
 // head and muzzle — is identical in every frame.
-var eyeRegexp = regexp.MustCompile(`\( ... \)`)
+var eyeRegexp = regexp.MustCompile(`\[ ... \]`)
 
 // auditMood reads the results the audit has printed so far and returns the eyes
 // that match them, or "" to leave the frame's own eyes alone.
@@ -2848,9 +2848,9 @@ func (m model) menuView() string {
 	var b strings.Builder
 
 	b.WriteString("\n")
-	b.WriteString(styleTitle.Render("    _") + "\n")
-	b.WriteString(styleTitle.Render("   / \\_/\\_") + "  " + styleTitle.Render("Raccoon") + "\n")
-	b.WriteString(styleTitle.Render("  ( o.o )") + "  " + styleDesc.Render("macOS companion toolkit") + "\n")
+	b.WriteString(styleTitle.Render("") + "\n")
+	b.WriteString(styleTitle.Render("   n___n") + "  " + styleTitle.Render("Raccoon") + "\n")
+	b.WriteString(styleTitle.Render("  [ o.o ]") + "  " + styleDesc.Render("macOS companion toolkit") + "\n")
 	b.WriteString(styleTitle.Render("   > ^ <") + "\n\n")
 
 	f := m.filtered()
@@ -2907,7 +2907,7 @@ func (m model) runningView() string {
 	if m.currentScript == "audit.sh" {
 		if eyes := auditMood(m.outputLines); eyes != "" {
 			for i, l := range artLines {
-				artLines[i] = eyeRegexp.ReplaceAllString(l, "( "+eyes+" )")
+				artLines[i] = eyeRegexp.ReplaceAllString(l, "[ "+eyes+" ]")
 			}
 		}
 	}
@@ -2921,8 +2921,8 @@ func (m model) runningView() string {
 				eyes = fleetFace(hosts)
 			}
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+eyes+" )")
-				if row != "" && strings.Contains(l, "(") && strings.Contains(l, ")") {
+				l = eyeRegexp.ReplaceAllString(l, "[ "+eyes+" ]")
+				if row != "" && strings.Contains(l, "[") && strings.Contains(l, "]") {
 					l += "  " + row
 				}
 				artLines[i] = l
@@ -2935,7 +2935,7 @@ func (m model) runningView() string {
 		if clashes := readOverlaps(m.outputLines); len(clashes) > 0 {
 			rows, face := overlapFork(m.spinnerFrame, clashes), overlapFace(clashes)
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
 				if rows[i] != "" {
 					l = fmt.Sprintf("%-11s %s", l, rows[i])
 				}
@@ -2954,7 +2954,7 @@ func (m model) runningView() string {
 				face = "o.o"
 			}
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
 				artLines[i] = strings.TrimRight(fmt.Sprintf("%-11s %s", l, rows[i]), " ")
 			}
 		}
@@ -2966,8 +2966,8 @@ func (m model) runningView() string {
 		if wall := certWall(total, valid, expiring, expired); wall != "" {
 			face := certFace(total, expired, expiring)
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
-				if strings.Contains(l, "(") && strings.Contains(l, ")") {
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
+				if strings.Contains(l, "[") && strings.Contains(l, "]") {
 					l += "  " + wall
 				}
 				artLines[i] = l
@@ -2980,7 +2980,7 @@ func (m model) runningView() string {
 		cmds := recentCommands(m.outputLines)
 		if slot := historyScroll(m.spinnerFrame, cmds, historyTotal(m.outputLines)); slot != "" {
 			for i, l := range artLines {
-				if strings.Contains(l, "(") && strings.Contains(l, ")") {
+				if strings.Contains(l, "[") && strings.Contains(l, "]") {
 					artLines[i] = l + "  " + slot
 				}
 			}
@@ -2994,7 +2994,7 @@ func (m model) runningView() string {
 			rows := fontsBook(fontsPage(m.spinnerFrame, dups))
 			face := fontsFace(dups, corrupted)
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
 				artLines[i] = strings.TrimRight(fmt.Sprintf("%-11s %s", l, rows[i]), " ")
 			}
 		}
@@ -3006,7 +3006,7 @@ func (m model) runningView() string {
 			rows := trashBin(m.spinnerFrame, gb, trashItems(m.outputLines))
 			face := trashFace(gb)
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
 				artLines[i] = strings.TrimRight(fmt.Sprintf("%-11s %s", l, rows[i]), " ")
 			}
 		}
@@ -3017,8 +3017,8 @@ func (m model) runningView() string {
 		if items := countStartupItems(m.outputLines); items > 0 {
 			trail, face := startupTrail(m.spinnerFrame, items), startupFace(items)
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
-				if trail != "" && strings.Contains(l, "(") && strings.Contains(l, ")") {
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
+				if trail != "" && strings.Contains(l, "[") && strings.Contains(l, "]") {
 					l += "  " + trail
 				}
 				artLines[i] = l
@@ -3031,7 +3031,7 @@ func (m model) runningView() string {
 		if entries := readPathEntries(m.outputLines); len(entries) > 0 {
 			rows, face := envTrail(m.spinnerFrame, entries), envFace(entries)
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
 				if rows[i] != "" {
 					l = fmt.Sprintf("%-11s %s", l, rows[i])
 				}
@@ -3045,7 +3045,7 @@ func (m model) runningView() string {
 		if gb := derivedDataGB(m.outputLines); gb >= 0 {
 			rows, face := xcodeHeap(gb), xcodeFace(gb)
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
 				if rows[i] != "" {
 					l = fmt.Sprintf("%-11s %s", l, rows[i])
 				}
@@ -3062,7 +3062,7 @@ func (m model) runningView() string {
 			rows := dockerStack(m.spinnerFrame, running, stopped)
 			face := dockerFace(missing, running, stopped)
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
 				if rows[i] != "" {
 					l = fmt.Sprintf("%-11s %s", l, rows[i])
 				}
@@ -3089,7 +3089,7 @@ func (m model) runningView() string {
 				}
 			}
 			for n, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
 				if n < len(rows) && rows[n] != "" {
 					l = fmt.Sprintf("%-11s %s", l, rows[n])
 					if n == 2 && name != "" {
@@ -3106,8 +3106,8 @@ func (m model) runningView() string {
 		if keys := readSSHKeys(m.outputLines); len(keys) > 0 {
 			slot, face := sshSlot(m.spinnerFrame, keys), sshFace(keys)
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
-				if slot != "" && strings.Contains(l, "(") && strings.Contains(l, ")") {
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
+				if slot != "" && strings.Contains(l, "[") && strings.Contains(l, "]") {
 					l += " " + slot
 				}
 				artLines[i] = l
@@ -3134,8 +3134,8 @@ func (m model) runningView() string {
 				batteryBolt(m.spinnerFrame, charging))
 			face := batteryFace(health, cycles)
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
-				if strings.Contains(l, "(") && strings.Contains(l, ")") {
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
+				if strings.Contains(l, "[") && strings.Contains(l, "]") {
 					l += " " + slot
 				}
 				artLines[i] = l
@@ -3148,8 +3148,8 @@ func (m model) runningView() string {
 		if ports := listenPorts(m.outputLines); len(ports) > 0 {
 			slot, face := portsSlot(m.spinnerFrame, ports), portsFace(ports)
 			for i, l := range artLines {
-				l = eyeRegexp.ReplaceAllString(l, "( "+face+" )")
-				if slot != "" && strings.Contains(l, "(") && strings.Contains(l, ")") {
+				l = eyeRegexp.ReplaceAllString(l, "[ "+face+" ]")
+				if slot != "" && strings.Contains(l, "[") && strings.Contains(l, "]") {
 					l += " " + slot
 				}
 				artLines[i] = l
@@ -3168,10 +3168,10 @@ func (m model) runningView() string {
 			}
 			for i, l := range artLines {
 				if st.eyes != "" {
-					l = eyeRegexp.ReplaceAllString(l, "( "+st.eyes+" )")
+					l = eyeRegexp.ReplaceAllString(l, "[ "+st.eyes+" ]")
 				}
 				l = strings.Replace(l, "> ^ <", "> "+st.muzzle+" <", 1)
-				if st.load != "" && strings.Contains(l, ")") && strings.Contains(l, "(") {
+				if st.load != "" && strings.Contains(l, "]") && strings.Contains(l, "[") {
 					l += " " + st.load
 				}
 				artLines[i] = l
@@ -3190,7 +3190,7 @@ func (m model) runningView() string {
 		}
 		if len(vols) > 0 {
 			for i, l := range artLines {
-				artLines[i] = eyeRegexp.ReplaceAllString(l, "( "+diskFace(vols)+" )")
+				artLines[i] = eyeRegexp.ReplaceAllString(l, "[ "+diskFace(vols)+" ]")
 			}
 		}
 	}
@@ -3206,7 +3206,7 @@ func (m model) runningView() string {
 		for i, l := range artLines {
 			l = boxRegexp.ReplaceAllString(l, box)
 			if eyes != "" {
-				l = eyeRegexp.ReplaceAllString(l, "( "+eyes+" )")
+				l = eyeRegexp.ReplaceAllString(l, "[ "+eyes+" ]")
 			}
 			artLines[i] = l
 		}
@@ -3285,9 +3285,9 @@ func (m model) outputView() string {
 	b.WriteString("\n")
 	var raccoonFace string
 	if m.outputSuccess {
-		raccoonFace = "( ^.^ )"
+		raccoonFace = "[ ^.^ ]"
 	} else {
-		raccoonFace = "( >.< )"
+		raccoonFace = "[ >.< ]"
 	}
 	status := styleStatusSuccess.Render("✓ Completed")
 	if !m.outputSuccess {
