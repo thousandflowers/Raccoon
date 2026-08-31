@@ -30,24 +30,37 @@ for arg in "$@"; do
 	esac
 done
 
+# A Mac with no battery is not an error: a mini, a Studio or an iMac has
+# nothing to report, and the answer is that fact. pmset prints no percentage
+# there, so grep exits 1, and under `set -euo pipefail` that killed the script
+# before it could say so - in text mode too, which printed nothing at all.
+# Every read of the charge goes through here, and here it cannot fail.
+_battery_charge() {
+	pmset -g batt 2>/dev/null | grep -oE '[0-9]+%' | head -1 | tr -d '%' || true
+}
+
 get_battery_info() {
 	local battery_info
 	battery_info=$(system_profiler SPPowerDataType 2>/dev/null)
 
 	local cycle_count
-	cycle_count=$(echo "$battery_info" | grep -i "Cycle Count" | awk '{print $NF}' | tr -d ':') || cycle_count=""
+	cycle_count=$(echo "$battery_info" | grep -i "Cycle Count" | head -1 | awk '{print $NF}' | tr -d ':') || cycle_count=""
 
 	local max_capacity
-	max_capacity=$(echo "$battery_info" | grep -i "Maximum Capacity" | awk '{print $NF}' | tr -d '%') || max_capacity=""
+	max_capacity=$(echo "$battery_info" | grep -i "Maximum Capacity" | head -1 | awk '{print $NF}' | tr -d '%') || max_capacity=""
 
 	local condition
-	condition=$(echo "$battery_info" | grep -i "Condition" | awk '{for(i=2;i<=NF;i++) printf "%s ", $i}' | sed 's/ *$//') || condition=""
+	condition=$(echo "$battery_info" | grep -i "Condition" | head -1 | awk '{for(i=2;i<=NF;i++) printf "%s ", $i}' | sed 's/ *$//') || condition=""
 
 	local is_charging
-	is_charging=$(echo "$battery_info" | grep -i "Charging:" | awk '{print $NF}') || is_charging=""
+	# SPPowerDataType prints "Charging:" twice, once for the battery and once
+	# for the AC charger. Without head -1 the value is two lines, the record
+	# below becomes two records, and every field after this one is lost: that is
+	# why this Mac reported "Fully Charged: No" while sitting at 100%.
+	is_charging=$(echo "$battery_info" | grep -i "Charging:" | head -1 | awk '{print $NF}') || is_charging=""
 
 	local is_full
-	is_full=$(echo "$battery_info" | grep -i "Fully Charged:" | awk '{print $NF}') || is_full=""
+	is_full=$(echo "$battery_info" | grep -i "Fully Charged:" | head -1 | awk '{print $NF}') || is_full=""
 
 	local charge_percent
 	charge_percent=$(echo "$battery_info" | \
@@ -55,30 +68,45 @@ get_battery_info() {
 		grep -oE '[0-9]+' | head -1) || charge_percent=""
 
 	if [[ -z "$charge_percent" ]]; then
-		charge_percent=$(pmset -g batt 2>/dev/null | \
-			grep -oE '[0-9]+%' | head -1 | tr -d '%')
+		charge_percent=$(_battery_charge)
 	fi
 
-	echo "cycle_count:$cycle_count|max_capacity:$max_capacity|condition:$condition|charging:$is_charging|full:$is_full|charge:$charge_percent"
+	# Cycle count, maximum capacity and charge are battery-only: a machine that
+	# reports none of the three has no battery, rather than a battery it failed
+	# to describe. Charging and Fully Charged are not part of the test, because
+	# a desktop on AC can answer them.
+	local present="true"
+	[[ -n "${cycle_count}${max_capacity}${charge_percent}" ]] || present="false"
+
+	echo "cycle_count:$cycle_count|max_capacity:$max_capacity|condition:$condition|charging:$is_charging|full:$is_full|charge:$charge_percent|present:$present"
 }
 
 display_battery_status() {
 	local data
 	data=$(get_battery_info)
 
-	local cycle_count_str max_capacity_str condition_str charging_str full_str charge_str
-	IFS='|' read -r cycle_count_str max_capacity_str condition_str charging_str full_str charge_str <<<"$data"
+	local cycle_count_str max_capacity_str condition_str charging_str full_str charge_str present_str
+	IFS='|' read -r cycle_count_str max_capacity_str condition_str charging_str full_str charge_str present_str <<<"$data"
 
-	local cycle_count max_capacity condition charging full charge
+	local cycle_count max_capacity condition charging full charge present
 	cycle_count=$(echo "$cycle_count_str" | cut -d: -f2)
 	max_capacity=$(echo "$max_capacity_str" | cut -d: -f2)
 	condition=$(echo "$condition_str" | cut -d: -f2-)
 	charging=$(echo "$charging_str" | cut -d: -f2)
 	full=$(echo "$full_str" | cut -d: -f2)
 	charge=$(echo "$charge_str" | cut -d: -f2)
+	present=$(echo "$present_str" | cut -d: -f2)
+
+	if [[ "$present" != "true" ]]; then
+		print_section_header "Battery Status"
+		echo "No battery: this Mac runs on AC power only"
+		echo ""
+		print_success "Completed"
+		return 0
+	fi
 
 	if [[ -z "$charge" || "$charge" == "N/A" ]]; then
-		charge=$(pmset -g batt 2>/dev/null | grep -oE '[0-9]+%' | head -1 | tr -d '%')
+		charge=$(_battery_charge)
 	fi
 
 	[[ -z "$charge" ]] && charge="0"
@@ -119,30 +147,38 @@ main() {
 		local data
 		data=$(get_battery_info)
 
-		local cycle_count_str max_capacity_str condition_str charging_str full_str charge_str
-		IFS='|' read -r cycle_count_str max_capacity_str condition_str charging_str full_str charge_str <<<"$data"
+		local cycle_count_str max_capacity_str condition_str charging_str full_str charge_str present_str
+		IFS='|' read -r cycle_count_str max_capacity_str condition_str charging_str full_str charge_str present_str <<<"$data"
 
-		local cycle_count max_capacity condition charging full charge
+		local cycle_count max_capacity condition charging full charge present
 		cycle_count=$(echo "$cycle_count_str" | cut -d: -f2)
 		max_capacity=$(echo "$max_capacity_str" | cut -d: -f2)
 		condition=$(echo "$condition_str" | cut -d: -f2-)
 		charging=$(echo "$charging_str" | cut -d: -f2)
 		full=$(echo "$full_str" | cut -d: -f2)
 		charge=$(echo "$charge_str" | cut -d: -f2)
+		present=$(echo "$present_str" | cut -d: -f2)
 
-		[[ -z "$full" ]] && full="No"
-		[[ -z "$charge" ]] && charge=$(pmset -g batt 2>/dev/null | grep -oE '[0-9]+%' | head -1 | tr -d '%')
-		[[ -z "$charge" ]] && charge="0"
+		[[ -z "$charge" ]] && charge=$(_battery_charge)
 		[[ "$charging" == "Yes" ]] && charging="true" || charging="false"
 		[[ "$full" == "Yes" ]] && full="true" || full="false"
-		[[ -z "$cycle_count" ]] && cycle_count=0
-		[[ -z "$max_capacity" ]] && max_capacity=0
+
+		# null, not 0. A number here is a measurement, and a Mac with no battery
+		# has not measured a cycle count of zero - it has nothing to measure. The
+		# same holds for a battery whose figures system_profiler did not report:
+		# zero reads as a new battery, which is the opposite of unknown.
+		[[ -n "$cycle_count" ]] || cycle_count="null"
+		[[ -n "$max_capacity" ]] || max_capacity="null"
+		[[ -n "$charge" ]] || charge="null"
+		local condition_json="null"
+		[[ -z "$condition" ]] || condition_json=$(printf '"%s"' "$condition")
 
 		cat <<EOF
 {
+  "present": $present,
   "cycle_count": $cycle_count,
   "max_capacity_percent": $max_capacity,
-  "condition": "$condition",
+  "condition": $condition_json,
   "charging": $charging,
   "fully_charged": $full,
   "charge_percent": $charge

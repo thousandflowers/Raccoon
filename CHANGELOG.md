@@ -53,6 +53,19 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 
 ### Fixed
 
+- `rcc battery` exited 1 and printed nothing on any Mac without a battery: a
+  mini, a Studio, an iMac, or a CI runner. `pmset` prints no percentage there,
+  so `grep` exited 1, `pipefail` propagated it and `set -e` killed the script
+  one line before the defaults that existed for exactly that case. Text mode was
+  affected too, not just `--json`. A missing battery is now a result: one line
+  in text, and `"present": false` with nulls in JSON, both exiting 0. `present`
+  is emitted in the normal case as well.
+- `rcc battery` reported `Fully Charged: No` on a Mac sitting at 100%.
+  `SPPowerDataType` prints `Charging:` twice, once for the battery and once for
+  the AC charger; both lines were taken, which turned the internal record into
+  two lines and dropped every field after `charging`. Found because it was what
+  broke the new `present` field.
+
 - `rcc audit` stopped at the end to ask "Fix N issue(s) automatically? [y/N]" and
   read stdin with nothing checking whether there was anyone to answer, so every
   text-mode run - a bare `rcc audit`, `--dry-run`, `--explain` - waited forever

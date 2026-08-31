@@ -299,7 +299,7 @@
       "| Condition       | Normal               |",
       "| Charge Level    | 100%                 |",
       "| Charging        | No                   |",
-      "| Fully Charged   | No                   |",
+      "| Fully Charged   | Yes                  |",
       "",
       "✓ Completed"
     ]
