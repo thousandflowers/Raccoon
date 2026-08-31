@@ -1,4 +1,4 @@
-import { Action, ActionPanel, Icon, List } from "@raycast/api";
+import { Action, ActionPanel, Icon, Keyboard, List } from "@raycast/api";
 import { COMMANDS, type RccCommand } from "./commands";
 import { RccDetail } from "./rcc-detail";
 
@@ -36,6 +36,7 @@ export default function Command() {
 							<Action.CopyToClipboard
 								title="Copy Command"
 								content={`rcc ${command.args.join(" ")}`}
+								shortcut={Keyboard.Shortcut.Common.Copy}
 							/>
 						</ActionPanel>
 					}
