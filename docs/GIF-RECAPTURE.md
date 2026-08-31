@@ -9,32 +9,47 @@ fixtures were captured on 2026-06-22 and show 0.11.0-era output. `hero.gif`,
 the first image in the README, is older still and is not produced by the
 harness at all - nothing here regenerates it.
 
-Only one of them is urgent. The fixtures are synthetic and clean; `hero.gif` is
-the single file in the repository that carries real data. It is recaptured
-first, for that reason and no other.
+Only one of them is urgent. The fixtures are synthetic and clean; `hero.gif`
+is the only *published image* that carries real data. It is recaptured first,
+for that reason and no other. See the correction under "Why `hero` goes first"
+for the two source files that also carry real names.
 
 ---
 
-## Step 0 - resolve the `rcc-menu.gif` collision first
+## Step 0 - the collision, resolved
 
-**Do this before generating anything.** Two independent pipelines write the
-same file:
+**Done.** It was wider than this note first said: not one file, twenty. Every
+`docs/tapes/rcc-<id>.tape` wrote to `../gifs/rcc-<id>.gif`, and all twenty of
+those ids have a Remotion fixture, so every one of them was a silent
+overwrite waiting for whichever tool ran last. `rcc-menu.gif` was simply the
+one that came up first.
 
-| pipeline | writes |
+The fix is an ownership rule that makes the two output sets disjoint by
+construction, so it cannot regress without someone adding a file on purpose:
+
+| tool | owns |
 |---|---|
-| `docs/remotion/scripts/render-all.mjs` (`const outDir = join(root, '..', 'gifs')`) | `docs/gifs/rcc-<id>.gif`, including `rcc-menu.gif` |
-| `docs/tapes/rcc-menu.tape` (`Output ../gifs/rcc-menu.gif`) | `docs/gifs/rcc-menu.gif` |
+| `docs/remotion/scripts/render-all.mjs` | `docs/gifs/rcc-<id>.gif`, for every id in `docs/remotion/fixtures/` |
+| `vhs`, `docs/tapes/hero.tape` | `docs/gifs/hero.gif`, and nothing else |
 
-Whichever runs last wins, silently. Since the hero rework needs vhs (see
-below) and the fixture pass needs Remotion, both will run in the same session
-and one will overwrite the other's `rcc-menu.gif`.
+There is no `hero` fixture, so Remotion never emits `hero.gif`; vhs no longer
+emits any `rcc-*.gif`. No guard code is needed for this - the sets simply do
+not intersect.
 
-Pick one owner for that path before the first render. Running them in either
-order without deciding produces a `rcc-menu.gif` whose provenance nobody can
-tell afterwards.
+The twenty-two `.tape` files were referenced by nothing and had been superseded
+by the Remotion harness since `50fd94d`. They are removed; git keeps them.
+Two were not even in the collision and went for their own reasons:
+`rcc-version.tape` rendered `rcc-version.gif`, which no longer exists, and
+`example.tape` was vhs stock carrying an absolute path with the real home
+directory in it.
 
-The twenty-two `.tape` files are referenced by nothing in the repo - dead
-tooling that still works. `vhs`, `asciinema` and `agg` are all installed.
+`docs/gif-helpers/demo-audit.sh` is kept. Its only caller was `rcc-audit.tape`,
+but it is the sanitisation harness Step 4 needs: it disables sudo, shims
+`scutil` so the DNS row does not print the IPv6 link-local address derived from
+this Mac's MAC, and shims `softwareupdate` so the capture does not hang for
+seven minutes on Apple's servers.
+
+`vhs`, `asciinema` and `agg` are all installed.
 
 ---
 
@@ -54,11 +69,27 @@ and clean: `/Users/alex` is invented, there is no real username and no real
 hostname anywhere in them. `50fd94d` did the sanitisation properly and it has
 held.
 
-Which leaves `hero.gif` as **the only file in the repository carrying real
-data** - the full home path of the machine it was recorded on, and two personal
-tap names, one of them a proxy client. Not one defect among seven: the only
-one of its kind in the whole project, and it sits at the top of the README,
-above the title.
+Which leaves `hero.gif` as **the only published image carrying real data** -
+the full home path of the machine it was recorded on, and two personal tap
+names, one of them a proxy client. It sits at the top of the README, above the
+title, and every reader sees it before anything else.
+
+A correction to an earlier draft of this note, which claimed hero was the only
+file of any kind: a `git grep` for the real username afterwards found three
+occurrences, not one.
+
+| file | what |
+|---|---|
+| `docs/tapes/example.tape:60` | `Output /Users/<real user>/Raccoon/docs/tapes/example.gif` - removed with the tapes in Step 0 |
+| `ui/main_test.go:772` | the real GitHub account name as a row in a `readRepos` test table |
+| `ui/main_test.go:1462-1496`, `ui/render_test.go:37` | the real machine names `lampone` and `quetzalcoatl-2` in fleet test tables |
+
+The two test files are a smaller problem than hero and a different one: they
+are source, not a rendered image, and a reader has to open a test to find them.
+They are still real host and account names in a public repository, and the
+synthetic-fixture rule that the Remotion harness follows should apply to them
+too. They are left as they are for now, deliberately, rather than changed
+without asking.
 
 That makes it the first thing to fix, before any cosmetic work. Everything else
 in this session is staleness - screens showing an old face, an old menu, an old
@@ -189,7 +220,7 @@ is the recipe - subject to Step 0.
 
 1. **The first image of the project is Raccoon failing to upgrade itself**,
    showing the `rcc-ui` build error and an invitation to open an issue.
-2. **It is the only file in the repository carrying real data.** The full home
+2. **It is the only published image carrying real data.** The full home
    path `/Users/<real username>/` is on screen, and so are two personal taps,
    `steipete/tap` and `v2raya/v2raya` - `v2raya` being a proxy client. Every
    fixture around it is synthetic; this one is not. It is a data problem, not a
