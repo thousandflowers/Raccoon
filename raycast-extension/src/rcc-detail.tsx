@@ -9,70 +9,12 @@ import {
 	openExtensionPreferences,
 } from "@raycast/api";
 import { useState } from "react";
+import { MissingRcc, REPO_URL } from "./missing-rcc";
 import type { RccCommand } from "./commands";
 import { pendingFixCount, toMarkdown, withSudoHint } from "./markdown";
 import { isFailure } from "./exit";
-import { INSTALL_COMMAND, RccNotFoundError, streamInstall } from "./rcc";
+import { RccNotFoundError } from "./rcc";
 import { useRccStream } from "./use-rcc-stream";
-
-const REPO_URL = "https://github.com/thousandflowers/Raccoon";
-
-/** First run without the CLI: install it from here rather than sending the user to a terminal. */
-function MissingRcc() {
-	const [log, setLog] = useState("");
-	const [isInstalling, setIsInstalling] = useState(false);
-
-	const install = async () => {
-		setIsInstalling(true);
-		setLog("");
-		try {
-			await streamInstall((chunk) =>
-				setLog((previous) => previous + chunk.text),
-			);
-		} finally {
-			setIsInstalling(false);
-		}
-	};
-
-	const markdown = [
-		"# Raccoon CLI not found",
-		"",
-		"This extension runs the `rcc` command-line tool.",
-		"",
-		"Press **Install with Homebrew** below, or set the path in preferences if it is already installed elsewhere.",
-		"",
-		log ? ["## Installing", "", "```", log, "```"].join("\n") : "",
-	].join("\n");
-
-	return (
-		<Detail
-			isLoading={isInstalling}
-			markdown={markdown}
-			actions={
-				<ActionPanel>
-					<Action
-						title="Install with Homebrew"
-						icon={Icon.Download}
-						onAction={install}
-					/>
-					<Action
-						title="Set Rcc Path"
-						icon={Icon.Gear}
-						onAction={openExtensionPreferences}
-					/>
-					<Action.CopyToClipboard
-						title="Copy Install Command"
-						content={INSTALL_COMMAND}
-					/>
-					<Action.OpenInBrowser
-						title="Open Raccoon on GitHub"
-						url={REPO_URL}
-					/>
-				</ActionPanel>
-			}
-		/>
-	);
-}
 
 /** What to say about a run that ended badly, with whatever stderr explained. */
 function failureNotice(

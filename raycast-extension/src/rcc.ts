@@ -19,7 +19,7 @@ const RCC_SEARCH_PATHS = [
  * system_profiler, diskutil, lsof, networksetup and ifconfig, which live in
  * /usr/sbin and /sbin. Without them rcc silently reports zeroes.
  */
-const RUNTIME_PATH = [
+export const RUNTIME_PATH = [
 	...RCC_SEARCH_PATHS,
 	"/usr/bin",
 	"/bin",
