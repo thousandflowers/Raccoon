@@ -1,5 +1,5 @@
 import React from 'react';
-import {AbsoluteFill, useCurrentFrame} from 'remotion';
+import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import {loadFont} from '@remotion/google-fonts/JetBrainsMono';
 
 const {fontFamily} = loadFont('normal', {weights: ['400', '700']});
@@ -15,7 +15,11 @@ const TYPE = 2;
 const PAD = 6;
 const REVEAL = 4;
 const HEADER_H = 96;
-const VISIBLE = 15;
+// Padding above and below (34 each) plus the 8px gap under the prompt: what
+// is left of the composition is what the output can occupy. This used to be a
+// fixed 15 lines, which scrolled a fixture off its own first line even when
+// the frame was tall enough to hold all of it.
+const OUTPUT_INSET = 34 * 2 + 8;
 
 export type TerminalProps = {cmd: string; lines: string[]};
 
@@ -35,9 +39,14 @@ export const Terminal: React.FC<TerminalProps> = ({cmd, lines}) => {
   const frame = useCurrentFrame();
   const typed = Math.min(cmd.length, Math.max(0, Math.floor(frame / TYPE)));
   const typeEnd = cmd.length * TYPE + PAD;
-  const shown = Math.max(0, Math.floor((frame - typeEnd) / REVEAL));
+  // Clamped: without the cap, shown keeps counting through the hold at the end
+  // and scrolls the output up past its own last line, so every GIF ended on a
+  // drifted frame rather than on the finished report.
+  const shown = Math.min(lines.length, Math.max(0, Math.floor((frame - typeEnd) / REVEAL)));
   const blink = Math.floor(frame / 15) % 2 === 0;
-  const scroll = Math.max(0, shown - VISIBLE) * LH;
+  const {height} = useVideoConfig();
+  const visible = Math.max(1, Math.floor((height - HEADER_H - OUTPUT_INSET) / LH));
+  const scroll = Math.max(0, shown - visible) * LH;
 
   return (
     <AbsoluteFill style={{backgroundColor: T.bg, fontFamily, fontSize: FONT_SIZE, padding: 34, overflow: 'hidden'}}>
