@@ -80,7 +80,7 @@ func TestRunningViewRendersEveryScript(t *testing.T) {
 						t.Errorf("%s frame %d at %dx%d: art is %d columns, terminal is %d:\n%q",
 							script, frame, size[0], size[1], w, size[0], plain)
 					}
-					if strings.Contains(plain, `/ \_/\_`) {
+					if strings.Contains(plain, "n___n") {
 						sawSilhouette = true
 					}
 				}
@@ -129,7 +129,7 @@ func TestMenuViewFitsTheTerminal(t *testing.T) {
 		if len(lines) > height-1 {
 			t.Errorf("height %d: menu rendered %d rows", height, len(lines))
 		}
-		if !strings.Contains(m.menuView(), "( o.o )") {
+		if !strings.Contains(m.menuView(), "[ o.o ]") {
 			t.Errorf("height %d: the raccoon is missing from the top", height)
 		}
 	}

@@ -153,7 +153,7 @@ func TestAuditFramesAreWellFormed(t *testing.T) {
 			t.Errorf("frame %d has %d lines, want 4", i+1, len(lines))
 			continue
 		}
-		if lines[0] != "    _" || lines[1] != `   / \_/\_` || lines[3] != "   > ^ <" {
+		if lines[0] != "" || lines[1] != "   n___n" || lines[3] != "   > ^ <" {
 			t.Errorf("frame %d deforms the silhouette:\n%s", i+1, f)
 		}
 		if !eyeRegexp.MatchString(lines[2]) {
@@ -166,17 +166,17 @@ func TestAuditFramesAreWellFormed(t *testing.T) {
 // a box that idled on "nothing to do" would misreport a run that is working.
 func TestPhaseBox(t *testing.T) {
 	cases := []struct{ label, box, eyes string }{
-		{"", "[ ]", ""},
-		{"brew: checking...", "[ ]", ""},
-		{"brew: up to date", "[ ]", ""},
-		{"brew: fetching...", "[.]", ""},
-		{"brew: downloading...", "[.]", ""},
-		{"brew: installing...", "[=]", ""},
-		{"npm: updating...", "[=]", ""},
-		{"brew: upgrading...", "[=]", ""},
-		{"brew: completed", "[#]", ""},
-		{"gem: updated", "[#]", ""},
-		{"gem: permission error, skipping", "[!]", ">.<"},
+		{"", "( )", ""},
+		{"brew: checking...", "( )", ""},
+		{"brew: up to date", "( )", ""},
+		{"brew: fetching...", "(.)", ""},
+		{"brew: downloading...", "(.)", ""},
+		{"brew: installing...", "(=)", ""},
+		{"npm: updating...", "(=)", ""},
+		{"brew: upgrading...", "(=)", ""},
+		{"brew: completed", "(#)", ""},
+		{"gem: updated", "(#)", ""},
+		{"gem: permission error, skipping", "(!)", ">.<"},
 	}
 	for _, c := range cases {
 		box, eyes := phaseBox(c.label)
@@ -199,7 +199,7 @@ func TestUpgradeFramesAreWellFormed(t *testing.T) {
 			t.Errorf("frame %d has %d lines, want 6", i+1, len(lines))
 			continue
 		}
-		if lines[2] != "    _" || lines[3] != `   / \_/\_` || lines[5] != "   > ^ <" {
+		if lines[2] != "" || lines[3] != "   n___n" || lines[5] != "   > ^ <" {
 			t.Errorf("frame %d deforms the silhouette:\n%s", i+1, f)
 		}
 		if got := len(boxRegexp.FindAllString(lines[4], -1)); got != 1 {
@@ -268,7 +268,7 @@ func TestAppsFramesAreJustTheRaccoon(t *testing.T) {
 			t.Errorf("frame %d has %d lines, want 4", i+1, len(lines))
 			continue
 		}
-		if lines[0] != "    _" || lines[1] != `   / \_/\_` || lines[3] != "   > ^ <" {
+		if lines[0] != "" || lines[1] != "   n___n" || lines[3] != "   > ^ <" {
 			t.Errorf("frame %d deforms the silhouette:\n%s", i+1, f)
 		}
 	}
@@ -288,11 +288,11 @@ func TestNetworkFramesPulse(t *testing.T) {
 			t.Errorf("frame %d has %d lines, want 4", i+1, len(lines))
 			continue
 		}
-		if !strings.HasPrefix(lines[1], `   / \_/\_`) || !strings.HasPrefix(lines[3], "   > ^ <") {
+		if !strings.HasPrefix(lines[1], "   n___n") || !strings.HasPrefix(lines[3], "   > ^ <") {
 			t.Errorf("frame %d deforms the silhouette:\n%s", i+1, f)
 		}
-		// Count only past the face: "  ( o.o )" carries a closing paren of its own.
-		sky := lines[2][strings.Index(lines[2], ")")+1:]
+		// Count only past the face: the face ends on a bracket of its own.
+		sky := lines[2][strings.Index(lines[2], "]")+1:]
 		if got := strings.Count(sky, ")"); got != wantArcs[i] {
 			t.Errorf("frame %d has %d arcs, want %d", i+1, got, wantArcs[i])
 		}
@@ -665,10 +665,10 @@ func TestBackupRowIsOpaque(t *testing.T) {
 	if len(row) != 4 {
 		t.Fatalf("row has %d lines, want 4", len(row))
 	}
-	if !strings.HasPrefix(row[2], "  ( o.o )") {
+	if !strings.HasPrefix(row[2], "  [ o.o ]") {
 		t.Errorf("the front face is not intact: %q", row[2])
 	}
-	if strings.Contains(row[2], "()") {
+	if strings.Contains(row[2], "[]") {
 		t.Errorf("a copy showed through the front raccoon's face: %q", row[2])
 	}
 	if !strings.Contains(row[2], "x.x") {
