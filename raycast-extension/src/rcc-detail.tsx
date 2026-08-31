@@ -5,11 +5,13 @@ import {
 	confirmAlert,
 	Detail,
 	Icon,
+	Keyboard,
 	openExtensionPreferences,
 } from "@raycast/api";
 import { useState } from "react";
 import type { RccCommand } from "./commands";
 import { pendingFixCount, toMarkdown, withSudoHint } from "./markdown";
+import { isFailure } from "./exit";
 import { INSTALL_COMMAND, RccNotFoundError, streamInstall } from "./rcc";
 import { useRccStream } from "./use-rcc-stream";
 
@@ -25,7 +27,7 @@ function MissingRcc() {
 		setLog("");
 		try {
 			await streamInstall((chunk) =>
-				setLog((previous) => previous + chunk),
+				setLog((previous) => previous + chunk.text),
 			);
 		} finally {
 			setIsInstalling(false);
@@ -72,12 +74,37 @@ function MissingRcc() {
 	);
 }
 
+/** What to say about a run that ended badly, with whatever stderr explained. */
+function failureNotice(
+	args: string[],
+	code: number,
+	stderrOutput: string,
+): string[] {
+	const reason = stderrOutput.trim();
+	return [
+		`> **\`rcc ${args.join(" ")}\` exited with status ${code}.**`,
+		"> The output above may be incomplete.",
+		...(reason ? ["", "```", reason, "```"] : []),
+	];
+}
+
 export function RccDetail({ command }: { command: RccCommand }) {
 	const [args, setArgs] = useState(command.args);
-	const { output, isLoading, error, reload, stop } = useRccStream(args);
+	const {
+		output,
+		stdoutOutput,
+		stderrOutput,
+		exit,
+		isLoading,
+		error,
+		reload,
+		stop,
+	} = useRccStream(args);
 
 	if (error instanceof RccNotFoundError) return <MissingRcc />;
 
+	// Three states, not two: a command that ends without printing anything used
+	// to leave "Running" on the screen for good.
 	let markdown: string;
 	if (error) {
 		markdown = [
@@ -89,8 +116,23 @@ export function RccDetail({ command }: { command: RccCommand }) {
 		].join("\n");
 	} else if (output) {
 		markdown = withSudoHint(toMarkdown(output));
-	} else {
+	} else if (isLoading) {
 		markdown = `Running \`rcc ${args.join(" ")}\``;
+	} else {
+		markdown = `\`rcc ${args.join(" ")}\` finished without printing anything.`;
+	}
+
+	// rcc audit says what it found through its exit status, so a non-zero code is
+	// not news by itself. Anything isFailure() does call a failure is reported
+	// here, because the output alone can look like an ordinary short report.
+	if (exit && isFailure(args, exit, stdoutOutput.trim() !== "")) {
+		markdown += [
+			"",
+			"",
+			"---",
+			"",
+			...failureNotice(args, exit.code, stderrOutput),
+		].join("\n");
 	}
 
 	// rcc offers its fixes through a terminal prompt that Raycast cannot answer,
@@ -123,6 +165,7 @@ export function RccDetail({ command }: { command: RccCommand }) {
 						<Action
 							title="Run Again"
 							icon={Icon.ArrowClockwise}
+							shortcut={Keyboard.Shortcut.Common.Refresh}
 							onAction={reload}
 						/>
 					)}
@@ -136,6 +179,7 @@ export function RccDetail({ command }: { command: RccCommand }) {
 					<Action.CopyToClipboard
 						title="Copy Output"
 						content={output}
+						shortcut={{ modifiers: ["cmd"], key: "c" }}
 					/>
 					<Action
 						title="Set Rcc Path"

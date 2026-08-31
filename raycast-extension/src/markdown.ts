@@ -85,8 +85,10 @@ export const SUDO_HINT = [
 	"---",
 	"",
 	"> **Some checks were skipped because Raccoon ran without administrator rights.**",
-	"> Press **Run with Admin Rights** to re-run this report. macOS asks once, via Touch ID.",
 	"> Values shown without root can be wrong, not just missing.",
+	">",
+	"> rcc asks for Touch ID itself when a check needs root. If it did not, run the",
+	"> **Configure Admin Session** command once, then **Run Again** from here.",
 ].join("\n");
 
 export function withSudoHint(markdown: string): string {
