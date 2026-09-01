@@ -3,6 +3,7 @@ import Audit from "./audit";
 import Battery from "./battery";
 import Memory from "./memory";
 import Docker from "./docker";
+import History from "./history";
 import Overlap from "./overlap";
 import Ports from "./ports";
 import Trash from "./trash";
@@ -27,6 +28,7 @@ const VIEWS: Record<string, () => ReactElement> = {
 	wifi: Wifi,
 	overlap: Overlap,
 	docker: Docker,
+	history: History,
 };
 
 /** Whether this command has a screen of its own rather than raw output. */

@@ -11,8 +11,8 @@ teardown() { teardown_raccoon_env; }
 # The refusal is not "unknown option": the flag is planned, and someone who tries
 # again in two months has to be able to tell the difference.
 
-NOT_IMPLEMENTED="certs disk fonts history network startup xcode"
-IMPLEMENTED="battery docker overlap ports trash wifi"
+NOT_IMPLEMENTED="certs disk fonts network startup xcode"
+IMPLEMENTED="battery docker history overlap ports trash wifi"
 
 @test "json: the ones that never implemented --json exit 64" {
 	local c

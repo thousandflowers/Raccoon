@@ -105,6 +105,19 @@ print_info() {
     echo "${GRAY}○${NC} $*"
 }
 
+# One JSON string escape for every command that emits JSON. It lived twice, in
+# audit.sh and wifi.sh, and the third copy was going to be the one that forgot
+# the backslash. Backslash first: escaping quotes first would then escape the
+# backslashes it just added.
+rcc_json_string() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\t'/\\t}"
+    s="${s//$'\n'/\\n}"
+    printf '"%s"' "$s"
+}
+
 print_step() {
     local n="$1" total="$2" label="$3"
     echo "${GRAY}[${n}/${total}]${NC} ${label}..."

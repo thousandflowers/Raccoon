@@ -244,3 +244,37 @@ teardown() { teardown_raccoon_env; }
 		false
 	}
 }
+
+# rcc_json_string lived in commands.sh, which the command scripts do not
+# source: they source common.sh. docker --json looked fine only because the
+# machine had no containers, so the function was never reached. Anything that
+# emits JSON must be able to see it.
+@test "common: every script that emits JSON can reach the escaper" {
+	local script bad=""
+	for script in "$SCRIPT_DIR"/bin/*.sh; do
+		grep -q 'rcc_json_string' "$script" || continue
+		run env RCC_NO_PROMPT=1 bash "$script" --json
+		[[ "$output" != *"rcc_json_string: command not found"* ]] ||
+			bad+="$(basename "$script") "
+	done
+	[[ -z "$bad" ]] || { echo "cannot reach rcc_json_string: $bad" >&2; false; }
+}
+
+@test "common: what the escaper produces decodes back to what went in" {
+	command -v python3 > /dev/null || skip "python3 not available"
+	local input
+	# A backslash, a quote, a tab and a newline: the four that break a JSON
+	# string, and the order matters - escaping quotes first would then escape
+	# the backslashes it just added.
+	for input in 'a\b"c' 'plain' '/Applications/Some App.app' "$(printf 'tab\there')"; do
+		run bash -c "source '$SCRIPT_DIR/lib/core/common.sh'; rcc_json_string \"\$1\"" _ "$input"
+		assert_success
+		run python3 -c "
+import json, sys
+decoded = json.loads(sys.argv[1])
+if decoded != sys.argv[2]:
+    raise SystemExit(f'{decoded!r} != {sys.argv[2]!r}')
+" "$output" "$input"
+		assert_success
+	done
+}

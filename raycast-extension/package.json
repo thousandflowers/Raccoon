@@ -230,6 +230,22 @@
 				"compose"
 			],
 			"mode": "view"
+		},
+		{
+			"name": "history",
+			"title": "Show Shell History",
+			"subtitle": "Raccoon",
+			"description": "How much each shell has recorded, and the last commands run.",
+			"keywords": [
+				"history",
+				"shell",
+				"zsh",
+				"bash",
+				"fish",
+				"commands",
+				"recent"
+			],
+			"mode": "view"
 		}
 	],
 	"dependencies": {

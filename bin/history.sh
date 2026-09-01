@@ -14,6 +14,7 @@ show_history_help() {
 	echo "Show shell command history"
 	echo ""
 	echo "Options:"
+	echo "  --json          Output in JSON format"
 	echo "  --help, -h      Show this help"
 }
 
@@ -27,14 +28,61 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
-		_rcc_json_unimplemented history
+		JSON_OUTPUT=true
+		shift
 		;;
 	*)
 		;;
 	esac
 done
 
+_history_lines() {
+	[[ -f "$1" ]] || { printf '0'; return 0; }
+	wc -l < "$1" 2>/dev/null | tr -d ' \n' || printf '0'
+}
+
+# The recent commands, first word only: the rest of a line is arguments, and
+# arguments are where paths and secrets live.
+_history_recent() {
+	local line cmd n=0
+	[[ -f "$1" ]] || return 0
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		[[ -z "$line" ]] && continue
+		cmd=$(printf '%s' "$line" | sed 's/^: [0-9]*:[0-9]*;//' | awk '{print $1}')
+		[[ -z "$cmd" ]] && continue
+		printf '%s\n' "$cmd"
+		n=$((n + 1))
+		[[ $n -ge 5 ]] && break
+	done < <(tail -n 20 "$1" 2>/dev/null)
+	return 0
+}
+
+_json_report() {
+	local zsh_h="$HOME/.zsh_history" bash_h="$HOME/.bash_history"
+	local fish_h="$HOME/.local/share/fish/history/default"
+	local z b f cmd first=1
+	z=$(_history_lines "$zsh_h")
+	b=$(_history_lines "$bash_h")
+	f=$(_history_lines "$fish_h")
+	printf '{\n'
+	printf '  "counts": {"zsh": %s, "bash": %s, "fish": %s, "total": %s},\n' \
+		"$z" "$b" "$f" "$((z + b + f))"
+	printf '  "recent": ['
+	while IFS= read -r cmd; do
+		[[ -z "$cmd" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    %s' "$(rcc_json_string "$cmd")"
+	done < <(_history_recent "$zsh_h")
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf ']\n}\n'
+}
+
 main() {
+	if [[ "${JSON_OUTPUT:-false}" == "true" ]]; then
+		_json_report
+		return 0
+	fi
 	print_section_header "Shell History"
 
 	echo "${GRAY}[1/2] Command Counts...${NC}"
