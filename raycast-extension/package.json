@@ -296,6 +296,23 @@
 				"family"
 			],
 			"mode": "view"
+		},
+		{
+			"name": "env",
+			"title": "Check Environment",
+			"subtitle": "Raccoon",
+			"description": "PATH entries, broken symlinks, duplicates and tool versions.",
+			"keywords": [
+				"env",
+				"path",
+				"symlink",
+				"broken",
+				"duplicate",
+				"version",
+				"tool",
+				"shell"
+			],
+			"mode": "view"
 		}
 	],
 	"dependencies": {

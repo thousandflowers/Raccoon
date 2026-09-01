@@ -9,7 +9,10 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_env_help() {
-	print_help_header "env" "Check environment: PATH entries, broken symlinks, duplicates, tool versions" ""
+	print_help_header "env" "Check environment: PATH entries, broken symlinks, duplicates, tool versions" "[--json]"
+	echo "Options:"
+	echo "  --json          Output in JSON format"
+	echo "  --help, -h      Show this help"
 	echo ""
 }
 
@@ -18,6 +21,9 @@ for arg in "$@"; do
 	--help | -h)
 		show_env_help
 		exit 0
+		;;
+	--json)
+		JSON_OUTPUT=true
 		;;
 	*)
 		;;
@@ -115,7 +121,89 @@ check_tool_versions() {
 	done
 }
 
+# The tools worth reporting: the ones a broken PATH breaks first.
+ENV_TOOLS=(git curl wget python3 node brew docker)
+
+_env_tool_version() {
+	command -v "$1" > /dev/null 2>&1 || return 1
+	"$1" --version 2>/dev/null | head -1 || printf 'found'
+}
+
+_json_report() {
+	local path_dir link target name version first
+	printf '{\n'
+
+	printf '  "path": ['
+	first=1
+	while IFS= read -r -d ':' path_dir; do
+		[[ -z "$path_dir" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    {"path": %s, "exists": %s}' \
+			"$(rcc_json_string "$path_dir")" \
+			"$([[ -d "$path_dir" ]] && echo true || echo false)"
+	done <<< "${PATH}:"
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	# A symlink whose target is gone: the command is on the PATH and still
+	# fails, which is the one thing here that surprises people.
+	printf '  "broken_symlinks": ['
+	first=1
+	while IFS= read -r -d ':' path_dir; do
+		[[ -z "$path_dir" || ! -d "$path_dir" ]] && continue
+		while IFS= read -r link; do
+			[[ -e "$link" ]] && continue
+			target=$(readlink "$link" 2>/dev/null || printf '')
+			[[ "$target" == /* ]] || target="$(dirname "$link")/$target"
+			[[ $first -eq 1 ]] || printf ','
+			first=0
+			printf '\n    {"name": %s, "link": %s, "target": %s}' \
+				"$(rcc_json_string "$(basename "$link")")" \
+				"$(rcc_json_string "$link")" \
+				"$(rcc_json_string "$target")"
+		done < <(find "$path_dir" -maxdepth 1 -type l 2>/dev/null || true)
+	done <<< "${PATH}:"
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	printf '  "duplicates": ['
+	first=1
+	local seen="" dir
+	while IFS= read -r -d ':' dir; do
+		[[ -z "$dir" ]] && continue
+		if printf '%s' "$seen" | grep -qxF "$dir"; then
+			[[ $first -eq 1 ]] || printf ','
+			first=0
+			printf '\n    %s' "$(rcc_json_string "$dir")"
+		else
+			seen+=$'\n'"$dir"
+		fi
+	done <<< "${PATH}:"
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	printf '  "tools": ['
+	first=1
+	for name in "${ENV_TOOLS[@]}"; do
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		if version=$(_env_tool_version "$name"); then
+			printf '\n    {"name": %s, "found": true, "version": %s}' \
+				"$(rcc_json_string "$name")" "$(rcc_json_string "$version")"
+		else
+			printf '\n    {"name": %s, "found": false, "version": null}' \
+				"$(rcc_json_string "$name")"
+		fi
+	done
+	printf '\n  ]\n}\n'
+}
+
 main() {
+	if [[ "${JSON_OUTPUT:-false}" == "true" ]]; then
+		_json_report
+		return 0
+	fi
 	show_progress_bar \
 		"PATH entries:check_path_entries" \
 		"Broken symlinks:check_broken_symlinks" \
