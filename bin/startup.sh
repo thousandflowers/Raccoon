@@ -15,6 +15,7 @@ show_startup_help() {
 	echo ""
 	echo "Options:"
 	echo "  --clean         Remove orphaned launch agents (interactive, with backup)"
+	echo "  --json          Output in JSON format"
 	echo "  --help, -h      Show this help"
 	echo ""
 	echo "Examples:"
@@ -34,7 +35,7 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
-		_rcc_json_unimplemented startup
+		JSON_OUTPUT=true
 		;;
 	--clean)
 		CLEAN_MODE=true
@@ -114,7 +115,55 @@ remove_orphan_agents() {
 	done
 }
 
+# The name a person recognises: com.example.thing.plist is the file, "thing"
+# is what they installed. Same stripping the table does.
+_startup_agent_name() {
+	printf '%s' "$1" | sed -E 's/^[^.]+\.[^.]+\.//' | sed 's/\.plist$//'
+}
+
+_json_report() {
+	local item first uptime_str load
+	printf '{\n'
+
+	printf '  "user_agents": ['
+	first=1
+	while IFS= read -r item; do
+		[[ -z "$item" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    %s' "$(rcc_json_string "$(_startup_agent_name "$item")")"
+	done < <(ls -1 ~/Library/LaunchAgents/ 2>/dev/null || true)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	printf '  "login_items": ['
+	first=1
+	while IFS= read -r item; do
+		item="${item#"${item%%[![:space:]]*}"}"
+		[[ -z "$item" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    %s' "$(rcc_json_string "$item")"
+	done < <(osascript -e 'tell application "System Events" to get the name of every login item' 2>/dev/null | tr ',' '\n' || true)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	printf '  "counts": {"system_agents": %s, "daemons": %s, "running_services": %s},\n' \
+		"$(ls -1 /Library/LaunchAgents/ 2>/dev/null | wc -l | tr -d ' ')" \
+		"$(ls -1 /Library/LaunchDaemons/ 2>/dev/null | wc -l | tr -d ' ')" \
+		"$(launchctl list 2>/dev/null | tail -n +2 | wc -l | tr -d ' ')"
+
+	uptime_str=$(uptime 2>/dev/null | sed 's/.*up \(.*\), [0-9]* user.*/\1/' || printf '')
+	load=$(uptime 2>/dev/null | awk -F'load averages?: ' '{print $2}' | sed 's/,//g' || printf '')
+	printf '  "uptime": %s,\n' "$(rcc_json_string "$uptime_str")"
+	printf '  "load": %s\n}\n' "$(rcc_json_string "$load")"
+}
+
 main() {
+	if [[ "${JSON_OUTPUT:-false}" == "true" ]]; then
+		_json_report
+		return 0
+	fi
 	if [[ "$CLEAN_MODE" == "true" ]]; then
 		print_section_header "Clean Orphaned Launch Agents"
 		find_orphan_agents

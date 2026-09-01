@@ -263,6 +263,23 @@
 				"https"
 			],
 			"mode": "view"
+		},
+		{
+			"name": "startup",
+			"title": "Show Startup Items",
+			"subtitle": "Raccoon",
+			"description": "What this Mac starts on its own: login items and launch agents.",
+			"keywords": [
+				"startup",
+				"login",
+				"launch",
+				"agent",
+				"daemon",
+				"boot",
+				"autostart",
+				"slow"
+			],
+			"mode": "view"
 		}
 	],
 	"dependencies": {
