@@ -51,6 +51,9 @@ test("exposed sorts before local, and numbers sort as numbers", () => {
 
 test("output that is not a list of ports says so", () => {
 	assert.throws(() => parsePorts("-- Network Ports"), /did not print JSON/);
-	assert.throws(() => parsePorts("{}"), /not a list of ports/);
+	assert.throws(
+		() => parsePorts("{}"),
+		/rcc ports printed JSON, but not a list/,
+	);
 	assert.throws(() => parsePorts("[{}]"), /Port 1 is not shaped/);
 });

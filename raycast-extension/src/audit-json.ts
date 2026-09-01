@@ -1,3 +1,4 @@
+import { extractJson } from "./json-out.ts";
 // The .ts extension is what node's ESM resolver needs to load this module from
 // audit-json.test.ts, and tsc accepts it here because allowImportingTsExtensions
 // is on. Without it the test cannot import this file at all.
@@ -69,46 +70,11 @@ function isCheck(value: unknown): value is AuditCheck {
  * would have turned that into undefined fields at render time instead of one
  * sentence here.
  */
-/**
- * The last JSON object in a stdout that begins with something else. Only a
- * brace at the start of a line is considered, so a brace inside the report's
- * own text cannot be mistaken for the start of the document.
- */
-function trailingJsonObject(text: string): unknown {
-	const lines = text.split("\n");
-	for (let i = 0; i < lines.length; i += 1) {
-		if (!lines[i].startsWith("{")) continue;
-		try {
-			return JSON.parse(lines.slice(i).join("\n"));
-		} catch {
-			// Not the start of the document: keep looking further down.
-		}
-	}
-	return undefined;
-}
-
 export function parseAuditReport(stdout: string): AuditReport {
 	const text = stdout.trim();
 	if (text === "") throw new Error("rcc audit printed nothing to parse.");
 
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(text);
-	} catch {
-		// rcc 0.17.0 prints JSON alone, but every earlier release printed the
-		// boxed report first and glued the JSON to the end of the same stdout.
-		// The extension is installed against whatever rcc the user has, so it
-		// reads the trailing object rather than telling them their CLI is wrong.
-		const recovered = trailingJsonObject(text);
-		if (recovered === undefined) {
-			throw new Error(
-				"rcc audit did not print JSON. An rcc older than 0.17.0 prints its " +
-					"report first; upgrade with `brew upgrade rcc`, or set the Raccoon " +
-					"CLI preference to a newer binary.",
-			);
-		}
-		parsed = recovered;
-	}
+	const parsed = extractJson(stdout, "audit");
 
 	if (
 		typeof parsed !== "object" ||

@@ -1,3 +1,5 @@
+import { expectObject } from "./json-out.ts";
+
 /**
  * `rcc battery --json`, read as rows a reader can judge at a glance.
  *
@@ -20,23 +22,7 @@ export type BatteryReport = {
 export type Health = "good" | "fair" | "poor" | "neutral";
 
 export function parseBattery(stdout: string): BatteryReport {
-	const text = stdout.trim();
-	if (text === "") throw new Error("rcc battery printed nothing to parse.");
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(text);
-	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error);
-		throw new Error(`rcc battery did not print JSON: ${reason}`);
-	}
-	if (
-		typeof parsed !== "object" ||
-		parsed === null ||
-		Array.isArray(parsed)
-	) {
-		throw new Error("rcc battery printed JSON, but not a report object.");
-	}
-	const r = parsed as Record<string, unknown>;
+	const r = expectObject(stdout, "battery");
 	const num = (v: unknown) => (typeof v === "number" ? v : null);
 	return {
 		// present arrived with the no-battery fix; an older rcc that reports a

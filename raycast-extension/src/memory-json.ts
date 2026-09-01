@@ -1,3 +1,5 @@
+import { expectArray } from "./json-out.ts";
+
 /**
  * `rcc memory --json`, read as rows.
  *
@@ -15,21 +17,7 @@ export type MemoryProcess = {
 export type Weight = "light" | "heavy" | "huge";
 
 export function parseMemory(stdout: string): MemoryProcess[] {
-	const text = stdout.trim();
-	if (text === "") throw new Error("rcc memory printed nothing to parse.");
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(text);
-	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error);
-		throw new Error(`rcc memory did not print JSON: ${reason}`);
-	}
-	if (!Array.isArray(parsed)) {
-		throw new Error(
-			"rcc memory printed JSON, but not a list of processes.",
-		);
-	}
-	return parsed.map((value, index) => {
+	return expectArray(stdout, "memory").map((value, index) => {
 		const p = value as Record<string, unknown>;
 		if (
 			typeof p?.pid !== "number" ||

@@ -1,3 +1,5 @@
+import { expectArray, expectObject } from "./json-out.ts";
+
 /**
  * Small readers for the commands whose --json is a shape of its own.
  *
@@ -5,33 +7,10 @@
  * rendered as "undefined" three screens later.
  */
 
-function object(stdout: string, command: string): Record<string, unknown> {
-	const text = stdout.trim();
-	if (text === "")
-		throw new Error(`rcc ${command} printed nothing to parse.`);
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(text);
-	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error);
-		throw new Error(`rcc ${command} did not print JSON: ${reason}`);
-	}
-	if (
-		typeof parsed !== "object" ||
-		parsed === null ||
-		Array.isArray(parsed)
-	) {
-		throw new Error(
-			`rcc ${command} printed JSON, but not a report object.`,
-		);
-	}
-	return parsed as Record<string, unknown>;
-}
-
 export type TrashReport = { path: string; size: string; count: number };
 
 export function parseTrash(stdout: string): TrashReport {
-	const r = object(stdout, "trash");
+	const r = expectObject(stdout, "trash");
 	return {
 		path: typeof r.path === "string" ? r.path : "",
 		size: typeof r.size === "string" ? r.size : "0",
@@ -47,7 +26,7 @@ export type WifiReport = {
 };
 
 export function parseWifi(stdout: string): WifiReport {
-	const r = object(stdout, "wifi");
+	const r = expectObject(stdout, "wifi");
 	return {
 		interface: typeof r.interface === "string" ? r.interface : "",
 		active_ssid: typeof r.active_ssid === "string" ? r.active_ssid : "",
@@ -69,19 +48,7 @@ export type PathEntry = {
 };
 
 export function parseOverlap(stdout: string): PathEntry[] {
-	const text = stdout.trim();
-	if (text === "") throw new Error("rcc overlap printed nothing to parse.");
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(text);
-	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error);
-		throw new Error(`rcc overlap did not print JSON: ${reason}`);
-	}
-	if (!Array.isArray(parsed)) {
-		throw new Error("rcc overlap printed JSON, but not a list of entries.");
-	}
-	return parsed.map((value, index) => {
+	return expectArray(stdout, "overlap").map((value, index) => {
 		const e = value as Record<string, unknown>;
 		if (typeof e?.name !== "string" || typeof e?.manager !== "string") {
 			throw new Error(

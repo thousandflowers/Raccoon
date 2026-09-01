@@ -1,3 +1,5 @@
+import { expectArray } from "./json-out.ts";
+
 /**
  * `rcc ports --json`, read as rows.
  *
@@ -20,19 +22,7 @@ export type Port = {
 export type Exposure = "exposed" | "local" | "idle";
 
 export function parsePorts(stdout: string): Port[] {
-	const text = stdout.trim();
-	if (text === "") throw new Error("rcc ports printed nothing to parse.");
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(text);
-	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error);
-		throw new Error(`rcc ports did not print JSON: ${reason}`);
-	}
-	if (!Array.isArray(parsed)) {
-		throw new Error("rcc ports printed JSON, but not a list of ports.");
-	}
-	return parsed.map((value, index) => {
+	return expectArray(stdout, "ports").map((value, index) => {
 		const p = value as Record<string, unknown>;
 		const str = (key: string) =>
 			typeof p?.[key] === "string" ? (p[key] as string) : "";

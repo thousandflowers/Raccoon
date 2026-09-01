@@ -34,7 +34,10 @@ test("the name is the last path component, not the whole path", () => {
 
 test("output that is not a list of processes says so", () => {
 	assert.throws(() => parseMemory("-- Memory Usage"), /did not print JSON/);
-	assert.throws(() => parseMemory("{}"), /not a list of processes/);
+	assert.throws(
+		() => parseMemory("{}"),
+		/rcc memory printed JSON, but not a list/,
+	);
 	assert.throws(
 		() => parseMemory(JSON.stringify([{ pid: 1 }])),
 		/Process 1 is not shaped/,
