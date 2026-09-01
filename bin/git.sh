@@ -136,7 +136,11 @@ main() {
 	local -a repo_issues=()
 	local repos_with_issues=0
 
-	for repo in "${repos[@]}"; do
+	# ${repos[@]+"${repos[@]}"} and not "${repos[@]}": in bash 3.2 an empty
+	# array expanded under set -u is an unbound variable, not an empty list, so
+	# a Mac with no git repositories died here with
+	# "repos[@]: unbound variable" instead of printing "No repositories found".
+	for repo in ${repos[@]+"${repos[@]}"}; do
 		local result
 		result=$(check_repo "$repo") || true
 		if [[ -n "$result" ]]; then
@@ -166,7 +170,7 @@ main() {
 	if [[ $repos_with_issues -eq 0 ]]; then
 		print_table_row "All repos|${GREEN}Clean${NC}" 40 20
 	else
-		for result in "${repo_issues[@]}"; do
+		for result in ${repo_issues[@]+"${repo_issues[@]}"}; do
 			print_table_row "$result" 40 20
 		done
 	fi

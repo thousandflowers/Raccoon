@@ -38,3 +38,20 @@ teardown() { teardown_raccoon_env; }
     [[ $status -eq 0 || $status -eq 1 ]]
 }
 
+
+# A Mac with no git repositories under HOME crashed here with
+# "repos[@]: unbound variable": in bash 3.2 an empty array under set -u is an
+# error, not an empty list, and the "No repositories found" branch sat after
+# the loop that died.
+@test "git: a machine with no repositories says so instead of crashing" {
+	local empty
+	empty="$(mktemp -d)"
+	run env HOME="$empty" bash "$SCRIPT_DIR/bin/git.sh"
+	rmdir "$empty" 2>/dev/null || true
+	assert_success
+	assert_output_contains "No repositories found"
+	[[ "$output" != *"unbound variable"* ]] || {
+		echo "still crashing: $output" >&2
+		false
+	}
+}
