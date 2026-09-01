@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import Audit from "./audit";
 import Battery from "./battery";
 import Memory from "./memory";
+import Docker from "./docker";
 import Overlap from "./overlap";
 import Ports from "./ports";
 import Trash from "./trash";
@@ -25,6 +26,7 @@ const VIEWS: Record<string, () => ReactElement> = {
 	trash: Trash,
 	wifi: Wifi,
 	overlap: Overlap,
+	docker: Docker,
 };
 
 /** Whether this command has a screen of its own rather than raw output. */

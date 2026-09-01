@@ -24,12 +24,98 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
-		_rcc_json_unimplemented docker
+		JSON_OUTPUT=true
+		shift
 		;;
 	esac
 done
 
+# Everything the report shows, as one document. The question this command
+# answers is "is Docker there, and what is it holding", so absence is a value
+# and not an error: a Mac without Docker gets installed:false, not a failure.
+_json_report() {
+	local images containers volumes sys_df first
+	printf '{\n'
+	printf '  "installed": %s,\n' "$(command -v docker >/dev/null 2>&1 && echo true || echo false)"
+
+	if ! command -v docker >/dev/null 2>&1; then
+		printf '  "running": false,\n  "images": [],\n  "containers": [],\n  "volumes": [],\n  "space": []\n}\n'
+		return 0
+	fi
+
+	# `docker info` fails when the daemon is down but the CLI is installed:
+	# two different states the text report collapsed into one line.
+	printf '  "running": %s,\n' "$(docker info >/dev/null 2>&1 && echo true || echo false)"
+
+	printf '  "images": ['
+	first=1
+	while read -r line; do
+		[[ -z "$line" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    {"repository": %s, "tag": %s, "size": %s}' \
+			"$(rcc_json_string "$(echo "$line" | awk '{print $1}')")" \
+			"$(rcc_json_string "$(echo "$line" | awk '{print $2}')")" \
+			"$(rcc_json_string "$(echo "$line" | awk '{print $NF}')")"
+	done < <(docker images 2>/dev/null | tail -n +2)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	printf '  "containers": ['
+	first=1
+	while read -r line; do
+		[[ -z "$line" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    {"id": %s, "image": %s, "status": %s}' \
+			"$(rcc_json_string "$(echo "$line" | awk '{print $1}')")" \
+			"$(rcc_json_string "$(echo "$line" | awk '{print $2}')")" \
+			"$(rcc_json_string "$(echo "$line" | sed -E 's/.*[[:space:]]{2,}(Up|Exited|Created|Restarting|Paused|Dead)/\1/;s/[[:space:]]{2,}.*$//')")"
+	done < <(docker ps -a 2>/dev/null | tail -n +2)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	printf '  "volumes": ['
+	first=1
+	while read -r line; do
+		[[ -z "$line" ]] && continue
+		local name driver
+		driver=$(echo "$line" | awk '{print $1}')
+		name=$(echo "$line" | awk '{print $2}')
+		[[ -z "$name" || "$name" == "NAME" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    {"name": %s, "driver": %s}' \
+			"$(rcc_json_string "$name")" "$(rcc_json_string "$driver")"
+	done < <(docker volume ls 2>/dev/null | tail -n +2)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	printf '  "space": ['
+	first=1
+	while read -r line; do
+		[[ -z "$line" ]] && continue
+		local type_ size reclaim
+		type_=$(echo "$line" | sed -E 's/[[:space:]]{2,}.*$//')
+		[[ -z "$type_" || "$type_" == "TYPE" ]] && continue
+		size=$(echo "$line" | awk '{print $(NF-1)}')
+		reclaim=$(echo "$line" | awk '{print $NF}')
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    {"type": %s, "size": %s, "reclaimable": %s}' \
+			"$(rcc_json_string "$type_")" "$(rcc_json_string "$size")" \
+			"$(rcc_json_string "$reclaim")"
+	done < <(docker system df 2>/dev/null)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf ']\n}\n'
+}
+
 main() {
+	if [[ "${JSON_OUTPUT:-false}" == "true" ]]; then
+		_json_report
+		return 0
+	fi
+
 	print_section_header "Docker Status"
 
 	if ! command -v docker >/dev/null 2>&1; then

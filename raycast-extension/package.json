@@ -214,6 +214,22 @@
 				"duplicate"
 			],
 			"mode": "view"
+		},
+		{
+			"name": "docker",
+			"title": "Show Docker Status",
+			"subtitle": "Raccoon",
+			"description": "Containers, images, volumes and reclaimable disk.",
+			"keywords": [
+				"docker",
+				"container",
+				"image",
+				"volume",
+				"desktop",
+				"daemon",
+				"compose"
+			],
+			"mode": "view"
 		}
 	],
 	"dependencies": {
