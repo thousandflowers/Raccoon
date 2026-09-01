@@ -4,6 +4,7 @@ import Battery from "./battery";
 import Memory from "./memory";
 import Backup from "./backup";
 import Certs from "./certs";
+import Git from "./git";
 import Startup from "./startup";
 import Disk from "./disk";
 import Docker from "./docker";
@@ -45,6 +46,7 @@ const VIEWS: Record<string, () => ReactElement> = {
 	network: Network,
 	xcode: Xcode,
 	backup: Backup,
+	git: Git,
 };
 
 /** Whether this command has a screen of its own rather than raw output. */

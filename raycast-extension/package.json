@@ -363,6 +363,24 @@
 				"destination"
 			],
 			"mode": "view"
+		},
+		{
+			"name": "git",
+			"title": "Check Git Repositories",
+			"subtitle": "Raccoon",
+			"description": "Repositories with work that is not committed, not pushed, or not on a branch.",
+			"keywords": [
+				"git",
+				"repo",
+				"repository",
+				"uncommitted",
+				"unpushed",
+				"stash",
+				"branch",
+				"upstream",
+				"detached"
+			],
+			"mode": "view"
 		}
 	],
 	"dependencies": {
