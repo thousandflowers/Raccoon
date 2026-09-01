@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 
 ### Added
 
+- `rcc audit --fix-only NAMES` fixes the named checks and nothing else.
+  `--only` takes groups, and the smallest group holds six checks, so a caller
+  with one finding in hand could not act on it without changing five
+  neighbours. `fix_issue` was already keyed by check name; the flag was the
+  missing piece. Comma-separated, matched case-insensitively, and an unknown
+  name fixes nothing rather than falling back to everything.
+- `rcc docker --json`. It reports three states the text collapsed into one
+  line: no Docker, Docker installed with the daemon stopped, and Docker
+  running with its images, containers, volumes and reclaimable space.
+- The Raycast extension has purpose-built screens for `audit`, `battery`,
+  `memory`, `ports`, `trash`, `wifi`, `overlap` and `docker` instead of the
+  raw text report, and the launcher opens them. Enter on a finding runs its
+  fix in Terminal, where sudo has a tty to ask on; Cmd+Enter fixes everything
+  on screen.
+
 - The Raycast extension's `audit` command is a list of checks instead of a wall
   of text. It reads `rcc audit --json`, which it had never done, and gives one
   selectable row per check with the report's own status deciding the colour;
@@ -141,7 +156,7 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
   `backup`, `env`, `git`, `ssh`, `fleet` and `upgrade` were not among them: they
   accept the flag and print the report anyway, which is the behaviour the change
   set out to remove. Seven of the twenty-two implement `--json` for real
-  (`audit`, `battery`, `memory`, `overlap`, `ports`, `trash`, `wifi`). `upgrade`
+  (`audit`, `battery`, `docker`, `memory`, `overlap`, `ports`, `trash`, `wifi`). `upgrade`
   is the odd one: it emits `__RCC_PROGRESS__` markers on stdout, so even its
   human output is not clean text. Left undone because the list of eight was
   drawn from the commands with a report worth serialising, and extending the

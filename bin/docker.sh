@@ -14,6 +14,7 @@ show_docker_help() {
 	echo "Show Docker images, containers, and space usage"
 	echo ""
 	echo "Options:"
+	echo "  --json          Output in JSON format"
 	echo "  --help, -h      Show this help"
 }
 
