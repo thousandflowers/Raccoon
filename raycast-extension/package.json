@@ -381,6 +381,24 @@
 				"detached"
 			],
 			"mode": "view"
+		},
+		{
+			"name": "ssh",
+			"title": "Check SSH Keys",
+			"subtitle": "Raccoon",
+			"description": "Private keys with no passphrase, wrong permissions, or no public half.",
+			"keywords": [
+				"ssh",
+				"key",
+				"keys",
+				"passphrase",
+				"permissions",
+				"id_rsa",
+				"ed25519",
+				"private",
+				"publickey"
+			],
+			"mode": "view"
 		}
 	],
 	"dependencies": {

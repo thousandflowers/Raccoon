@@ -5,6 +5,7 @@ import Memory from "./memory";
 import Backup from "./backup";
 import Certs from "./certs";
 import Git from "./git";
+import Ssh from "./ssh";
 import Startup from "./startup";
 import Disk from "./disk";
 import Docker from "./docker";
@@ -47,6 +48,7 @@ const VIEWS: Record<string, () => ReactElement> = {
 	xcode: Xcode,
 	backup: Backup,
 	git: Git,
+	ssh: Ssh,
 };
 
 /** Whether this command has a screen of its own rather than raw output. */

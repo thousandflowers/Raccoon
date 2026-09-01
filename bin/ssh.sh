@@ -11,7 +11,8 @@ source "$SCRIPT_DIR/../lib/core/common.sh"
 SSH_DIR="$HOME/.ssh"
 
 show_ssh_help() {
-	print_help_header "ssh" "Inspect and manage SSH keys (orphan, unprotected, permissions)" "[--export KEY] [--export-gpg [KEY]]"
+	print_help_header "ssh" "Inspect and manage SSH keys (orphan, unprotected, permissions)" "[--json] [--export KEY] [--export-gpg [KEY]]"
+	echo "  --json          Output in JSON format"
 	echo ""
 	echo "  Inspection (default):"
 	echo "    Scans ~/.ssh for unprotected keys (no passphrase), orphan keys (missing .pub),"
@@ -23,42 +24,102 @@ show_ssh_help() {
 	echo ""
 }
 
+JSON_OUTPUT=false
+
 for arg in "$@"; do
 	case "$arg" in
 	--help | -h)
 		show_ssh_help
 		exit 0
 		;;
+	--json)
+		JSON_OUTPUT=true
+		;;
 	*)
 		;;
 	esac
 done
 
+# One record per private key in ~/.ssh, scanned once.
+#
+# The three checks below used to walk the directory separately and call
+# ssh-keygen from inside their own loops, so the same key was read three times
+# and the answers only agreed by coincidence. They now render this.
+#
+#   name|type|has_passphrase|has_pub|perms
+_ssh_scan() {
+	[[ -d "$SSH_DIR" ]] || return 0
+	local key key_name key_type has_passphrase has_pub perms
+	for key in "$SSH_DIR"/id_*; do
+		[[ -f "$key" ]] || continue
+		[[ "$key" == *.pub ]] && continue
+
+		key_name=$(basename "$key")
+
+		# ssh-keygen succeeds with an empty passphrase only when there is none.
+		has_passphrase=1
+		ssh-keygen -y -P "" -f "$key" >/dev/null 2>&1 && has_passphrase=0
+
+		has_pub=0
+		key_type="?"
+		if [[ -f "${key}.pub" ]]; then
+			has_pub=1
+			key_type=$(ssh-keygen -l -f "${key}.pub" 2>/dev/null | awk '{print $NF}' || echo "?")
+		fi
+
+		perms=$(stat -f %A "$key" 2>/dev/null || echo "000")
+
+		printf '%s|%s|%s|%s|%s\n' \
+			"$key_name" "$key_type" "$has_passphrase" "$has_pub" "$perms"
+	done
+}
+
+# ssh-keygen prints the type parenthesised, "(ED25519)". The table has always
+# shown it that way; JSON should not.
+_ssh_bare_type() {
+	local type="$1"
+	type="${type#(}"
+	printf '%s' "${type%)}"
+}
+
+_ssh_json_report() {
+	local dir_present=false dir_perms="000"
+	if [[ -d "$SSH_DIR" ]]; then
+		dir_present=true
+		dir_perms=$(stat -f %A "$SSH_DIR" 2>/dev/null || echo "000")
+	fi
+
+	printf '{"ssh_dir_present":%s,"ssh_dir_perms":%s,"keys":[' \
+		"$dir_present" "$(rcc_json_string "$dir_perms")"
+
+	local first=1 name type has_passphrase has_pub perms
+	while IFS='|' read -r name type has_passphrase has_pub perms; do
+		[[ -z "$name" ]] && continue
+		[[ $first -eq 0 ]] && printf ','
+		first=0
+		printf '{"name":%s,"type":%s,"passphrase":%s,"public_key":%s,"perms":%s,"perms_ok":%s}' \
+			"$(rcc_json_string "$name")" \
+			"$(rcc_json_string "$(_ssh_bare_type "$type")")" \
+			"$([[ "$has_passphrase" -eq 1 ]] && echo true || echo false)" \
+			"$([[ "$has_pub" -eq 1 ]] && echo true || echo false)" \
+			"$(rcc_json_string "$perms")" \
+			"$([[ "$perms" == "600" ]] && echo true || echo false)"
+	done < <(_ssh_scan)
+
+	printf ']}\n'
+}
+
 check_unprotected_keys() {
 	print_section_header "Unprotected Keys"
 	print_table_header "Key|Type|Status" 30 15 15
 
-	local found=0
-	if [[ -d "$SSH_DIR" ]]; then
-		for key in "$SSH_DIR"/id_*; do
-			[[ -f "$key" ]] || continue
-			[[ "$key" == *.pub ]] && continue
-
-			local key_name
-			key_name=$(basename "$key")
-
-			if ssh-keygen -y -P "" -f "$key" >/dev/null 2>&1; then
-				local key_type=""
-				if [[ -f "${key}.pub" ]]; then
-					key_type=$(ssh-keygen -l -f "${key}.pub" 2>/dev/null | awk '{print $NF}' || echo "?")
-				else
-					key_type="?"
-				fi
-				print_table_row "$key_name|$key_type|${YELLOW}NO PASSPHRASE${NC}" 30 15 15
-				((found++)) || true
-			fi
-		done
-	fi
+	local found=0 name type has_passphrase
+	while IFS='|' read -r name type has_passphrase _ _; do
+		[[ -z "$name" ]] && continue
+		[[ "$has_passphrase" -eq 1 ]] && continue
+		print_table_row "$name|$type|${YELLOW}NO PASSPHRASE${NC}" 30 15 15
+		((found++)) || true
+	done < <(_ssh_scan)
 
 	if [[ $found -eq 0 ]]; then
 		print_table_row "None|All protected|${GRAY}OK${NC}" 30 15 15
@@ -69,21 +130,13 @@ check_orphan_keys() {
 	print_section_header "Orphan Keys"
 	print_table_header "Key|Status" 30 15
 
-	local found=0
-	if [[ -d "$SSH_DIR" ]]; then
-		for key in "$SSH_DIR"/id_*; do
-			[[ -f "$key" ]] || continue
-			[[ "$key" == *.pub ]] && continue
-
-			local key_name
-			key_name=$(basename "$key")
-
-			if [[ ! -f "${key}.pub" ]]; then
-				print_table_row "$key_name|${YELLOW}No .pub file${NC}" 30 15
-				((found++)) || true
-			fi
-		done
-	fi
+	local found=0 name has_pub
+	while IFS='|' read -r name _ _ has_pub _; do
+		[[ -z "$name" ]] && continue
+		[[ "$has_pub" -eq 1 ]] && continue
+		print_table_row "$name|${YELLOW}No .pub file${NC}" 30 15
+		((found++)) || true
+	done < <(_ssh_scan)
 
 	if [[ $found -eq 0 ]]; then
 		print_table_row "None|${GRAY}OK${NC}" 30 15
@@ -94,29 +147,23 @@ check_key_permissions() {
 	print_section_header "Key Permissions"
 	print_table_header "Key|Perms|Status" 30 10 15
 
-	local found=0
-	if [[ -d "$SSH_DIR" ]]; then
-		for key in "$SSH_DIR"/id_*; do
-			[[ -f "$key" ]] || continue
-			[[ "$key" == *.pub ]] && continue
-
-			local key_name
-			key_name=$(basename "$key")
-
-			local perms
-			perms=$(stat -f %A "$key" 2>/dev/null || echo "000")
-
-			if [[ "$perms" != "600" ]]; then
-				print_table_row "$key_name|$perms|${RED}Should be 600${NC}" 30 10 15
-			else
-				print_table_row "$key_name|$perms|${GRAY}OK${NC}" 30 10 15
-			fi
-			((found++)) || true
-		done
-	fi
+	local name perms
+	while IFS='|' read -r name _ _ _ perms; do
+		[[ -z "$name" ]] && continue
+		if [[ "$perms" != "600" ]]; then
+			print_table_row "$name|$perms|${RED}Should be 600${NC}" 30 10 15
+		else
+			print_table_row "$name|$perms|${GRAY}OK${NC}" 30 10 15
+		fi
+	done < <(_ssh_scan)
 }
 
 main() {
+	if [[ "$JSON_OUTPUT" == "true" ]]; then
+		_ssh_json_report
+		return 0
+	fi
+
 	check_unprotected_keys
 	check_orphan_keys
 	check_key_permissions
