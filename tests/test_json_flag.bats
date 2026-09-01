@@ -65,6 +65,28 @@ IMPLEMENTED="battery certs docker fonts history overlap ports startup trash wifi
 	done
 }
 
+# Three scripts have now died on a directory or a command that was simply not
+# there: battery on a Mac with no battery, git with no repositories, fonts with
+# no ~/Library/Fonts. find and grep exit non-zero on nothing, pipefail
+# propagates it, and set -e turns "nothing to report" into "no output at all".
+@test "json: an empty HOME is a report, not a crash" {
+	command -v python3 > /dev/null || skip "python3 not available"
+	local c empty bad=""
+	empty="$(mktemp -d)"
+	for c in $IMPLEMENTED; do
+		run env HOME="$empty" RCC_NO_PROMPT=1 bash "$SCRIPT_DIR/bin/$c.sh" --json
+		if [[ "$status" -ne 0 ]] ||
+			! printf '%s' "$output" | python3 -m json.tool > /dev/null 2>&1; then
+			bad+="$c "
+		fi
+	done
+	rmdir "$empty" 2> /dev/null || true
+	[[ -z "$bad" ]] || {
+		echo "no JSON with an empty HOME: $bad" >&2
+		false
+	}
+}
+
 @test "json: the ones that do implement it still say so in their help" {
 	local c
 	for c in $IMPLEMENTED; do

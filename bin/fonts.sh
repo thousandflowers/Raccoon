@@ -35,8 +35,13 @@ for arg in "$@"; do
 	esac
 done
 
+# A directory that does not exist is zero fonts, not a failure. find exits
+# non-zero on a missing path, pipefail propagates it and set -e kills the
+# script: a Mac with no ~/Library/Fonts printed nothing at all. Same trap as
+# bin/battery.sh.
 _fonts_count_in() {
-	find "$1" -mindepth 1 -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' '
+	[[ -d "$1" ]] || { printf '0'; return 0; }
+	find "$1" -mindepth 1 -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' ' || printf '0'
 }
 
 # Files that fc-scan cannot read: a font installed but broken, which is the
