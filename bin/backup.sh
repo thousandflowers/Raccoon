@@ -9,7 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
 show_backup_help() {
-	print_help_header "backup" "Check Time Machine backup status" ""
+	print_help_header "backup" "Check Time Machine backup status" "[--json]"
+	echo "  --json          Output in JSON format"
 	echo ""
 }
 
