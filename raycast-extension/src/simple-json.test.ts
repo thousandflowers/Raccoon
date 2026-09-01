@@ -4,7 +4,10 @@ import {
 	parseOverlap,
 	parseTrash,
 	parseWifi,
-	shadowed,
+	byClash,
+	clashLevel,
+	groupByName,
+	type NameGroup,
 	type PathEntry,
 } from "./simple-json.ts";
 
@@ -47,24 +50,64 @@ test("overlap entries are checked, not cast", () => {
 	);
 });
 
-test("a name from two managers is the one worth finding", () => {
-	const e = (name: string, manager: string): PathEntry => ({
-		name,
-		path: `/x/${name}`,
-		resolved: `/x/${name}`,
-		manager,
-	});
-	const dupes = shadowed([
-		e("jq", "brew"),
-		e("jq", "system"),
-		e("rg", "brew"),
-	]);
-	assert.ok(dupes.has("jq"));
-	assert.ok(!dupes.has("rg"));
-});
-
 test("output that is not JSON says which command failed", () => {
 	assert.throws(() => parseTrash("-- Trash"), /rcc trash did not print JSON/);
 	assert.throws(() => parseWifi("-- Wi-Fi"), /rcc wifi did not print JSON/);
 	assert.throws(() => parseOverlap("[["), /rcc overlap did not print JSON/);
+});
+
+test("one row per name, not per PATH entry", () => {
+	const e = (name: string, manager: string, path: string): PathEntry => ({
+		name,
+		path,
+		resolved: path,
+		manager,
+	});
+	const groups = groupByName([
+		e("jq", "brew", "/opt/homebrew/bin/jq"),
+		e("jq", "system", "/usr/bin/jq"),
+		e("rg", "brew", "/opt/homebrew/bin/rg"),
+	]);
+	assert.equal(groups.length, 2);
+	const jq = groups.find((g) => g.name === "jq");
+	assert.deepEqual(jq?.managers, ["brew", "system"]);
+	// PATH order decides which copy runs, so the first entry is the winner.
+	assert.equal(jq?.entries[0].path, "/opt/homebrew/bin/jq");
+});
+
+test("the same manager twice is still one manager", () => {
+	const e = (manager: string, path: string): PathEntry => ({
+		name: "python3",
+		path,
+		resolved: path,
+		manager,
+	});
+	const [group] = groupByName([
+		e("brew", "/a/python3"),
+		e("brew", "/b/python3"),
+	]);
+	assert.deepEqual(group.managers, ["brew"]);
+	// Two copies is still a clash, even from one manager.
+	assert.equal(clashLevel(group), "double");
+});
+
+test("three copies is worse than two, and sorts above it", () => {
+	const g = (name: string, n: number): NameGroup => ({
+		name,
+		entries: Array.from({ length: n }, () => ({
+			name,
+			path: "/x",
+			resolved: "/x",
+			manager: "brew",
+		})),
+		managers: ["brew"],
+	});
+	assert.equal(clashLevel(g("pip3", 3)), "worse");
+	assert.equal(clashLevel(g("jq", 2)), "double");
+	assert.equal(clashLevel(g("rg", 1)), "single");
+	const sorted = [g("rg", 1), g("jq", 2), g("pip3", 3)].sort(byClash);
+	assert.deepEqual(
+		sorted.map((x) => x.name),
+		["pip3", "jq", "rg"],
+	);
 });

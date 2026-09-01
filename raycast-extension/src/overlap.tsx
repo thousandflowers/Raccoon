@@ -1,53 +1,60 @@
 import { Color, Icon, List } from "@raycast/api";
 import { useMemo } from "react";
 import { RccList } from "./rcc-list";
-import { parseOverlap, shadowed, type PathEntry } from "./simple-json";
+import {
+	byClash,
+	clashLevel,
+	groupByName,
+	parseOverlap,
+	type NameGroup,
+} from "./simple-json";
 
-/** One colour per manager would be decorative. Only the clash is coloured. */
-function tint(entry: PathEntry, clashing: boolean): Color {
-	if (clashing) return Color.Orange;
-	return entry.manager === "system" ? Color.SecondaryText : Color.Green;
-}
+const TINT = {
+	single: Color.SecondaryText,
+	double: Color.Orange,
+	worse: Color.Red,
+} as const;
+
+const ICON = {
+	single: Icon.Terminal,
+	double: Icon.Duplicate,
+	worse: Icon.ExclamationMark,
+} as const;
 
 function Rows({
-	entries,
+	groups,
 	actions,
 }: {
-	entries: PathEntry[];
+	groups: NameGroup[];
 	actions: React.ReactNode;
 }) {
-	// Names provided by two managers first: which copy wins is decided by PATH
-	// order, and that is the question this command exists to answer.
-	const clashes = useMemo(() => shadowed(entries), [entries]);
-	const sorted = useMemo(
-		() =>
-			[...entries].sort((a, b) => {
-				const rank = (e: PathEntry) => (clashes.has(e.name) ? 0 : 1);
-				return rank(a) - rank(b) || a.name.localeCompare(b.name);
-			}),
-		[entries, clashes],
-	);
+	// Worst first: three copies of a name is the reason to open this screen.
+	const sorted = useMemo(() => [...groups].sort(byClash), [groups]);
 	return (
 		<>
-			{sorted.map((entry, index) => {
-				const clashing = clashes.has(entry.name);
+			{sorted.map((group) => {
+				const level = clashLevel(group);
+				const winner = group.entries[0];
 				return (
 					<List.Item
-						key={`${entry.name}-${entry.path}-${index}`}
-						icon={{
-							source: clashing ? Icon.Duplicate : Icon.Terminal,
-							tintColor: tint(entry, clashing),
-						}}
-						title={entry.name}
-						subtitle={entry.path}
-						keywords={[entry.manager, entry.resolved]}
+						key={group.name}
+						icon={{ source: ICON[level], tintColor: TINT[level] }}
+						title={group.name}
+						// The copy that actually runs, decided by PATH order.
+						subtitle={winner.path}
+						keywords={group.entries.flatMap((e) => [
+							e.manager,
+							e.path,
+						])}
 						accessories={[
-							{
-								tag: {
-									value: entry.manager,
-									color: tint(entry, clashing),
-								},
-							},
+							// One tag per manager, on one row, rather than one row per
+							// copy: the point is that the same name has several owners.
+							...group.managers.map((manager) => ({
+								tag: { value: manager, color: TINT[level] },
+							})),
+							...(group.entries.length > group.managers.length
+								? [{ text: `${group.entries.length} copies` }]
+								: []),
 						]}
 						actions={actions}
 					/>
@@ -61,17 +68,17 @@ export default function Command() {
 	return (
 		<RccList
 			command="overlap"
-			parse={parseOverlap}
-			navigationTitle={(e) =>
-				e
-					? `PATH — ${e.length} entries, ${shadowed(e).size} shadowed`
-					: "PATH"
-			}
+			parse={(stdout) => groupByName(parseOverlap(stdout))}
+			navigationTitle={(g) => {
+				if (!g) return "PATH";
+				const clashing = g.filter((x) => x.entries.length > 1).length;
+				return `PATH — ${g.length} names, ${clashing} from more than one place`;
+			}}
 			searchBarPlaceholder="Search by name, manager or path"
 			emptyIcon={Icon.Terminal}
 			emptyTitle="Nothing on the PATH"
 		>
-			{(entries, actions) => <Rows entries={entries} actions={actions} />}
+			{(groups, actions) => <Rows groups={groups} actions={actions} />}
 		</RccList>
 	);
 }

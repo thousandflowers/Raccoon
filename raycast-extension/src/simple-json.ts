@@ -65,15 +65,48 @@ export function parseOverlap(stdout: string): PathEntry[] {
 }
 
 /**
- * A name provided by more than one manager: the reason this command exists.
- * Which copy wins is decided by PATH order, and the reader wants those first.
+ * One row per name, not per PATH entry.
+ *
+ * The command answers "which names come from more than one manager", so the
+ * unit is the name: a name provided twice is one row carrying two managers,
+ * not two rows a reader has to notice are the same word. Which copy actually
+ * runs is decided by PATH order, so the first entry is the winner and the
+ * rest are shadowed.
  */
-export function shadowed(entries: PathEntry[]): Set<string> {
-	const seen = new Map<string, number>();
+export type NameGroup = {
+	name: string;
+	/** In PATH order. The first one is the copy that runs. */
+	entries: PathEntry[];
+	/** Distinct managers, in the order they appear on the PATH. */
+	managers: string[];
+};
+
+export function groupByName(entries: PathEntry[]): NameGroup[] {
+	const groups = new Map<string, PathEntry[]>();
 	for (const entry of entries) {
-		seen.set(entry.name, (seen.get(entry.name) ?? 0) + 1);
+		const existing = groups.get(entry.name);
+		if (existing) existing.push(entry);
+		else groups.set(entry.name, [entry]);
 	}
-	return new Set(
-		[...seen.entries()].filter(([, n]) => n > 1).map(([name]) => name),
-	);
+	return [...groups.entries()].map(([name, list]) => ({
+		name,
+		entries: list,
+		managers: [...new Set(list.map((e) => e.manager))],
+	}));
+}
+
+/**
+ * How much a name is worth looking at. Two managers is a clash worth knowing;
+ * three or more is a mess, and gets the colour that says so.
+ */
+export function clashLevel(group: NameGroup): "single" | "double" | "worse" {
+	if (group.entries.length >= 3) return "worse";
+	if (group.entries.length === 2) return "double";
+	return "single";
+}
+
+/** Worst first, then alphabetical: the reason to open this is at the top. */
+export function byClash(a: NameGroup, b: NameGroup): number {
+	const rank = b.entries.length - a.entries.length;
+	return rank !== 0 ? rank : a.name.localeCompare(b.name);
 }
