@@ -3529,6 +3529,7 @@ func (m *model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state = stateMenu
 		m.searchQuery = ""
 		m.selected = 0
+		m.skipHeadings(1)
 	case tea.KeyBackspace:
 		if len(m.searchQuery) > 0 {
 			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
@@ -3536,6 +3537,7 @@ func (m *model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.state = stateMenu
 			m.selected = 0
+			m.skipHeadings(1)
 		}
 	case tea.KeyEnter:
 		f := m.filtered()
@@ -3594,6 +3596,12 @@ func main() {
 		items:   items(),
 		binPath: binPath,
 	}
+	// Row 0 is the "Maintenance" heading — a label with nothing to run and no
+	// highlight — so the menu opened with nothing selected and the first Down
+	// keypress was spent landing on the first command rather than moving to the
+	// second. g and G already did this; the three places that reset the cursor
+	// to the top did not.
+	m.skipHeadings(1)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
