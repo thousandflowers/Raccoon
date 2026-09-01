@@ -2682,13 +2682,26 @@ func sudoCached() bool {
 // the running TUI instead is what made the password come back "Sorry, try
 // again" on Macs without Touch ID: issue #23.
 func primeSudo() tea.Cmd {
-	// The terminal is blank while sudo waits, because ExecProcess hands over a
-	// screen the TUI has just cleared and Touch ID prints no prompt of its own:
-	// it only waits for a finger. What the reader saw was a black screen for as
-	// long as they took to notice. So say what is happening first, in the
-	// terminal sudo is about to use.
-	const notice = `printf '\n  \033[1mRaccoon needs administrator rights.\033[0m\n' >&2
-printf '  Touch ID, or type your password. Ctrl-C to cancel.\n\n' >&2
+	// sudo needs the real terminal: Touch ID and the password prompt only exist
+	// outside the alt screen, which is why ExecProcess hands it over at all
+	// (issue #23). The cost is that the TUI is gone for as long as the prompt
+	// lasts, and what replaced it was two lines of prose on a bare shell — no
+	// menu, no raccoon, indistinguishable from the program having crashed.
+	//
+	// So the handover draws the same face the TUI draws. The screen is cleared
+	// first, otherwise the notice lands under whatever was in the terminal
+	// before rcc started and still reads as an escape rather than a step.
+	// Nothing is animated: sudo owns stdin here, and a background writer would
+	// interleave with its prompt.
+	//
+	// The eyes are `o.o` — the attentive frame, the one the TUI uses while it
+	// waits for something. `sudo -v` is exec'd so the shell does not sit between
+	// the terminal and the prompt.
+	const notice = `printf '\033[2J\033[H' >&2
+printf '\n   \033[1mn___n\033[0m\n' >&2
+printf '  \033[1m[ o.o ]\033[0m   \033[1mRaccoon needs administrator rights.\033[0m\n' >&2
+printf '   \033[1m> ^ <\033[0m\n' >&2
+printf '\n  Touch ID, or type your password. Ctrl-C to cancel.\n\n' >&2
 exec sudo -v`
 	return tea.ExecProcess(exec.Command("bash", "-c", notice), func(err error) tea.Msg {
 		return sudoPrimed{err: err}
