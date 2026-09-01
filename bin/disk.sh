@@ -17,6 +17,7 @@ show_disk_help() {
 	echo "  --large [PATH]      Find the biggest files (default PATH: \$HOME)"
 	echo "    --min SIZE        Minimum file size (default: 100M)"
 	echo "    --top N           How many to show (default: 20)"
+	echo "  --json              Output in JSON format"
 	echo "  --help, -h          Show this help"
 	echo ""
 	echo "Examples:"
