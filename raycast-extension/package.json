@@ -165,6 +165,55 @@
 				"privileges"
 			],
 			"mode": "view"
+		},
+		{
+			"name": "trash",
+			"title": "Show Trash",
+			"subtitle": "Raccoon",
+			"description": "Trash size, item count and where it lives.",
+			"keywords": [
+				"trash",
+				"bin",
+				"delete",
+				"empty",
+				"space",
+				"cleanup",
+				"junk"
+			],
+			"mode": "view"
+		},
+		{
+			"name": "wifi",
+			"title": "Show Wi-Fi Networks",
+			"subtitle": "Raccoon",
+			"description": "The network you are on and the ones this Mac remembers.",
+			"keywords": [
+				"wifi",
+				"wi-fi",
+				"network",
+				"ssid",
+				"wireless",
+				"password",
+				"airport"
+			],
+			"mode": "view"
+		},
+		{
+			"name": "overlap",
+			"title": "Map PATH Overlaps",
+			"subtitle": "Raccoon",
+			"description": "Which manager is behind each PATH entry, and which names clash.",
+			"keywords": [
+				"path",
+				"overlap",
+				"shadow",
+				"brew",
+				"npm",
+				"cargo",
+				"which",
+				"duplicate"
+			],
+			"mode": "view"
 		}
 	],
 	"dependencies": {

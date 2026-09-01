@@ -1,6 +1,6 @@
 import { Action, ActionPanel, Icon, Keyboard, List } from "@raycast/api";
 import { COMMANDS, type RccCommand } from "./commands";
-import { RccDetail } from "./rcc-detail";
+import { hasView, viewFor } from "./views";
 
 function accessories(command: RccCommand): List.Item.Accessory[] {
 	const items: List.Item.Accessory[] = [];
@@ -22,16 +22,22 @@ export default function Command() {
 			{COMMANDS.map((command) => (
 				<List.Item
 					key={command.id}
-					icon={Icon.Window}
+					icon={hasView(command) ? Icon.AppWindowList : Icon.Text}
 					title={command.title}
 					subtitle={command.description}
 					accessories={accessories(command)}
 					actions={
 						<ActionPanel>
 							<Action.Push
-								title="Show Output"
-								icon={Icon.Window}
-								target={<RccDetail command={command} />}
+								title={
+									hasView(command) ? "Open" : "Show Output"
+								}
+								icon={
+									hasView(command)
+										? Icon.AppWindowList
+										: Icon.Text
+								}
+								target={viewFor(command)}
 							/>
 							<Action.CopyToClipboard
 								title="Copy Command"
