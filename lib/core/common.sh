@@ -109,6 +109,34 @@ print_info() {
 # audit.sh and wifi.sh, and the third copy was going to be the one that forgot
 # the backslash. Backslash first: escaping quotes first would then escape the
 # backslashes it just added.
+# A spawned process can arrive without HOME: a launchd job, a sandboxed helper,
+# an extension that hands its child a trimmed environment. Under `set -u` every
+# read of it aborted the script before it printed anything, and a caller reading
+# an empty stdout has no way to tell that apart from a command with nothing to
+# say. Bash still knows the home directory from the passwd entry, so ask it.
+if [[ -z "${HOME:-}" ]]; then
+    HOME="$(cd ~ 2>/dev/null && pwd)" || HOME="/tmp"
+    export HOME
+fi
+
+# A number for a JSON document. Anything that is not a plain integer becomes 0.
+#
+# Every count in these reports comes out of a pipeline - `wc -l`, an arithmetic
+# expansion, a tool that may not be installed - and a pipeline that produces
+# nothing produces an empty string. `printf '%s'` writes that straight into the
+# document as `"families": ,`, which is not a report with a gap in it: it is a
+# file no reader can open, and the reader is told the CLI is too old rather than
+# that one count was missing. A wrong count is visible. Invalid JSON is not.
+rcc_json_number() {
+    local n="${1:-}"
+    n="${n//[[:space:]]/}"
+    if [[ "$n" =~ ^-?[0-9]+$ ]]; then
+        printf '%s' "$n"
+    else
+        printf '0'
+    fi
+}
+
 rcc_json_string() {
     local s="$1"
     s="${s//\\/\\\\}"

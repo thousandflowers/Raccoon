@@ -69,13 +69,23 @@ _json_report() {
 	fi
 	printf '{\n'
 	printf '  "sources": [\n'
-	printf '    {"path": %s, "count": %s},\n' "$(rcc_json_string "/Library/Fonts")" "$sys"
-	printf '    {"path": %s, "count": %s}\n' "$(rcc_json_string "$HOME/Library/Fonts")" "$user"
+	printf '    {"path": %s, "count": %s},\n' \
+		"$(rcc_json_string "/Library/Fonts")" "$(rcc_json_number "$sys")"
+	printf '    {"path": %s, "count": %s}\n' \
+		"$(rcc_json_string "$HOME/Library/Fonts")" "$(rcc_json_number "$user")"
 	printf '  ],\n'
-	printf '  "installed": %s,\n' "$((sys + user))"
+	printf '  "installed": %s,\n' "$(rcc_json_number "$((sys + user))")"
+	# Every count here comes out of a pipeline that can produce nothing at all -
+	# fc-list missing, a cache it cannot read, a run that was cut short - and an
+	# empty string interpolated with %s writes `"families": ,` into the document.
+	# The reader is then told the CLI is too old, which is the wrong thing to be
+	# told and the reason this reached a user.
 	printf '  "fontconfig": {"available": %s, "fonts": %s, "families": %s, "duplicate_families": %s},\n' \
-		"$fc_available" "$fonts" "$families" "$dupes"
-	printf '  "corrupted": %s\n}\n' "$(_fonts_corrupted)"
+		"$fc_available" \
+		"$(rcc_json_number "$fonts")" \
+		"$(rcc_json_number "$families")" \
+		"$(rcc_json_number "$dupes")"
+	printf '  "corrupted": %s\n}\n' "$(rcc_json_number "$(_fonts_corrupted)")"
 }
 
 main() {

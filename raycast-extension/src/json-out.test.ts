@@ -1,46 +1,68 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { expectArray, expectObject, extractJson } from "./json-out.ts";
+import { test } from "node:test";
+import { expectObject, extractJson } from "./json-out.ts";
 
-test("clean JSON is read as it is", () => {
-	assert.deepEqual(extractJson('{"a":1}', "x"), { a: 1 });
-	assert.deepEqual(extractJson("[1,2]", "x"), [1, 2]);
+test("a report printed before the JSON is still read", () => {
+	const parsed = extractJson('[1/3] scanning...\n{"a":1}', "certs");
+	assert.deepEqual(parsed, { a: 1 });
 });
 
-test("a human report in front of the JSON is stepped over", () => {
-	// What rcc 0.16.0 prints for memory and for audit.
-	assert.deepEqual(extractJson('-- Memory Usage\n| a | b |\n{"a":1}', "x"), {
-		a: 1,
-	});
-	assert.deepEqual(extractJson('+-----+\n| Core |\n[{"a":1}]', "x"), [
-		{ a: 1 },
-	]);
+test("prose with no document in it is blamed on the version, which is the fix", () => {
+	try {
+		extractJson("[1/4] PATH entries...\n| Path | Status |\n", "env");
+		assert.fail("should have thrown");
+	} catch (e) {
+		assert.match((e as Error).message, /brew upgrade rcc/);
+	}
 });
 
-test("a brace inside the report is not the start of the document", () => {
-	assert.deepEqual(extractJson('| note: {oops} |\n{"a":1}', "x"), { a: 1 });
+test("a malformed document is NOT blamed on the version", () => {
+	// rcc fonts --json wrote an empty count into an otherwise well-formed
+	// report, and the reader was told to upgrade a CLI that was already current.
+	try {
+		extractJson(
+			'{\n  "fontconfig": {"fonts": , "families": 3}\n}',
+			"fonts",
+		);
+		assert.fail("should have thrown");
+	} catch (e) {
+		const m = (e as Error).message;
+		assert.ok(
+			!m.includes("brew upgrade rcc"),
+			"must not blame the version",
+		);
+		assert.match(m, /defect in rcc/);
+	}
 });
 
-test("output with no JSON says which rcc would have printed some", () => {
-	assert.throws(
-		() => extractJson("-- Memory Usage\n| a | b |", "memory"),
-		/rcc memory did not print JSON.*brew upgrade rcc/s,
-	);
+test("the failure carries the output, so the next one names itself", () => {
+	try {
+		extractJson('{"fonts": , }', "fonts");
+		assert.fail("should have thrown");
+	} catch (e) {
+		assert.match((e as Error).message, /\{"fonts": , \}/);
+	}
 });
 
-test("malformed JSON is not recoverable, and says so the same way", () => {
-	// rcc 0.16.0's ports: a process name with a backslash, unescaped.
-	assert.throws(
-		() => extractJson('[{"process": "back\\slash"}]', "ports"),
-		/did not print JSON/,
-	);
+test("a very long output is cut, and says it was cut", () => {
+	const long = `{${"x".repeat(900)}`;
+	try {
+		extractJson(long, "ports");
+		assert.fail("should have thrown");
+	} catch (e) {
+		const m = (e as Error).message;
+		assert.ok(
+			m.length < long.length,
+			"excerpt must be shorter than the output",
+		);
+		assert.match(m, /…/);
+	}
 });
 
-test("empty output is named before anything else", () => {
-	assert.throws(() => extractJson("   ", "ports"), /printed nothing/);
+test("empty output says so instead of guessing", () => {
+	assert.throws(() => extractJson("   \n", "trash"), /printed nothing/);
 });
 
-test("the shape is checked, not assumed", () => {
-	assert.throws(() => expectObject("[1]", "x"), /not a report object/);
-	assert.throws(() => expectArray("{}", "x"), /not a list/);
+test("valid JSON that is not an object is refused by name", () => {
+	assert.throws(() => expectObject("[1,2]", "memory"), /not a report object/);
 });

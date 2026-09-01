@@ -19,6 +19,45 @@ const UPGRADE =
 	"output is not valid JSON at all. Upgrade with `brew upgrade rcc`, or point " +
 	"the Raccoon CLI preference at a newer binary.";
 
+/** The first stretch of output, enough to see what went wrong, short enough to read. */
+function excerpt(text: string): string {
+	const head = text.slice(0, 400);
+	return head.length < text.length ? `${head}\n…` : head;
+}
+
+/** Marks of rcc's human report: a step counter, a table row, a section rule. */
+const REPORT_MARKS = [
+	/^\s*\[\d+\/\d+\]/m, // [1/4] PATH entries...
+	/^\s*\|/m, //            | Path | Status |
+	/^\s*--\s/m, //          -- PATH Entries
+];
+
+/** The start of an ANSI colour sequence, as a plain string: a regex literal
+ *  holding an ESC trips no-control-regex, and there is nothing to match here
+ *  that needs a pattern. */
+const ANSI = "\u001b[";
+
+/**
+ * Whether this looks like a CLI that answered in prose rather than JSON.
+ *
+ * The distinction decides what the reader is told, and the first version of it
+ * got the decision backwards: it asked whether the output *started* with a
+ * bracket, and rcc's own step counter reads `[1/4] PATH entries...`, which
+ * starts with one. So the case this exists for — an old rcc printing its report
+ * — was classed as a broken emitter.
+ *
+ * It now looks for what a report actually contains. Output with a step counter,
+ * a table row, a section rule or a colour escape in it is prose, and "upgrade"
+ * is the answer. Output with none of those is a document that stopped making
+ * sense partway through, which is a bug in the emitter — and telling that reader
+ * to upgrade sends them to fix something that is not broken, which is what
+ * happened when `fonts --json` wrote an empty count into an otherwise
+ * well-formed report and the extension blamed their version of rcc.
+ */
+function looksLikeProse(text: string): boolean {
+	return text.includes(ANSI) || REPORT_MARKS.some((mark) => mark.test(text));
+}
+
 /**
  * The JSON document in a stdout that may begin with something else.
  *
@@ -45,7 +84,16 @@ export function extractJson(stdout: string, command: string): unknown {
 		}
 		const reason = first instanceof Error ? first.message : String(first);
 		throw new Error(
-			`rcc ${command} did not print JSON: ${reason}. ${UPGRADE}`,
+			[
+				`rcc ${command} did not print JSON: ${reason}`,
+				"",
+				looksLikeProse(text)
+					? UPGRADE
+					: "This is a defect in rcc, not a version you can upgrade past. " +
+						"The output it printed is below — please report it.",
+				"",
+				excerpt(text),
+			].join("\n"),
 		);
 	}
 }
