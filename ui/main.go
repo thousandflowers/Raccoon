@@ -2688,22 +2688,33 @@ func primeSudo() tea.Cmd {
 	// lasts, and what replaced it was two lines of prose on a bare shell — no
 	// menu, no raccoon, indistinguishable from the program having crashed.
 	//
-	// So the handover draws the same face the TUI draws. The screen is cleared
-	// first, otherwise the notice lands under whatever was in the terminal
-	// before rcc started and still reads as an escape rather than a step.
-	// Nothing is animated: sudo owns stdin here, and a background writer would
-	// interleave with its prompt.
+	// So the handover draws the same face the TUI draws, in the same colour.
+	// The text is rendered here with styleTitle rather than written as a raw
+	// escape in the shell script, because a hand-written \033[1m is bold white:
+	// it looked like a different program's notice sitting where Raccoon's menu
+	// had been. Going through lipgloss also means the honey gold degrades the
+	// way every other line in the TUI does on a terminal with fewer colours,
+	// instead of being a second opinion about what this terminal supports.
 	//
-	// The eyes are `o.o` — the attentive frame, the one the TUI uses while it
-	// waits for something. `sudo -v` is exec'd so the shell does not sit between
-	// the terminal and the prompt.
-	const notice = `printf '\033[2J\033[H' >&2
-printf '\n   \033[1mn___n\033[0m\n' >&2
-printf '  \033[1m[ o.o ]\033[0m   \033[1mRaccoon needs administrator rights.\033[0m\n' >&2
-printf '   \033[1m> ^ <\033[0m\n' >&2
-printf '\n  Touch ID, or type your password. Ctrl-C to cancel.\n\n' >&2
+	// The screen is cleared first, otherwise the notice lands under whatever was
+	// in the terminal before rcc started and reads as an escape rather than a
+	// step. Nothing is animated: sudo owns stdin here, and a background writer
+	// would interleave with its prompt. The eyes are o.o, the attentive frame
+	// the TUI uses while it waits for something.
+	notice := "\033[2J\033[H\n" +
+		"   " + styleTitle.Render("n___n") + "\n" +
+		"  " + styleTitle.Render("[ o.o ]") + "   " +
+		styleTitle.Render("Raccoon needs administrator rights.") + "\n" +
+		"   " + styleTitle.Render("> ^ <") + "\n\n" +
+		"  " + styleDesc.Render("Touch ID, or type your password. Ctrl-C to cancel.") +
+		"\n\n"
+
+	// The notice travels as argv, not inside the script text: it carries escape
+	// sequences and a shell quoting mistake here would be printed rather than
+	// obeyed. `exec` so no shell sits between the terminal and the prompt.
+	const script = `printf '%s' "$1" >&2
 exec sudo -v`
-	return tea.ExecProcess(exec.Command("bash", "-c", notice), func(err error) tea.Msg {
+	return tea.ExecProcess(exec.Command("bash", "-c", script, "bash", notice), func(err error) tea.Msg {
 		return sudoPrimed{err: err}
 	})
 }
