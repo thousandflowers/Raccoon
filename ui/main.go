@@ -3368,23 +3368,25 @@ func (m model) runningView() string {
 func (m model) outputView() string {
 	var b strings.Builder
 
-	// Title row with raccoon face + status badge
-	b.WriteString("\n")
-	var raccoonFace string
-	if m.outputSuccess {
-		raccoonFace = "[ ^.^ ]"
-	} else {
-		raccoonFace = "[ >.< ]"
+	// The whole animal, not just its eyes. This screen carried a single row,
+	// "[ ^.^ ]", since the TUI was written: with round brackets it read as a
+	// smiley, but next to a menu that shows ears and a mouth it reads as a head
+	// with its top and bottom cut off. The eyes still carry the outcome.
+	eyes := "^.^"
+	if !m.outputSuccess {
+		eyes = ">.<"
 	}
 	status := styleStatusSuccess.Render("✓ Completed")
 	if !m.outputSuccess {
 		status = styleStatusError.Render("✗ Failed")
 	}
-	b.WriteString(fmt.Sprintf("  %s  %s  %s",
-		styleTitle.Render(raccoonFace),
+	b.WriteString("\n")
+	b.WriteString("  " + styleTitle.Render("   n___n") + "\n")
+	b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
+		styleTitle.Render("  [ "+eyes+" ]"),
 		styleTitle.Render(m.outputTitle),
 		status))
-	b.WriteString("\n")
+	b.WriteString("  " + styleTitle.Render("   > ^ <") + "\n")
 
 	sepLen := m.sepWidth()
 	b.WriteString(styleMuted.Render("  " + strings.Repeat("─", sepLen)))

@@ -765,6 +765,30 @@ func TestGitCount(t *testing.T) {
 }
 
 // Reading the real table, capped, skipping the header.
+// The finished-command screen carried one row, "[ ^.^ ]", from the first
+// version of the TUI: eyes with no ears and no mouth. Next to a menu that
+// draws the whole animal it read as a head with its top and bottom cut off.
+func TestOutputViewShowsTheWholeFace(t *testing.T) {
+	for _, ok := range []bool{true, false} {
+		m := model{items: items(), width: 90, height: 20,
+			outputTitle: "disk", outputSuccess: ok,
+			outputLines: []string{"-- Disk Status"}}
+		out := stripANSI(m.outputView())
+		for _, part := range []string{"n___n", "> ^ <"} {
+			if !strings.Contains(out, part) {
+				t.Errorf("outputSuccess=%v: the face is missing %q:\n%s", ok, part, out)
+			}
+		}
+		eyes := "[ ^.^ ]"
+		if !ok {
+			eyes = "[ >.< ]"
+		}
+		if !strings.Contains(out, eyes) {
+			t.Errorf("outputSuccess=%v: the eyes must carry the outcome, want %q", ok, eyes)
+		}
+	}
+}
+
 func TestReadRepos(t *testing.T) {
 	lines := []string{
 		"| Repository                               | Issues               |",
