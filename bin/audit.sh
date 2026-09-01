@@ -91,8 +91,28 @@ _box_row() {
 }
 
 SUDO_AVAILABLE=true
+
+# Root for one check.
+#
+# RCC_NO_PROMPT is set by any caller that owns the terminal — the Go TUI holds
+# it in raw mode and runs its own key reader. Such a caller authenticates up
+# front, and the rule from issue #23 is that a script must never raise a prompt
+# of its own afterwards. This function broke that rule: it called plain `sudo`,
+# so when the cached timestamp ran out partway through a report, Touch ID was
+# asked for a second time, from behind a screen the reader was not looking at.
+#
+# Under that caller it now asks non-interactively and degrades instead: the
+# remaining checks that need root are skipped and say so, which is a worse
+# report but an honest one, and it cannot hang.
+#
+# The old `[[ "$1" != "-v" ]]` escape hatch is gone with it. Nothing called
+# `_sudo -v`, and its only effect would have been to let exactly this prompt
+# through after sudo had already been declared unavailable.
 _sudo() {
-	if [[ "${SUDO_AVAILABLE:-true}" != "true" ]] && [[ "$1" != "-v" ]]; then
+	[[ "${SUDO_AVAILABLE:-true}" == "true" ]] || return 1
+	if [[ "${RCC_NO_PROMPT:-}" == "1" ]]; then
+		sudo -n "$@" && return 0
+		SUDO_AVAILABLE=false
 		return 1
 	fi
 	sudo "$@"

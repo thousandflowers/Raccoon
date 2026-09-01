@@ -174,7 +174,12 @@ start_sudo_keepalive() {
     ( trap 'kill "$_rcc_ka_sleep" 2>/dev/null; exit 0' TERM
       _rcc_ka_sleep=""
       while true; do
-          sudo -n true 2>/dev/null
+          # `|| true` is load-bearing. A subshell inherits the caller's shell
+          # options, and every script that starts this runs `set -euo pipefail`,
+          # so ONE failed refresh killed the whole keepalive without a word. The
+          # timestamp then expired mid-run and the next _sudo raised the
+          # unanswerable prompt this function exists to prevent (issue #23).
+          sudo -n true 2>/dev/null || true
           sleep 50 & _rcc_ka_sleep=$!
           wait "$_rcc_ka_sleep" 2>/dev/null || true
           kill -0 "$$" 2>/dev/null || exit
