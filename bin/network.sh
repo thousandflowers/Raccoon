@@ -172,8 +172,14 @@ _json_report() {
 	printf '  "firewall": {"application": %s, "pf": %s},\n' \
 		"$(rcc_json_string "$awlf")" "$(rcc_json_string "${pf:-unknown}")"
 
-	printf '  "connections": %s\n}\n' \
-		"$(netstat -an 2>/dev/null | grep -c ESTABLISHED || printf '0')"
+	# `grep -c` prints 0 on no match AND exits 1, so `|| printf '0'` printed a
+	# second one and the document became `"connections": 0\n0`. It showed up only
+	# where netstat is off the PATH — /usr/sbin is not always on it — which is
+	# exactly the environment a spawned process gets. Same shape as the comment
+	# in lib/audit/checks.sh:344, which had already learned this.
+	local established
+	established=$(netstat -an 2>/dev/null | grep -c ESTABLISHED || true)
+	printf '  "connections": %s\n}\n' "$(rcc_json_number "$established")"
 }
 
 main() {
