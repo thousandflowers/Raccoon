@@ -19,7 +19,7 @@ export type AuditCheck = {
 	 * there is something to change, so a Mac with nothing wrong reports false
 	 * everywhere. Zero fixable is the ordinary case, not an empty result.
 	 */
-	fix_available: boolean;
+	fix_available?: boolean;
 };
 
 export type AuditReport = {
@@ -53,7 +53,11 @@ function isCheck(value: unknown): value is AuditCheck {
 		typeof c.value === "string" &&
 		typeof c.cis === "string" &&
 		typeof c.command === "string" &&
-		typeof c.fix_available === "boolean"
+		// Optional on purpose: fix_available arrived in rcc 0.17.0, and an
+		// extension that refuses an older report shows a red screen instead of
+		// thirty checks it could perfectly well render. Absent means unknown,
+		// which fixableCount already treats as not fixable.
+		(c.fix_available === undefined || typeof c.fix_available === "boolean")
 	);
 }
 
@@ -65,6 +69,24 @@ function isCheck(value: unknown): value is AuditCheck {
  * would have turned that into undefined fields at render time instead of one
  * sentence here.
  */
+/**
+ * The last JSON object in a stdout that begins with something else. Only a
+ * brace at the start of a line is considered, so a brace inside the report's
+ * own text cannot be mistaken for the start of the document.
+ */
+function trailingJsonObject(text: string): unknown {
+	const lines = text.split("\n");
+	for (let i = 0; i < lines.length; i += 1) {
+		if (!lines[i].startsWith("{")) continue;
+		try {
+			return JSON.parse(lines.slice(i).join("\n"));
+		} catch {
+			// Not the start of the document: keep looking further down.
+		}
+	}
+	return undefined;
+}
+
 export function parseAuditReport(stdout: string): AuditReport {
 	const text = stdout.trim();
 	if (text === "") throw new Error("rcc audit printed nothing to parse.");
@@ -72,9 +94,20 @@ export function parseAuditReport(stdout: string): AuditReport {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(text);
-	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error);
-		throw new Error(`rcc audit did not print JSON: ${reason}`);
+	} catch {
+		// rcc 0.17.0 prints JSON alone, but every earlier release printed the
+		// boxed report first and glued the JSON to the end of the same stdout.
+		// The extension is installed against whatever rcc the user has, so it
+		// reads the trailing object rather than telling them their CLI is wrong.
+		const recovered = trailingJsonObject(text);
+		if (recovered === undefined) {
+			throw new Error(
+				"rcc audit did not print JSON. An rcc older than 0.17.0 prints its " +
+					"report first; upgrade with `brew upgrade rcc`, or set the Raccoon " +
+					"CLI preference to a newer binary.",
+			);
+		}
+		parsed = recovered;
 	}
 
 	if (

@@ -49,9 +49,19 @@ test("empty stdout is a readable error, not a crash", () => {
 });
 
 test("stdout that is not JSON says so", () => {
-	// What `rcc audit --json` printed before 0.17.0: the boxed report, then JSON.
+	// What `rcc audit --json` printed before 0.17.0: the boxed report, then the
+	// JSON. The extension runs against whatever rcc is installed, so it reads
+	// the trailing object instead of refusing.
+	const mixed = parseAuditReport("+-----+\n| Core |\n+-----+\n" + report());
+	assert.equal(mixed.results.length, 1);
+
+	// A brace inside the report's own text is not the start of the document.
+	const noisy = parseAuditReport("| note: {not json} |\n" + report());
+	assert.equal(noisy.results.length, 1);
+
+	// Output with no JSON anywhere still fails, and says what to do about it.
 	assert.throws(
-		() => parseAuditReport("+-----+\n| Core |\n+-----+\n" + report()),
+		() => parseAuditReport("+-----+\n| Core |\n+-----+"),
 		/did not print JSON/,
 	);
 });
@@ -62,12 +72,23 @@ test("JSON that is not a report object says so", () => {
 });
 
 test("a result missing a field is named, not rendered as undefined", () => {
+	// Not fix_available: that one is optional on purpose, because rcc before
+	// 0.17.0 does not emit it. command is still required.
 	const broken = { ...check() } as Record<string, unknown>;
-	delete broken.fix_available;
+	delete broken.command;
 	assert.throws(
 		() => parseAuditReport(report([check(), broken])),
 		/Result 2 of 2/,
 	);
+});
+
+test("a report from an rcc older than 0.17.0 still renders", () => {
+	const old = { ...check() } as Record<string, unknown>;
+	delete old.fix_available;
+	const parsed = parseAuditReport(report([old]));
+	assert.equal(parsed.results.length, 1);
+	// Unknown is not fixable: the count must not guess.
+	assert.equal(fixableCount(parsed, new Set()), 0);
 });
 
 test("an unknown status is not a status", () => {
