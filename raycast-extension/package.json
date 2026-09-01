@@ -331,6 +331,23 @@
 				"internet"
 			],
 			"mode": "view"
+		},
+		{
+			"name": "xcode",
+			"title": "Show Xcode Status",
+			"subtitle": "Raccoon",
+			"description": "Build caches worth reclaiming, simulators still running, what is installed.",
+			"keywords": [
+				"xcode",
+				"simulator",
+				"deriveddata",
+				"ios",
+				"build",
+				"cache",
+				"space",
+				"developer"
+			],
+			"mode": "view"
 		}
 	],
 	"dependencies": {

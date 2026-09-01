@@ -14,6 +14,7 @@ import Overlap from "./overlap";
 import Ports from "./ports";
 import Trash from "./trash";
 import Wifi from "./wifi";
+import Xcode from "./xcode";
 import type { RccCommand } from "./commands";
 import { RccDetail } from "./rcc-detail";
 
@@ -41,6 +42,7 @@ const VIEWS: Record<string, () => ReactElement> = {
 	env: Env,
 	disk: Disk,
 	network: Network,
+	xcode: Xcode,
 };
 
 /** Whether this command has a screen of its own rather than raw output. */

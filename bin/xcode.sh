@@ -14,6 +14,7 @@ show_xcode_help() {
 	echo "Show Xcode simulators, derived data, and version"
 	echo ""
 	echo "Options:"
+	echo "  --json          Output in JSON format"
 	echo "  --help, -h      Show this help"
 }
 
@@ -27,14 +28,81 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
-		_rcc_json_unimplemented xcode
+		JSON_OUTPUT=true
 		;;
 	*)
 		;;
 	esac
 done
 
+# DerivedData is the only thing here worth reclaiming: everything else is a
+# fact about the install, not a decision anyone makes.
+_xcode_derived_bytes() {
+	local path="$HOME/Library/Developer/Xcode/DerivedData"
+	[[ -d "$path" ]] || { printf '0'; return 0; }
+	du -sk "$path" 2>/dev/null | awk '{print $1 * 1024}' || printf '0'
+}
+
+_json_report() {
+	local first line name platform version path
+
+	if ! command -v xcrun > /dev/null 2>&1; then
+		printf '{\n  "installed": false,\n  "simulators": [],\n'
+		printf '  "derived_data": {"present": false, "bytes": 0, "projects": 0},\n'
+		printf '  "platforms": [],\n  "version": null,\n  "build": null\n}\n'
+		return 0
+	fi
+
+	printf '{\n  "installed": true,\n'
+
+	# Booted first: a running simulator is holding memory right now.
+	printf '  "simulators": ['
+	first=1
+	while IFS= read -r line; do
+		[[ -z "$line" ]] && continue
+		name=$(printf '%s' "$line" | sed -E 's/^ *//; s/ \(.*//')
+		[[ -z "$name" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    {"name": %s, "booted": %s}' \
+			"$(rcc_json_string "$name")" \
+			"$(printf '%s' "$line" | grep -q '(Booted)' && echo true || echo false)"
+	done < <(xcrun simctl list devices available 2>/dev/null | grep -E 'iPhone|iPad|Apple Watch|Apple TV' || true)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	path="$HOME/Library/Developer/Xcode/DerivedData"
+	printf '  "derived_data": {"present": %s, "bytes": %s, "projects": %s},\n' \
+		"$([[ -d "$path" ]] && echo true || echo false)" \
+		"$(_xcode_derived_bytes)" \
+		"$([[ -d "$path" ]] && find "$path" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ' || printf '0')"
+
+	printf '  "platforms": ['
+	first=1
+	local dev_dir
+	dev_dir=$(xcode-select -p 2>/dev/null) || dev_dir=""
+	if [[ -n "$dev_dir" && -d "$dev_dir/Platforms" ]]; then
+		while IFS= read -r platform; do
+			[[ -z "$platform" ]] && continue
+			[[ $first -eq 1 ]] || printf ','
+			first=0
+			printf '\n    %s' "$(rcc_json_string "$(basename "$platform" .platform)")"
+		done < <(find "$dev_dir/Platforms" -mindepth 1 -maxdepth 1 -name '*.platform' 2>/dev/null || true)
+	fi
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	version=$(xcodebuild -version 2>/dev/null | head -1 | sed 's/^Xcode //' || printf '')
+	printf '  "version": %s,\n' "$(rcc_json_string "$version")"
+	printf '  "build": %s\n}\n' \
+		"$(rcc_json_string "$(xcodebuild -version 2>/dev/null | sed -n '2p' | sed 's/^Build version //' || printf '')")"
+}
+
 main() {
+	if [[ "${JSON_OUTPUT:-false}" == "true" ]]; then
+		_json_report
+		return 0
+	fi
 	print_section_header "Xcode Status"
 
 	if ! command -v xcrun >/dev/null 2>&1; then
