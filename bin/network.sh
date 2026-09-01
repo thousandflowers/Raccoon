@@ -14,6 +14,7 @@ show_network_help() {
 	echo "Show network status with multi-scan confidence scoring"
 	echo ""
 	echo "Options:"
+	echo "  --json          Output in JSON format"
 	echo "  --help, -h      Show this help"
 }
 
@@ -28,7 +29,7 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
-		_rcc_json_unimplemented network
+		JSON_OUTPUT=true
 		;;
 	*)
 		;;
@@ -96,7 +97,90 @@ get_latency() {
 
 
 
+_json_report() {
+	local iface ip ip6 first line name state ns
+
+	printf '{\n'
+
+	# Addresses first: what this Mac is, on the network, right now.
+	printf '  "interfaces": ['
+	first=1
+	for iface in lo0 en0 en1 utun0 utun1 utun2 utun3 utun4 utun5; do
+		ip=$(ifconfig "$iface" 2>/dev/null | grep "inet " | awk '{print $2}' | head -1 || printf '')
+		if [[ -n "$ip" ]]; then
+			[[ $first -eq 1 ]] || printf ','
+			first=0
+			printf '\n    {"name": %s, "family": "inet", "address": %s, "kind": %s}' \
+				"$(rcc_json_string "$iface")" "$(rcc_json_string "$ip")" \
+				"$(rcc_json_string "$(categorize_interface "$ip")")"
+		fi
+		ip6=$(ifconfig "$iface" 2>/dev/null | grep "inet6 " | grep -v fe80 | awk '{print $2}' | head -1 || printf '')
+		if [[ -n "$ip6" ]]; then
+			[[ $first -eq 1 ]] || printf ','
+			first=0
+			printf '\n    {"name": %s, "family": "inet6", "address": %s, "kind": %s}' \
+				"$(rcc_json_string "$iface")" "$(rcc_json_string "$ip6")" \
+				"$(rcc_json_string "$(categorize_interface "$ip6")")"
+		fi
+	done
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	printf '  "dns": ['
+	first=1
+	while IFS= read -r ns; do
+		[[ -z "$ns" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    %s' "$(rcc_json_string "$ns")"
+	done < <(scutil --dns 2>/dev/null | grep "nameserver" | sed 's/.*: //' | sort -u || true)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	# A VPN that is configured is not a VPN that is up: scutil marks the live
+	# one with an asterisk, and the text report only ever showed the names.
+	printf '  "vpns": ['
+	first=1
+	while IFS= read -r line; do
+		[[ -z "$line" ]] && continue
+		name=$(printf '%s' "$line" | sed 's/.*"\(.*\)".*/\1/' || printf '')
+		[[ -z "$name" ]] && continue
+		state=$(printf '%s' "$line" | grep -qE '^\* *\(Connected\)' && printf 'connected' || printf 'configured')
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    {"name": %s, "state": %s}' \
+			"$(rcc_json_string "$name")" "$(rcc_json_string "$state")"
+	done < <(scutil --nc list 2>/dev/null | tail -n +2 || true)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	printf '  "proxies": ['
+	first=1
+	while IFS= read -r line; do
+		[[ -z "$line" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    {"name": %s, "value": %s}' \
+			"$(rcc_json_string "${line%%=*}")" "$(rcc_json_string "${line#*=}")"
+	done < <(env 2>/dev/null | grep -iE '_proxy=' | grep -v '^_' || true)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	local awlf pf
+	awlf=$(/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>/dev/null | grep -qi enabled && printf 'enabled' || printf 'disabled')
+	pf=$(pfctl -s info 2>/dev/null | grep "Status" | awk '{print $2}' || printf '')
+	printf '  "firewall": {"application": %s, "pf": %s},\n' \
+		"$(rcc_json_string "$awlf")" "$(rcc_json_string "${pf:-unknown}")"
+
+	printf '  "connections": %s\n}\n' \
+		"$(netstat -an 2>/dev/null | grep -c ESTABLISHED || printf '0')"
+}
+
 main() {
+	if [[ "${JSON_OUTPUT:-false}" == "true" ]]; then
+		_json_report
+		return 0
+	fi
 	print_section_header "Network Status"
 
 	print_section_header "[1/10] Interfaces"

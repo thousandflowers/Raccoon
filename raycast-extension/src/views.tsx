@@ -9,6 +9,7 @@ import Docker from "./docker";
 import Env from "./env";
 import Fonts from "./fonts";
 import History from "./history";
+import Network from "./network";
 import Overlap from "./overlap";
 import Ports from "./ports";
 import Trash from "./trash";
@@ -39,6 +40,7 @@ const VIEWS: Record<string, () => ReactElement> = {
 	fonts: Fonts,
 	env: Env,
 	disk: Disk,
+	network: Network,
 };
 
 /** Whether this command has a screen of its own rather than raw output. */

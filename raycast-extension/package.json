@@ -313,6 +313,24 @@
 				"shell"
 			],
 			"mode": "view"
+		},
+		{
+			"name": "network",
+			"title": "Show Network",
+			"subtitle": "Raccoon",
+			"description": "Your address, who resolves your names, and anything in between.",
+			"keywords": [
+				"network",
+				"ip",
+				"address",
+				"dns",
+				"vpn",
+				"proxy",
+				"firewall",
+				"wifi",
+				"internet"
+			],
+			"mode": "view"
 		}
 	],
 	"dependencies": {
