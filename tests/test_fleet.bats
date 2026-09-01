@@ -317,3 +317,47 @@ _status_for() {
 	assert_output_contains " mario@2001:db8::1"
 	[[ "$output" != *"-p "* ]]
 }
+
+# The box drew as ┌������┐: `printf '%*s' 48 '' | tr ' ' '─'` substitutes
+# bytes, and ─ is three of them in UTF-8, so every space became a third of a
+# character. Sourcing fleet.sh runs main, and main without a subcommand starts
+# an audit over SSH, so the box function is extracted and run on its own.
+@test "fleet: the box is drawn in characters, not in bytes" {
+	local fn out
+	fn="$(sed -n '/^_fleet_box_line() {/,/^}/p' "$SCRIPT_DIR/bin/fleet.sh")"
+	[[ -n "$fn" ]] || { echo "_fleet_box_line not found" >&2; false; }
+
+	out="$(LC_ALL=C bash -c "
+		$fn
+		line=\"\"; for ((i = 0; i < 48; i++)); do line+='─'; done
+		echo \"┌\${line}┐\"
+		_fleet_box_line '1 hosts · 5 parallel connections'
+		echo \"└\${line}┘\"
+	")"
+
+	# Measured in characters, not bytes: awk's length() under LC_ALL=C counts
+	# bytes, which is the very mistake being tested for.
+	command -v python3 > /dev/null || skip "python3 not available"
+	local widths
+	widths="$(printf '%s\n' "$out" | python3 -c '
+import sys
+print(len({len(line.rstrip(chr(10))) for line in sys.stdin if line.strip()}))
+')"
+	[[ "$widths" == "1" ]] || {
+		echo "the box edges do not line up:" >&2
+		printf '%s\n' "$out" >&2
+		false
+	}
+	[[ "$out" != *"�"* ]] || { echo "broken characters: $out" >&2; false; }
+}
+
+@test "fleet: no line is built by substituting bytes" {
+	# tr works on bytes: any box character fed to it comes out in pieces.
+	# Comment lines are skipped: the fix explains the idiom by quoting it.
+	run grep -vE "^[[:space:]]*#" "$SCRIPT_DIR/bin/fleet.sh"
+	run grep -nE "tr ' ' '[^ -~]" <<< "$output"
+	[[ "$status" -ne 0 ]] || {
+		echo "a rule is still built byte-wise: $output" >&2
+		false
+	}
+}

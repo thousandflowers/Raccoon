@@ -260,13 +260,32 @@ _status_icon() {
 	esac
 }
 
+# One line inside the box, padded to its right edge.
+#
+# These scripts run with LC_ALL=C, where ${#s} and printf's %-Ns count bytes.
+# The box uses · and —, two and three bytes each, so a byte-counted pad left
+# the right edge short by one column per multi-byte character. The width is
+# measured on a copy with those replaced by one ASCII character apiece.
+_fleet_box_line() {
+	local text="$1" plain pad
+	plain="${text//·/.}"
+	plain="${plain//—/-}"
+	pad=$((47 - ${#plain}))
+	[[ $pad -lt 0 ]] && pad=0
+	printf '│ %s%*s│\n' "$text" "$pad" ''
+}
+
 print_fleet_text() {
-	local line
-	line="$(printf '%*s' 48 '' | tr ' ' '─')"
+	# Not `printf '%*s' 48 '' | tr ' ' '─'`: tr substitutes bytes, and ─ is three
+	# of them in UTF-8, so each space became one third of a character and the
+	# box drew as ┌������┐.
+	local line i
+	line=""
+	for ((i = 0; i < 48; i++)); do line+="─"; done
 	echo ""
 	echo "┌${line}┐"
-	printf '│ Fleet Audit — %-33s│\n' "$(date '+%Y-%m-%d %H:%M')"
-	printf '│ %s hosts · %s parallel connections%*s│\n' "$FLEET_COUNT" "$PARALLEL" 12 ''
+	_fleet_box_line "Fleet Audit — $(date '+%Y-%m-%d %H:%M')"
+	_fleet_box_line "$FLEET_COUNT hosts · $PARALLEL parallel connections"
 	echo "└${line}┘"
 	echo ""
 
