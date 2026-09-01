@@ -1,5 +1,7 @@
 import { Color, Icon, List } from "@raycast/api";
+import { openApp, openSettings, reveal, SETTINGS } from "./fixes";
 import { RccList } from "./rcc-list";
+import { RowActions } from "./resolve";
 import { fillLevel, parseDisk, smartLevel, type DiskReport } from "./disk-json";
 
 const FILL_TINT = {
@@ -15,6 +17,16 @@ const SMART_TINT = {
 } as const;
 
 function Rows({ d, actions }: { d: DiskReport; actions: React.ReactNode }) {
+	// Nothing here deletes anything: which files go is a decision, and macOS
+	// already has the one screen that shows what is taking the room. So Enter
+	// opens the volume where the reader can look, and Cmd+Enter opens Storage
+	// settings, which is the honest bulk answer to "the disk is full".
+	const storage = {
+		title: "Open Storage Settings",
+		command: openSettings(SETTINGS.storage),
+		detail: "Shows what is taking the room, by category.",
+		count: 1,
+	};
 	return (
 		<>
 			{/* The only question anyone opens this for. */}
@@ -39,7 +51,17 @@ function Rows({ d, actions }: { d: DiskReport; actions: React.ReactNode }) {
 									},
 								},
 							]}
-							actions={actions}
+							actions={
+								<RowActions
+									one={{
+										title: "Open This Volume",
+										command: reveal(v.mount),
+										detail: `${v.free} free of what is mounted at ${v.mount}.`,
+									}}
+									all={storage}
+									shared={actions}
+								/>
+							}
 						/>
 					);
 				})}
@@ -68,7 +90,17 @@ function Rows({ d, actions }: { d: DiskReport; actions: React.ReactNode }) {
 									},
 								},
 							]}
-							actions={actions}
+							actions={
+								<RowActions
+									one={{
+										title: "Open Disk Utility",
+										command: openApp("Disk Utility"),
+										detail: "SMART status and partitions are shown there.",
+									}}
+									all={storage}
+									shared={actions}
+								/>
+							}
 						/>
 					);
 				})}
@@ -91,7 +123,7 @@ function Rows({ d, actions }: { d: DiskReport; actions: React.ReactNode }) {
 							{ text: d.apfs_container.size },
 							{ tag: { value: `${d.apfs_container.free} free` } },
 						]}
-						actions={actions}
+						actions={<RowActions all={storage} shared={actions} />}
 					/>
 				</List.Section>
 			) : null}
@@ -110,7 +142,16 @@ function Rows({ d, actions }: { d: DiskReport; actions: React.ReactNode }) {
 							}}
 							title={n.mount}
 							subtitle={n.source}
-							actions={actions}
+							actions={
+								<RowActions
+									one={{
+										title: "Open This Mount",
+										command: reveal(n.mount),
+									}}
+									all={storage}
+									shared={actions}
+								/>
+							}
 						/>
 					))}
 				</List.Section>

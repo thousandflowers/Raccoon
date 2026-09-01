@@ -1,5 +1,12 @@
 import { Color, Icon, List } from "@raycast/api";
+import {
+	bootoutAgents,
+	openSettings,
+	removeLoginItems,
+	SETTINGS,
+} from "./fixes";
 import { RccList } from "./rcc-list";
+import { RowActions } from "./resolve";
 import { loadNow, parseStartup, type StartupReport } from "./startup-json";
 
 /** Busy relative to nothing in particular, but 4 and 8 are where a Mac feels it. */
@@ -12,6 +19,41 @@ function loadTint(load: string): Color {
 }
 
 function Rows({ s, actions }: { s: StartupReport; actions: React.ReactNode }) {
+	// Two kinds of thing start on their own and they are removed differently: a
+	// login item is an entry System Events owns, an agent is a job launchd
+	// loads. The bulk form of each is offered only from its own section, so
+	// Cmd+Enter never reaches across into the other kind.
+	const allLoginItems =
+		s.login_items.length > 0
+			? {
+					title: `Stop ${s.login_items.length} Login Items`,
+					command: removeLoginItems(s.login_items),
+					detail: s.login_items.join(", "),
+					destructive: true,
+					count: s.login_items.length,
+				}
+			: undefined;
+	const allAgents =
+		s.user_agents.length > 0
+			? {
+					title: `Stop ${s.user_agents.length} Launch Agents`,
+					command: bootoutAgents(s.user_agents),
+					detail: "Stops them for this login session. They load again at next login unless their plist is removed.",
+					destructive: true,
+					count: s.user_agents.length,
+				}
+			: undefined;
+	// Nothing in the System section is the reader's to switch off from a list,
+	// so Enter there opens the pane that owns the whole question instead.
+	const systemRow = (
+		<RowActions
+			one={{
+				title: "Open Login Items Settings",
+				command: openSettings(SETTINGS.loginItems),
+			}}
+			shared={actions}
+		/>
+	);
 	return (
 		<>
 			{/* What a person installed, and can remove. */}
@@ -25,7 +67,18 @@ function Rows({ s, actions }: { s: StartupReport; actions: React.ReactNode }) {
 						icon={{ source: Icon.Person, tintColor: Color.Green }}
 						title={item}
 						accessories={[{ tag: { value: "opens at login" } }]}
-						actions={actions}
+						actions={
+							<RowActions
+								one={{
+									title: "Stop It Opening at Login",
+									command: removeLoginItems([item]),
+									detail: `Removes ${item} from Login Items. The app itself is untouched.`,
+									destructive: true,
+								}}
+								all={allLoginItems}
+								shared={actions}
+							/>
+						}
 					/>
 				))}
 			</List.Section>
@@ -39,7 +92,18 @@ function Rows({ s, actions }: { s: StartupReport; actions: React.ReactNode }) {
 						icon={{ source: Icon.Gear, tintColor: Color.Green }}
 						title={agent}
 						subtitle="~/Library/LaunchAgents"
-						actions={actions}
+						actions={
+							<RowActions
+								one={{
+									title: "Stop This Agent",
+									command: bootoutAgents([agent]),
+									detail: `Unloads ${agent} for this login session. Its plist stays, so it loads again at next login.`,
+									destructive: true,
+								}}
+								all={allAgents}
+								shared={actions}
+							/>
+						}
 					/>
 				))}
 			</List.Section>
@@ -49,19 +113,19 @@ function Rows({ s, actions }: { s: StartupReport; actions: React.ReactNode }) {
 					icon={{ source: Icon.Gear, tintColor: Color.SecondaryText }}
 					title="System launch agents"
 					accessories={[{ text: String(s.counts.system_agents) }]}
-					actions={actions}
+					actions={systemRow}
 				/>
 				<List.Item
 					icon={{ source: Icon.Gear, tintColor: Color.SecondaryText }}
 					title="Launch daemons"
 					accessories={[{ text: String(s.counts.daemons) }]}
-					actions={actions}
+					actions={systemRow}
 				/>
 				<List.Item
 					icon={{ source: Icon.Bolt, tintColor: Color.SecondaryText }}
 					title="Running services"
 					accessories={[{ text: String(s.counts.running_services) }]}
-					actions={actions}
+					actions={systemRow}
 				/>
 				<List.Item
 					icon={{
@@ -70,7 +134,7 @@ function Rows({ s, actions }: { s: StartupReport; actions: React.ReactNode }) {
 					}}
 					title="Uptime"
 					accessories={[{ text: s.uptime || "Unknown" }]}
-					actions={actions}
+					actions={systemRow}
 				/>
 				<List.Item
 					icon={{
@@ -86,7 +150,7 @@ function Rows({ s, actions }: { s: StartupReport; actions: React.ReactNode }) {
 							},
 						},
 					]}
-					actions={actions}
+					actions={systemRow}
 				/>
 			</List.Section>
 		</>

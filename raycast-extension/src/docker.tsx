@@ -1,5 +1,7 @@
 import { Color, Icon, List } from "@raycast/api";
+import { dockerPrune, openApp } from "./fixes";
 import { RccList } from "./rcc-list";
+import { RowActions } from "./resolve";
 import { containerState, parseDocker, type DockerReport } from "./docker-json";
 
 const STATE_TINT = {
@@ -9,6 +11,20 @@ const STATE_TINT = {
 } as const;
 
 function Rows({ d, actions }: { d: DockerReport; actions: React.ReactNode }) {
+	// Docker's reclaimable disk is stopped containers, dangling images and
+	// unused volumes, and `system prune --volumes` is exactly that set — so the
+	// row-level and screen-level answers are the same command. It is offered
+	// only while the daemon is up, because it needs one.
+	const prune = d.running
+		? {
+				title: "Reclaim Unused Docker Disk",
+				command: dockerPrune(),
+				detail: "Removes stopped containers, dangling images and unused volumes. Running containers are untouched.",
+				destructive: true,
+				count: 1,
+			}
+		: undefined;
+	const row = <RowActions one={prune} all={prune} shared={actions} />;
 	// Absence is the whole answer, so it is one row and not an empty screen.
 	if (!d.installed) {
 		return (
@@ -19,7 +35,7 @@ function Rows({ d, actions }: { d: DockerReport; actions: React.ReactNode }) {
 				}}
 				title="Docker is not installed"
 				subtitle="Install Docker Desktop to see images, containers and volumes"
-				actions={actions}
+				actions={<RowActions shared={actions} />}
 			/>
 		);
 	}
@@ -32,7 +48,15 @@ function Rows({ d, actions }: { d: DockerReport; actions: React.ReactNode }) {
 				accessories={[
 					{ tag: { value: "Stopped", color: Color.Orange } },
 				]}
-				actions={actions}
+				actions={
+					<RowActions
+						one={{
+							title: "Open Docker Desktop",
+							command: openApp("Docker"),
+						}}
+						shared={actions}
+					/>
+				}
 			/>
 		);
 	}
@@ -61,7 +85,7 @@ function Rows({ d, actions }: { d: DockerReport; actions: React.ReactNode }) {
 									},
 								},
 							]}
-							actions={actions}
+							actions={row}
 						/>
 					);
 				})}
@@ -77,7 +101,7 @@ function Rows({ d, actions }: { d: DockerReport; actions: React.ReactNode }) {
 						title={i.repository}
 						subtitle={i.tag}
 						accessories={[{ text: i.size }]}
-						actions={actions}
+						actions={row}
 					/>
 				))}
 			</List.Section>
@@ -91,7 +115,7 @@ function Rows({ d, actions }: { d: DockerReport; actions: React.ReactNode }) {
 						}}
 						title={v.name}
 						accessories={[{ text: v.driver }]}
-						actions={actions}
+						actions={row}
 					/>
 				))}
 			</List.Section>
@@ -120,7 +144,7 @@ function Rows({ d, actions }: { d: DockerReport; actions: React.ReactNode }) {
 									]
 								: []),
 						]}
-						actions={actions}
+						actions={row}
 					/>
 				))}
 			</List.Section>

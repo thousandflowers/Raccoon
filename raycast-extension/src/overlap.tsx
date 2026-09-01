@@ -1,6 +1,8 @@
-import { Color, Icon, List } from "@raycast/api";
+import { Action, Color, Icon, List } from "@raycast/api";
 import { useMemo } from "react";
+import { whichAll } from "./fixes";
 import { RccList } from "./rcc-list";
+import { RowActions } from "./resolve";
 import {
 	byClash,
 	clashLevel,
@@ -56,7 +58,21 @@ function Rows({
 								? [{ text: `${group.entries.length} copies` }]
 								: []),
 						]}
-						actions={actions}
+						actions={
+							<RowActions
+								one={{
+									title: "Show Every Place It Resolves From",
+									command: whichAll(group.name),
+									detail: "In PATH order. The first line is the one that runs.",
+								}}
+								shared={actions}
+							>
+								<Action.CopyToClipboard
+									title="Copy Winning Path"
+									content={winner.path}
+								/>
+							</RowActions>
+						}
 					/>
 				);
 			})}

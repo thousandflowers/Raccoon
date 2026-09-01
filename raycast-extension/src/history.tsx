@@ -1,8 +1,12 @@
-import { Color, Icon, List } from "@raycast/api";
+import { Action, Color, Icon, List } from "@raycast/api";
 import { RccList } from "./rcc-list";
+import { RowActions } from "./resolve";
 import { parseHistory, used, type HistoryReport } from "./history-json";
 
 function Rows({ h, actions }: { h: HistoryReport; actions: React.ReactNode }) {
+	// Nothing here is broken, so nothing here gets fixed. What a person wants
+	// from a list of commands they already ran is the command back: Enter puts
+	// one on the clipboard, Cmd+Enter puts the whole visible list there.
 	const shells: Array<[string, number]> = [
 		["zsh", h.counts.zsh],
 		["bash", h.counts.bash],
@@ -36,7 +40,7 @@ function Rows({ h, actions }: { h: HistoryReport; actions: React.ReactNode }) {
 								},
 							},
 						]}
-						actions={actions}
+						actions={<RowActions shared={actions} />}
 					/>
 				))}
 			</List.Section>
@@ -49,7 +53,22 @@ function Rows({ h, actions }: { h: HistoryReport; actions: React.ReactNode }) {
 							tintColor: Color.SecondaryText,
 						}}
 						title={cmd}
-						actions={actions}
+						actions={
+							<RowActions shared={actions}>
+								<Action.CopyToClipboard
+									title="Copy This Command"
+									content={cmd}
+								/>
+								<Action.CopyToClipboard
+									title={`Copy All ${h.recent.length} Commands`}
+									content={h.recent.join("\n")}
+									shortcut={{
+										modifiers: ["cmd"],
+										key: "return",
+									}}
+								/>
+							</RowActions>
+						}
 					/>
 				))}
 			</List.Section>

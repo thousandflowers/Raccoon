@@ -1,7 +1,8 @@
-import { Action, ActionPanel, Color, Icon, List, Keyboard } from "@raycast/api";
+import { Action, Color, Icon, Keyboard, List } from "@raycast/api";
 import { homedir } from "node:os";
 import { RccList } from "./rcc-list";
-import { runInTerminal, shellQuote } from "./terminal";
+import { gitPush, gitPushAll, repoStatus } from "./fixes";
+import { RowActions } from "./resolve";
 import {
 	parseGit,
 	repoLevel,
@@ -36,37 +37,53 @@ const SECTION: Record<RepoLevel, string> = {
 
 const ORDER: RepoLevel[] = ["unpushed", "detached", "uncommitted", "loose"];
 
-/** Open Terminal in the repository, with its status already printed. */
-function openRepo(repo: GitRepo) {
-	return runInTerminal(`cd ${shellQuote(repo.path)} && git status`);
-}
-
-function repoActions(repo: GitRepo, shared: React.ReactNode) {
-	return (
-		<ActionPanel>
-			{/* Nothing here can be fixed without a decision: what to commit, what
-			    to push, which branch to attach. So Enter opens the repository with
-			    its status in front of you rather than pretending to resolve it. */}
-			<Action
-				title="Open in Terminal"
-				icon={Icon.Terminal}
-				onAction={() => openRepo(repo)}
-			/>
-			<Action.ShowInFinder path={repo.path} />
-			<Action.CopyToClipboard
-				title="Copy Path"
-				content={repo.path}
-				shortcut={Keyboard.Shortcut.Common.Pin}
-			/>
-			{shared}
-		</ActionPanel>
-	);
+/**
+ * What Enter does to a repository depends on what is wrong with it.
+ *
+ * Commits that exist only on this disk have one resolution and it is a command:
+ * push them. Uncommitted work does not — what to commit and what to say about
+ * it are decisions, and no keystroke should guess them — so those rows open the
+ * repository with its status printed and leave the decision where it belongs.
+ */
+function repoFix(repo: GitRepo) {
+	if (repo.unpushed > 0 && repo.uncommitted === 0) {
+		return {
+			title: `Push ${repo.unpushed} ${repo.unpushed === 1 ? "Commit" : "Commits"}`,
+			command: gitPush(repo.path),
+			detail: `${repo.name} — the working tree is clean, so pushing is the whole of it.`,
+		};
+	}
+	return {
+		title: "Open in Terminal",
+		command: repoStatus(repo.path),
+		detail:
+			repo.uncommitted > 0
+				? `${repo.uncommitted} uncommitted ${repo.uncommitted === 1 ? "change" : "changes"}: what to commit is yours to choose.`
+				: undefined,
+	};
 }
 
 function Rows({ g, actions }: { g: GitReport; actions: React.ReactNode }) {
 	const home = homedir();
 	const sorted = sortRepos(g.repos);
 	const clean = g.repos_total - g.repos_with_issues;
+	// The bulk form only takes the repositories where pushing is the whole
+	// answer. A repository with uncommitted work is left out on purpose: the
+	// keystroke has to mean the same thing for every row it touches.
+	const pushable = sorted.filter(
+		(r) => r.unpushed > 0 && r.uncommitted === 0,
+	);
+	const pushAll =
+		pushable.length > 0
+			? {
+					title: `Push ${pushable.length} Clean ${pushable.length === 1 ? "Repository" : "Repositories"}`,
+					command: gitPushAll(pushable.map((r) => r.path)),
+					detail: pushable
+						.map((r) => `${r.name} (${r.unpushed})`)
+						.join(", "),
+					count: pushable.length,
+				}
+			: undefined;
 
 	return (
 		<>
@@ -88,7 +105,7 @@ function Rows({ g, actions }: { g: GitReport; actions: React.ReactNode }) {
 							: `${g.repos_with_issues} of ${g.repos_total} need attention`
 					}
 					subtitle={`${clean} clean`}
-					actions={actions}
+					actions={<RowActions all={pushAll} shared={actions} />}
 				/>
 			</List.Section>
 
@@ -118,7 +135,22 @@ function Rows({ g, actions }: { g: GitReport; actions: React.ReactNode }) {
 										},
 									},
 								]}
-								actions={repoActions(repo, actions)}
+								actions={
+									<RowActions
+										one={repoFix(repo)}
+										all={pushAll}
+										shared={actions}
+									>
+										<Action.ShowInFinder path={repo.path} />
+										<Action.CopyToClipboard
+											title="Copy Path"
+											content={repo.path}
+											shortcut={
+												Keyboard.Shortcut.Common.Pin
+											}
+										/>
+									</RowActions>
+								}
 							/>
 						))}
 					</List.Section>

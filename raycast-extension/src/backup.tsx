@@ -1,5 +1,7 @@
 import { Color, Icon, List } from "@raycast/api";
+import { openSettings, reveal, SETTINGS, startBackup } from "./fixes";
 import { RccList } from "./rcc-list";
+import { RowActions } from "./resolve";
 import {
 	health,
 	humanAge,
@@ -24,6 +26,28 @@ const HEADLINE: Record<BackupHealth, string> = {
 
 function Rows({ b, actions }: { b: BackupReport; actions: React.ReactNode }) {
 	const state = health(b);
+	// A Mac with no destination cannot be told to back up; the destination has
+	// to be chosen first, and only System Settings can do that. With one
+	// configured, starting a backup now is the whole resolution — there is one
+	// backup, so Enter and Cmd+Enter are the same act.
+	const fix = b.destination.configured
+		? {
+				title: b.running ? "Open Time Machine Settings" : "Back Up Now",
+				command: b.running
+					? openSettings(SETTINGS.timeMachine)
+					: startBackup(),
+				detail: b.running
+					? undefined
+					: `Writes to ${b.destination.name || "the configured destination"}.`,
+				count: 1,
+			}
+		: {
+				title: "Choose a Destination",
+				command: openSettings(SETTINGS.timeMachine),
+				detail: "Time Machine has nowhere to write until a disk is chosen.",
+				count: 1,
+			};
+	const row = <RowActions one={fix} all={fix} shared={actions} />;
 	return (
 		<>
 			{/* The answer, as one row, before any of the detail under it. */}
@@ -46,7 +70,7 @@ function Rows({ b, actions }: { b: BackupReport; actions: React.ReactNode }) {
 							},
 						},
 					]}
-					actions={actions}
+					actions={row}
 				/>
 			</List.Section>
 
@@ -70,7 +94,7 @@ function Rows({ b, actions }: { b: BackupReport; actions: React.ReactNode }) {
 							? b.destination.kind || undefined
 							: "Time Machine has nowhere to write"
 					}
-					actions={actions}
+					actions={row}
 				/>
 				<List.Item
 					icon={{
@@ -90,7 +114,7 @@ function Rows({ b, actions }: { b: BackupReport; actions: React.ReactNode }) {
 							},
 						},
 					]}
-					actions={actions}
+					actions={row}
 				/>
 			</List.Section>
 
@@ -107,7 +131,16 @@ function Rows({ b, actions }: { b: BackupReport; actions: React.ReactNode }) {
 								tintColor: Color.SecondaryText,
 							}}
 							title={path}
-							actions={actions}
+							actions={
+								<RowActions
+									one={{
+										title: "Show It in Finder",
+										command: reveal(path),
+									}}
+									all={fix}
+									shared={actions}
+								/>
+							}
 						/>
 					))}
 				</List.Section>

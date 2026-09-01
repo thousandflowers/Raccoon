@@ -1,8 +1,22 @@
 import { Color, Icon, List } from "@raycast/api";
+import { openApp, reveal } from "./fixes";
 import { RccList } from "./rcc-list";
+import { RowActions } from "./resolve";
 import { parseFonts, sourceLabel, type FontsReport } from "./fonts-json";
 
 function Rows({ f, actions }: { f: FontsReport; actions: React.ReactNode }) {
+	// rcc fonts counts; it does not name the duplicate or the unreadable file,
+	// so there is nothing here to delete by keystroke without guessing which
+	// file was meant. Font Book is the tool that both names them and removes
+	// them, so that is what Enter and Cmd+Enter open, and the row that does
+	// know a path opens that path instead.
+	const fontBook = {
+		title: "Open Font Book",
+		command: openApp("Font Book"),
+		detail: "Font Book names the duplicates and the files macOS cannot read.",
+		count: 1,
+	};
+	const row = <RowActions one={fontBook} all={fontBook} shared={actions} />;
 	// The only line anyone acts on, so it is the only one that can be red.
 	const broken = f.corrupted > 0;
 	return (
@@ -18,7 +32,16 @@ function Rows({ f, actions }: { f: FontsReport; actions: React.ReactNode }) {
 						title={sourceLabel(s.path)}
 						subtitle={s.path}
 						accessories={[{ text: String(s.count) }]}
-						actions={actions}
+						actions={
+							<RowActions
+								one={{
+									title: "Show This Folder in Finder",
+									command: reveal(s.path),
+								}}
+								all={fontBook}
+								shared={actions}
+							/>
+						}
 					/>
 				))}
 			</List.Section>
@@ -38,7 +61,7 @@ function Rows({ f, actions }: { f: FontsReport; actions: React.ReactNode }) {
 							},
 						},
 					]}
-					actions={actions}
+					actions={row}
 				/>
 				<List.Item
 					icon={{
@@ -60,7 +83,7 @@ function Rows({ f, actions }: { f: FontsReport; actions: React.ReactNode }) {
 							},
 						},
 					]}
-					actions={actions}
+					actions={row}
 				/>
 			</List.Section>
 			<List.Section title="Catalog">
@@ -73,7 +96,7 @@ function Rows({ f, actions }: { f: FontsReport; actions: React.ReactNode }) {
 							}}
 							title="Fonts known to fontconfig"
 							accessories={[{ text: String(f.fontconfig.fonts) }]}
-							actions={actions}
+							actions={row}
 						/>
 						<List.Item
 							icon={{
@@ -84,7 +107,7 @@ function Rows({ f, actions }: { f: FontsReport; actions: React.ReactNode }) {
 							accessories={[
 								{ text: String(f.fontconfig.families) },
 							]}
-							actions={actions}
+							actions={row}
 						/>
 					</>
 				) : (
@@ -95,7 +118,7 @@ function Rows({ f, actions }: { f: FontsReport; actions: React.ReactNode }) {
 						}}
 						title="fontconfig is not installed"
 						subtitle="Duplicate and corruption checks need it"
-						actions={actions}
+						actions={row}
 					/>
 				)}
 			</List.Section>

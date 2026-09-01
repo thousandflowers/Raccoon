@@ -1,6 +1,8 @@
-import { Color, Icon, List } from "@raycast/api";
+import { Action, Color, Icon, List } from "@raycast/api";
 import { useMemo } from "react";
+import { deleteCertificates, openApp } from "./fixes";
 import { RccList } from "./rcc-list";
+import { RowActions } from "./resolve";
 import {
 	byUrgency,
 	parseCerts,
@@ -27,6 +29,27 @@ function Rows({ c, actions }: { c: CertsReport; actions: React.ReactNode }) {
 		() => [...c.certificates].sort(byUrgency),
 		[c.certificates],
 	);
+	// Only an expired certificate is a thing to remove, and only from the login
+	// keychain: the System keychain holds roots other software trusts, and one
+	// expired there is not the reader's to remove from a list. A valid or
+	// expiring certificate opens Keychain Access instead — the decision to
+	// renew or replace is not one keystroke's worth.
+	const expired = useMemo(
+		() => sorted.filter((cert) => cert.status === "expired"),
+		[sorted],
+	);
+	const clearAll =
+		expired.length > 0
+			? {
+					title: `Remove ${expired.length} Expired Certificates`,
+					command: deleteCertificates(
+						expired.map((cert) => cert.name),
+					),
+					detail: "From the login keychain only. The System keychain is left alone.",
+					destructive: true,
+					count: expired.length,
+				}
+			: undefined;
 	return (
 		<>
 			{sorted.map((cert, i) => (
@@ -51,7 +74,32 @@ function Rows({ c, actions }: { c: CertsReport; actions: React.ReactNode }) {
 							},
 						},
 					]}
-					actions={actions}
+					actions={
+						<RowActions
+							one={
+								cert.status === "expired"
+									? {
+											title: "Remove This Certificate",
+											command: deleteCertificates([
+												cert.name,
+											]),
+											detail: `Expired ${cert.expires}. Removed from the login keychain only.`,
+											destructive: true,
+										}
+									: {
+											title: "Open Keychain Access",
+											command: openApp("Keychain Access"),
+										}
+							}
+							all={clearAll}
+							shared={actions}
+						>
+							<Action.CopyToClipboard
+								title="Copy Certificate Name"
+								content={cert.name}
+							/>
+						</RowActions>
+					}
 				/>
 			))}
 		</>

@@ -1,10 +1,28 @@
-import { Color, Icon, List } from "@raycast/api";
+import { Action, Color, Icon, List } from "@raycast/api";
+import { removeSymlink, reveal, whichAll } from "./fixes";
 import { RccList } from "./rcc-list";
+import { RowActions } from "./resolve";
 import { parseEnv, problems, shortVersion, type EnvReport } from "./env-json";
 
 function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 	const missing = e.path.filter((p) => !p.exists);
 	const present = e.path.filter((p) => p.exists);
+	// Only one of the three problems can be put right by a command. A dangling
+	// symlink is a file to delete. A PATH entry that does not exist and a PATH
+	// entry listed twice both live in a shell startup file that only the reader
+	// knows the shape of, so those rows open the file rather than rewrite it.
+	const allBroken =
+		e.broken_symlinks.length > 0
+			? {
+					title: `Remove ${e.broken_symlinks.length} Broken Symlinks`,
+					command: removeSymlink(
+						e.broken_symlinks.map((b) => b.link),
+					),
+					detail: e.broken_symlinks.map((b) => b.name).join(", "),
+					destructive: true,
+					count: e.broken_symlinks.length,
+				}
+			: undefined;
 	return (
 		<>
 			{/* A command on the PATH that still fails: the most surprising of the
@@ -31,7 +49,18 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 									},
 								},
 							]}
-							actions={actions}
+							actions={
+								<RowActions
+									one={{
+										title: "Remove This Symlink",
+										command: removeSymlink([b.link]),
+										detail: `${b.link} points at ${b.target}, which is gone.`,
+										destructive: true,
+									}}
+									all={allBroken}
+									shared={actions}
+								/>
+							}
 						/>
 					))}
 				</List.Section>
@@ -58,7 +87,17 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 									},
 								},
 							]}
-							actions={actions}
+							actions={
+								<RowActions all={allBroken} shared={actions}>
+									{/* The entry lives in a shell startup file
+									    whose shape only the reader knows, so
+									    this copies it rather than editing. */}
+									<Action.CopyToClipboard
+										title="Copy Path Entry"
+										content={p.path}
+									/>
+								</RowActions>
+							}
 						/>
 					))}
 				</List.Section>
@@ -77,7 +116,16 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 								tintColor: Color.Orange,
 							}}
 							title={d}
-							actions={actions}
+							actions={
+								<RowActions
+									one={{
+										title: "Show Every Place It Resolves From",
+										command: whichAll(d),
+									}}
+									all={allBroken}
+									shared={actions}
+								/>
+							}
 						/>
 					))}
 				</List.Section>
@@ -99,7 +147,20 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 								? shortVersion(t.version)
 								: "not installed"
 						}
-						actions={actions}
+						actions={
+							<RowActions
+								one={
+									t.found
+										? {
+												title: "Show Every Place It Resolves From",
+												command: whichAll(t.name),
+											}
+										: undefined
+								}
+								all={allBroken}
+								shared={actions}
+							/>
+						}
 					/>
 				))}
 			</List.Section>
@@ -115,7 +176,16 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 						title={p.path}
 						// Position matters: the first match on the PATH is the one that runs.
 						accessories={[{ text: `#${i + 1}` }]}
-						actions={actions}
+						actions={
+							<RowActions
+								one={{
+									title: "Show This Directory in Finder",
+									command: reveal(p.path),
+								}}
+								all={allBroken}
+								shared={actions}
+							/>
+						}
 					/>
 				))}
 			</List.Section>

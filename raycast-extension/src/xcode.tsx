@@ -1,5 +1,7 @@
 import { Color, Icon, List } from "@raycast/api";
+import { clearDerivedData, openApp, shutdownSimulators } from "./fixes";
 import { RccList } from "./rcc-list";
+import { RowActions } from "./resolve";
 import {
 	derivedLevel,
 	humanBytes,
@@ -14,6 +16,29 @@ const DERIVED_TINT = {
 } as const;
 
 function Rows({ x, actions }: { x: XcodeReport; actions: React.ReactNode }) {
+	// Two things here cost something and can be given back: the build cache,
+	// and simulators left running. Cmd+Enter does both at once, because that is
+	// what "reclaim what Xcode is holding" means.
+	const booted = x.simulators.filter((s) => s.booted);
+	const reclaimable = x.derived_data.bytes > 0 || booted.length > 0;
+	const reclaimAll = reclaimable
+		? {
+				title: "Reclaim Everything Shown",
+				command: `${shutdownSimulators()}; ${clearDerivedData()}`,
+				detail: [
+					x.derived_data.bytes > 0
+						? `DerivedData: ${humanBytes(x.derived_data.bytes)}`
+						: null,
+					booted.length > 0
+						? `${booted.length} booted ${booted.length === 1 ? "simulator" : "simulators"}`
+						: null,
+				]
+					.filter(Boolean)
+					.join(" · "),
+				destructive: true,
+				count: (x.derived_data.bytes > 0 ? 1 : 0) + booted.length,
+			}
+		: undefined;
 	if (!x.installed) {
 		return (
 			<List.Item
@@ -23,11 +48,10 @@ function Rows({ x, actions }: { x: XcodeReport; actions: React.ReactNode }) {
 				}}
 				title="Xcode is not installed"
 				subtitle="Install it from the App Store to see simulators and build caches"
-				actions={actions}
+				actions={<RowActions shared={actions} />}
 			/>
 		);
 	}
-	const booted = x.simulators.filter((s) => s.booted);
 	const level = derivedLevel(x.derived_data.bytes);
 	return (
 		<>
@@ -52,7 +76,22 @@ function Rows({ x, actions }: { x: XcodeReport; actions: React.ReactNode }) {
 							},
 						},
 					]}
-					actions={actions}
+					actions={
+						<RowActions
+							one={
+								x.derived_data.bytes > 0
+									? {
+											title: "Delete DerivedData",
+											command: clearDerivedData(),
+											detail: `Frees ${humanBytes(x.derived_data.bytes)}. Xcode rebuilds it, so the next build of each project is a full one.`,
+											destructive: true,
+										}
+									: undefined
+							}
+							all={reclaimAll}
+							shared={actions}
+						/>
+					}
 				/>
 			</List.Section>
 
@@ -76,7 +115,18 @@ function Rows({ x, actions }: { x: XcodeReport; actions: React.ReactNode }) {
 									},
 								},
 							]}
-							actions={actions}
+							actions={
+								<RowActions
+									one={{
+										title: "Shut Down Booted Simulators",
+										command: shutdownSimulators(),
+										detail: "simctl shuts them down by state, not one by one, so this stops every booted simulator.",
+										destructive: true,
+									}}
+									all={reclaimAll}
+									shared={actions}
+								/>
+							}
 						/>
 					))}
 				</List.Section>
@@ -96,7 +146,9 @@ function Rows({ x, actions }: { x: XcodeReport; actions: React.ReactNode }) {
 								tintColor: Color.SecondaryText,
 							}}
 							title={s.name}
-							actions={actions}
+							actions={
+								<RowActions all={reclaimAll} shared={actions} />
+							}
 						/>
 					))}
 			</List.Section>
@@ -110,7 +162,16 @@ function Rows({ x, actions }: { x: XcodeReport; actions: React.ReactNode }) {
 					title="Xcode"
 					subtitle={x.build ? `build ${x.build}` : undefined}
 					accessories={[{ text: x.version ?? "unknown version" }]}
-					actions={actions}
+					actions={
+						<RowActions
+							one={{
+								title: "Open Xcode",
+								command: openApp("Xcode"),
+							}}
+							all={reclaimAll}
+							shared={actions}
+						/>
+					}
 				/>
 				{x.platforms.map((p) => (
 					<List.Item
@@ -120,7 +181,9 @@ function Rows({ x, actions }: { x: XcodeReport; actions: React.ReactNode }) {
 							tintColor: Color.SecondaryText,
 						}}
 						title={p}
-						actions={actions}
+						actions={
+							<RowActions all={reclaimAll} shared={actions} />
+						}
 					/>
 				))}
 			</List.Section>

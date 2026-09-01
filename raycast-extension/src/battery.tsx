@@ -18,6 +18,8 @@ import {
 	cycleHealth,
 	parseBattery,
 } from "./battery-json";
+import { openSettings, SETTINGS } from "./fixes";
+import { ResolveActions } from "./resolve";
 import { findCommand } from "./commands";
 import { MissingRcc, REPO_URL } from "./missing-rcc";
 import { RccDetail } from "./rcc-detail";
@@ -126,33 +128,46 @@ export default function Command() {
 
 	if (resolveError instanceof RccNotFoundError) return <MissingRcc />;
 
+	// A battery is a reading, not a setting: nothing here is put right by a
+	// command, and a cycle count is not a thing to fix. What is actually
+	// adjustable — charge limit, low power mode, what wakes the Mac — all lives
+	// in one pane, so both keystrokes open it rather than pretend otherwise.
+	const settings = {
+		title: "Open Battery Settings",
+		command: openSettings(SETTINGS.battery),
+		detail: "Charge limit, low power mode and wake behaviour are set here.",
+		count: 1,
+	};
+
 	const actions = (
 		<ActionPanel>
-			<Action
-				title="Run Again"
-				icon={Icon.ArrowClockwise}
-				shortcut={Keyboard.Shortcut.Common.Refresh}
-				onAction={revalidate}
-			/>
-			{/* The table is the exception, not the default: it exists for the
+			<ResolveActions one={settings} all={settings}>
+				<Action
+					title="Run Again"
+					icon={Icon.ArrowClockwise}
+					shortcut={Keyboard.Shortcut.Common.Refresh}
+					onAction={revalidate}
+				/>
+				{/* The table is the exception, not the default: it exists for the
 			    reader who wants the output rcc actually printed. */}
-			<Action
-				title="Show Raw Output"
-				icon={Icon.Text}
-				shortcut={{ modifiers: ["cmd"], key: "t" }}
-				onAction={() =>
-					push(<RccDetail command={findCommand("battery")} />)
-				}
-			/>
-			<Action
-				title="Set Rcc Path"
-				icon={Icon.Gear}
-				onAction={openExtensionPreferences}
-			/>
-			<Action.OpenInBrowser
-				title="Open Raccoon on GitHub"
-				url={REPO_URL}
-			/>
+				<Action
+					title="Show Raw Output"
+					icon={Icon.Text}
+					shortcut={{ modifiers: ["cmd"], key: "t" }}
+					onAction={() =>
+						push(<RccDetail command={findCommand("battery")} />)
+					}
+				/>
+				<Action
+					title="Set Rcc Path"
+					icon={Icon.Gear}
+					onAction={openExtensionPreferences}
+				/>
+				<Action.OpenInBrowser
+					title="Open Raccoon on GitHub"
+					url={REPO_URL}
+				/>
+			</ResolveActions>
 		</ActionPanel>
 	);
 

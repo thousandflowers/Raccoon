@@ -1,5 +1,7 @@
 import { Color, Icon, List } from "@raycast/api";
+import { openSettings, SETTINGS } from "./fixes";
 import { RccList } from "./rcc-list";
+import { RowActions } from "./resolve";
 import {
 	isNoise,
 	parseNetwork,
@@ -8,6 +10,17 @@ import {
 } from "./network-json";
 
 function Rows({ n, actions }: { n: NetworkReport; actions: React.ReactNode }) {
+	// A VPN, a proxy or a DNS server is not wrong, it is chosen — and every one
+	// of them is changed in the same place. So Enter opens Network settings from
+	// any row that stands for a setting, and Cmd+Enter does the same: there is
+	// no batch here, there is one pane.
+	const net = {
+		title: "Open Network Settings",
+		command: openSettings(SETTINGS.network),
+		detail: "VPNs, proxies and DNS servers are all set here.",
+		count: 1,
+	};
+	const row = <RowActions one={net} all={net} shared={actions} />;
 	const real = n.interfaces.filter((i) => !isNoise(i));
 	const loopback = n.interfaces.filter(isNoise);
 	const firewallOn = n.firewall.application === "enabled";
@@ -24,7 +37,7 @@ function Rows({ n, actions }: { n: NetworkReport; actions: React.ReactNode }) {
 							{ tag: { value: i.kind } },
 							{ text: i.family },
 						]}
-						actions={actions}
+						actions={row}
 					/>
 				))}
 			</List.Section>
@@ -55,7 +68,7 @@ function Rows({ n, actions }: { n: NetworkReport; actions: React.ReactNode }) {
 									},
 								},
 							]}
-							actions={actions}
+							actions={row}
 						/>
 					))}
 					{n.proxies.map((p) => (
@@ -75,7 +88,7 @@ function Rows({ n, actions }: { n: NetworkReport; actions: React.ReactNode }) {
 									},
 								},
 							]}
-							actions={actions}
+							actions={row}
 						/>
 					))}
 				</List.Section>
@@ -90,7 +103,7 @@ function Rows({ n, actions }: { n: NetworkReport; actions: React.ReactNode }) {
 							tintColor: Color.SecondaryText,
 						}}
 						title={server}
-						actions={actions}
+						actions={row}
 					/>
 				))}
 			</List.Section>
@@ -110,7 +123,7 @@ function Rows({ n, actions }: { n: NetworkReport; actions: React.ReactNode }) {
 							},
 						},
 					]}
-					actions={actions}
+					actions={row}
 				/>
 				<List.Item
 					icon={{
@@ -119,7 +132,7 @@ function Rows({ n, actions }: { n: NetworkReport; actions: React.ReactNode }) {
 					}}
 					title="Established connections"
 					accessories={[{ text: String(n.connections) }]}
-					actions={actions}
+					actions={row}
 				/>
 				{loopback.map((i, index) => (
 					<List.Item
@@ -130,7 +143,7 @@ function Rows({ n, actions }: { n: NetworkReport; actions: React.ReactNode }) {
 						}}
 						title={i.address}
 						subtitle={`${i.name} · ${i.kind}`}
-						actions={actions}
+						actions={row}
 					/>
 				))}
 			</List.Section>

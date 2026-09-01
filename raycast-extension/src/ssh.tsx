@@ -1,8 +1,9 @@
-import { Action, ActionPanel, Color, Icon, List } from "@raycast/api";
+import { Action, Color, Icon, List } from "@raycast/api";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { RccList } from "./rcc-list";
-import { runInTerminal, shellQuote } from "./terminal";
+import { RowActions } from "./resolve";
+import { shellQuote } from "./terminal";
 import {
 	keyLevel,
 	parseSsh,
@@ -66,17 +67,57 @@ function fixFor(key: SshKey): { title: string; command: string } | undefined {
 	}
 }
 
-function keyActions(key: SshKey, shared: React.ReactNode) {
+/** Every key on screen that has something to put right, as one command. */
+function fixAll(keys: SshKey[]) {
+	const fixable = keys
+		.map((key) => ({ key, fix: fixFor(key) }))
+		.filter(
+			(
+				f,
+			): f is {
+				key: SshKey;
+				fix: NonNullable<ReturnType<typeof fixFor>>;
+			} => Boolean(f.fix),
+		);
+	if (fixable.length === 0) return undefined;
+	return {
+		// Chained with `;` and not `&&`: ssh-keygen -p returns non-zero when the
+		// reader declines a passphrase, and one declined key must not stop the
+		// permissions fix on the next one.
+		title: `Fix ${fixable.length} ${fixable.length === 1 ? "Key" : "Keys"}`,
+		command: fixable.map((f) => f.fix.command).join("; "),
+		detail: fixable
+			.map((f) => `${f.key.name}: ${f.fix.title.toLowerCase()}`)
+			.join("\n"),
+		destructive: true,
+		count: fixable.length,
+	};
+}
+
+function keyActions(
+	key: SshKey,
+	all: ReturnType<typeof fixAll>,
+	shared: React.ReactNode,
+) {
 	const fix = fixFor(key);
 	return (
-		<ActionPanel>
-			{fix ? (
-				<Action
-					title={fix.title}
-					icon={Icon.Hammer}
-					onAction={() => runInTerminal(fix.command)}
-				/>
-			) : null}
+		<RowActions
+			one={
+				fix
+					? {
+							title: fix.title,
+							command: fix.command,
+							detail:
+								keyLevel(key) === "unprotected"
+									? "ssh-keygen asks for the new passphrase twice, in Terminal."
+									: undefined,
+							destructive: keyLevel(key) !== "orphan",
+						}
+					: undefined
+			}
+			all={all}
+			shared={shared}
+		>
 			{key.public_key ? (
 				<Action.CopyToClipboard
 					title="Copy Public Key Path"
@@ -84,8 +125,7 @@ function keyActions(key: SshKey, shared: React.ReactNode) {
 				/>
 			) : null}
 			<Action.ShowInFinder path={sshPath(key.name)} />
-			{shared}
-		</ActionPanel>
+		</RowActions>
 	);
 }
 
@@ -96,7 +136,7 @@ function Rows({ s, actions }: { s: SshReport; actions: React.ReactNode }) {
 				icon={{ source: Icon.Folder, tintColor: Color.SecondaryText }}
 				title="No ~/.ssh on this Mac"
 				subtitle="Nothing to check until a key is created"
-				actions={actions}
+				actions={<RowActions shared={actions} />}
 			/>
 		);
 	}
@@ -104,6 +144,7 @@ function Rows({ s, actions }: { s: SshReport; actions: React.ReactNode }) {
 	const problems = problemCount(s);
 	const dirOk = s.ssh_dir_perms === "700";
 	const sorted = sortKeys(s.keys);
+	const all = fixAll(sorted);
 
 	return (
 		<>
@@ -129,7 +170,7 @@ function Rows({ s, actions }: { s: SshReport; actions: React.ReactNode }) {
 							},
 						},
 					]}
-					actions={actions}
+					actions={<RowActions all={all} shared={actions} />}
 				/>
 			</List.Section>
 
@@ -159,7 +200,7 @@ function Rows({ s, actions }: { s: SshReport; actions: React.ReactNode }) {
 										},
 									},
 								]}
-								actions={keyActions(key, actions)}
+								actions={keyActions(key, all, actions)}
 							/>
 						))}
 					</List.Section>

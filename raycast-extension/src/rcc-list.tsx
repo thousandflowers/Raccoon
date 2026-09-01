@@ -60,8 +60,12 @@ export function RccList<T>({
 		},
 	);
 
-	const actions = (
-		<ActionPanel>
+	// A fragment of Actions, not an ActionPanel: a row composes these into its
+	// own panel alongside whatever it can resolve. Handing out a whole
+	// ActionPanel meant every view that added a row action nested one panel
+	// inside another, which Raycast does not render.
+	const sharedActions = (
+		<>
 			<Action
 				title="Run Again"
 				icon={Icon.ArrowClockwise}
@@ -86,8 +90,10 @@ export function RccList<T>({
 				title="Open Raccoon on GitHub"
 				url={REPO_URL}
 			/>
-		</ActionPanel>
+		</>
 	);
+
+	const actions = <ActionPanel>{sharedActions}</ActionPanel>;
 
 	if (resolveError instanceof RccNotFoundError) return <MissingRcc />;
 
@@ -115,7 +121,7 @@ export function RccList<T>({
 				title={isLoading ? `Running rcc ${command}` : emptyTitle}
 				actions={actions}
 			/>
-			{data ? children(data, actions) : null}
+			{data ? children(data, sharedActions) : null}
 		</List>
 	);
 }
