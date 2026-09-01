@@ -74,3 +74,51 @@ teardown() {
 	assert_success
 	[[ "$output" == "0.16.0" ]]
 }
+
+# The installer is where most people meet Raccoon, and it now draws the same
+# face the TUI draws. Sourcing install.sh clones the repository, so the drawing
+# functions are extracted and run on their own.
+_install_fns() {
+	sed -n '/^_rcc_frame() {/,/^}/p;/^_rcc_step() {/,/^}/p;/^_rcc_done() {/,/^}/p' \
+		"$SCRIPT_DIR/install.sh"
+}
+
+@test "install: the raccoon it draws is the whole animal" {
+	local out
+	out="$(bash -c "
+		BOLD=''; GREEN=''; NC=''; ANIMATE=false
+		$(_install_fns)
+		_rcc_done 'done'
+	")"
+	local part
+	for part in "n___n" "> ^ <" "[ ^.^ ]"; do
+		[[ "$out" == *"$part"* ]] || {
+			echo "the installer's face is missing $part:" >&2
+			echo "$out" >&2
+			false
+		}
+	done
+}
+
+@test "install: without a terminal it prints lines, not cursor moves" {
+	local out
+	out="$(bash -c "
+		BOLD=''; GREEN=''; NC=''; ANIMATE=false
+		$(_install_fns)
+		_rcc_step 'Cloning the repository'
+	")"
+	[[ "$out" == "  Cloning the repository" ]] || {
+		echo "unexpected: [$out]" >&2
+		false
+	}
+	# \033[3A moves the cursor up: in a log it is garbage, not animation.
+	[[ "$out" != *$'\033'* ]] || { echo "escape sequences in a pipe: $out" >&2; false; }
+}
+
+@test "install: the animation is never required for the install to work" {
+	# ANIMATE is decided by the terminal, and nothing downstream reads it.
+	run grep -c 'ANIMATE' "$SCRIPT_DIR/install.sh"
+	assert_success
+	run bash -n "$SCRIPT_DIR/install.sh"
+	assert_success
+}
