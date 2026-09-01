@@ -2682,7 +2682,15 @@ func sudoCached() bool {
 // the running TUI instead is what made the password come back "Sorry, try
 // again" on Macs without Touch ID: issue #23.
 func primeSudo() tea.Cmd {
-	return tea.ExecProcess(exec.Command("sudo", "-v"), func(err error) tea.Msg {
+	// The terminal is blank while sudo waits, because ExecProcess hands over a
+	// screen the TUI has just cleared and Touch ID prints no prompt of its own:
+	// it only waits for a finger. What the reader saw was a black screen for as
+	// long as they took to notice. So say what is happening first, in the
+	// terminal sudo is about to use.
+	const notice = `printf '\n  \033[1mRaccoon needs administrator rights.\033[0m\n' >&2
+printf '  Touch ID, or type your password. Ctrl-C to cancel.\n\n' >&2
+exec sudo -v`
+	return tea.ExecProcess(exec.Command("bash", "-c", notice), func(err error) tea.Msg {
 		return sudoPrimed{err: err}
 	})
 }
