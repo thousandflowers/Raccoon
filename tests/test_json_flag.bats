@@ -11,8 +11,8 @@ teardown() { teardown_raccoon_env; }
 # The refusal is not "unknown option": the flag is planned, and someone who tries
 # again in two months has to be able to tell the difference.
 
-NOT_IMPLEMENTED="disk network xcode"
-IMPLEMENTED="battery certs docker env fonts history overlap ports startup trash wifi"
+NOT_IMPLEMENTED="network xcode"
+IMPLEMENTED="battery certs disk docker env fonts history overlap ports startup trash wifi"
 
 @test "json: the ones that never implemented --json exit 64" {
 	local c
@@ -93,5 +93,30 @@ IMPLEMENTED="battery certs docker env fonts history overlap ports startup trash 
 		run bash "$SCRIPT_DIR/bin/$c.sh" --help
 		assert_success
 		assert_output_contains "--json"
+	done
+}
+
+# disk.sh parses its flags with `while [[ $# -gt 0 ]]` and a shift inside each
+# branch. A --json branch without one spins forever: the command hung for ten
+# minutes before anyone noticed it was not slow, it was stuck.
+@test "json: --json terminates, and quickly" {
+	command -v python3 > /dev/null || skip "python3 not available"
+	local c
+	for c in $IMPLEMENTED; do
+		# Run it in the background and give it a hard deadline: a spinning
+		# argument loop produces no output, so a timeout is the only signal.
+		bash "$SCRIPT_DIR/bin/$c.sh" --json > /dev/null 2>&1 &
+		local pid=$!
+		local waited=0
+		while kill -0 "$pid" 2> /dev/null && [[ $waited -lt 60 ]]; do
+			sleep 1
+			waited=$((waited + 1))
+		done
+		if kill -0 "$pid" 2> /dev/null; then
+			kill -9 "$pid" 2> /dev/null || true
+			echo "$c --json did not finish in 60s" >&2
+			false
+		fi
+		wait "$pid" 2> /dev/null || true
 	done
 }

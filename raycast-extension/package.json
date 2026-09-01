@@ -65,7 +65,7 @@
 			"name": "disk",
 			"title": "Show Disk Space",
 			"subtitle": "Raccoon",
-			"description": "Disks, volumes and what is filling them up.",
+			"description": "Volumes, how full they are, disk health and network mounts.",
 			"keywords": [
 				"disk",
 				"storage",

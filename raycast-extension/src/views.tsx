@@ -4,6 +4,7 @@ import Battery from "./battery";
 import Memory from "./memory";
 import Certs from "./certs";
 import Startup from "./startup";
+import Disk from "./disk";
 import Docker from "./docker";
 import Env from "./env";
 import Fonts from "./fonts";
@@ -37,6 +38,7 @@ const VIEWS: Record<string, () => ReactElement> = {
 	startup: Startup,
 	fonts: Fonts,
 	env: Env,
+	disk: Disk,
 };
 
 /** Whether this command has a screen of its own rather than raw output. */

@@ -39,7 +39,8 @@ while [[ $# -gt 0 ]]; do
 		exit 0
 		;;
 	--json)
-		_rcc_json_unimplemented disk
+		JSON_OUTPUT=true
+		shift
 		;;
 	--large)
 		LARGE_MODE=true
@@ -84,7 +85,95 @@ show_large_files() {
 	echo "${GRAY}Cerca con: find $SEARCH_PATH -size +$MIN_SIZE${NC}"
 }
 
+# The synthesized helper volumes an APFS container carries: Preboot, VM,
+# Update, Recovery. Nobody manages their space, and they bury the two mounts
+# that matter.
+_disk_is_helper() {
+	case "$1" in
+		/System/Volumes/Data) return 1 ;;
+		/System/Volumes/*) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
+_json_report() {
+	local line id type_ info size smart mount first
+	printf '{\n'
+
+	printf '  "disks": ['
+	first=1
+	while IFS= read -r line; do
+		[[ -z "$line" ]] && continue
+		id=$(printf '%s' "$line" | sed 's|/dev/||' | awk '{print $1}')
+		type_=$(printf '%s' "$line" | grep -oE '(internal|external)' || printf '')
+		info=$(diskutil info "$id" 2>/dev/null || printf '')
+		size=$(printf '%s' "$info" | grep "Disk Size" | head -1 | awk '{print $3, $4}' || printf '')
+		smart=$(printf '%s' "$info" | grep "SMART Status" | head -1 | awk '{print $3}' || printf '')
+		mount=$(df -h 2>/dev/null | grep "^/dev/${id}s" | head -1 | awk '{print $NF}' || printf '')
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    {"id": %s, "type": %s, "size": %s, "mount": %s, "smart": %s}' \
+			"$(rcc_json_string "$id")" "$(rcc_json_string "$type_")" \
+			"$(rcc_json_string "$size")" "$(rcc_json_string "$mount")" \
+			"$(rcc_json_string "${smart:-Not supported}")"
+	done < <(diskutil list 2>/dev/null | grep 'physical)' || true)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	# One list, not two: the text report shows these mounts twice, once with
+	# used and free and once with the percentage.
+	printf '  "volumes": ['
+	first=1
+	local vol_mount vol_used vol_free vol_pct vol_name
+	while IFS= read -r line; do
+		[[ -z "$line" ]] && continue
+		vol_mount=$(printf '%s' "$line" | awk '{print $NF}')
+		_disk_is_helper "$vol_mount" && continue
+		vol_used=$(printf '%s' "$line" | awk '{print $3}')
+		vol_free=$(printf '%s' "$line" | awk '{print $4}')
+		vol_pct=$(printf '%s' "$line" | awk '{print $5}')
+		case "$vol_mount" in
+			/) vol_name="System" ;;
+			/System/Volumes/Data) vol_name="Data" ;;
+			*) vol_name=$(basename "$vol_mount") ;;
+		esac
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    {"name": %s, "mount": %s, "used": %s, "free": %s, "percent": %s}' \
+			"$(rcc_json_string "$vol_name")" "$(rcc_json_string "$vol_mount")" \
+			"$(rcc_json_string "$vol_used")" "$(rcc_json_string "$vol_free")" \
+			"$(rcc_json_string "$vol_pct")"
+	done < <(df -h 2>/dev/null | grep "^/dev/disk" || true)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	local cinfo cref csize cfree
+	cinfo=$(diskutil apfs list 2>/dev/null || printf '')
+	cref=$(printf '%s' "$cinfo" | grep "Container Reference:" | head -1 | awk '{print $NF}' || printf '')
+	csize=$(printf '%s' "$cinfo" | grep "Size (Capacity Ceiling):" | head -1 | sed 's/.*(\([0-9.]*\) GB.*/\1 GB/' || printf '')
+	cfree=$(printf '%s' "$cinfo" | grep "Capacity Not Allocated:" | head -1 | sed 's/.*(\([0-9.]*\) GB.*/\1 GB/' || printf '')
+	printf '  "apfs_container": {"reference": %s, "size": %s, "free": %s},\n' \
+		"$(rcc_json_string "$cref")" "$(rcc_json_string "$csize")" "$(rcc_json_string "$cfree")"
+
+	printf '  "network_mounts": ['
+	first=1
+	while IFS= read -r line; do
+		[[ -z "$line" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    {"source": %s, "mount": %s}' \
+			"$(rcc_json_string "$(printf '%s' "$line" | awk '{print $1}')")" \
+			"$(rcc_json_string "$(printf '%s' "$line" | awk '{print $NF}')")"
+	done < <(df -h -t smbfs,nfs,afpfs 2>/dev/null | tail -n +2 || true)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf ']\n}\n'
+}
+
 main() {
+	if [[ "${JSON_OUTPUT:-false}" == "true" ]]; then
+		_json_report
+		return 0
+	fi
 	if [[ "$LARGE_MODE" == "true" ]]; then
 		show_large_files
 		return 0
