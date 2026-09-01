@@ -43,7 +43,7 @@ test("a quote or a backslash cannot break out of the AppleScript literal", () =>
 });
 
 test("the fix command names one check and widens to nothing else", () => {
-	const cmd = fixCommand("/opt/homebrew/bin/rcc", "Stealth Mode");
+	const cmd = fixCommand("/opt/homebrew/bin/rcc", ["Stealth Mode"]);
 	assert.equal(
 		cmd,
 		"'/opt/homebrew/bin/rcc' audit --fix --force --fix-only 'Stealth Mode'",
@@ -53,6 +53,24 @@ test("the fix command names one check and widens to nothing else", () => {
 });
 
 test("a path with a space is quoted too", () => {
-	const cmd = fixCommand("/Users/a b/rcc", "VPN");
+	const cmd = fixCommand("/Users/a b/rcc", ["VPN"]);
 	assert.ok(cmd.startsWith("'/Users/a b/rcc'"), cmd);
+});
+
+test("several checks travel as one comma-separated argument", () => {
+	const cmd = fixCommand("/usr/local/bin/rcc", [
+		"Stealth Mode",
+		"Bluetooth",
+		".ssh Permissions",
+	]);
+	assert.equal(
+		cmd,
+		"'/usr/local/bin/rcc' audit --fix --force --fix-only 'Stealth Mode,Bluetooth,.ssh Permissions'",
+	);
+});
+
+test("fixing nothing is refused rather than widened to everything", () => {
+	// Without the guard the flag would carry an empty value, which rcc reads
+	// as no filter at all: every fix on the machine.
+	assert.throws(() => fixCommand("/usr/local/bin/rcc", []), /No check/);
 });

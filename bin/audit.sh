@@ -108,7 +108,7 @@ show_audit_help() {
 	echo "  --fix          Attempt to fix issues automatically"
 	echo "  --fix --dry-run Show fixes without applying"
 	echo "  --fix --force Apply fixes without confirmation"
-	echo "  --fix-only NAME Fix only the named check (implies one target, not a group)"
+	echo "  --fix-only NAMES Fix only these checks (comma-separated names, not groups)"
 	echo "  --quiet       Suppress non-essential output"
 	echo "  --report FILE  Save report to file"
 	echo "  --html        Output in HTML format"
@@ -1130,11 +1130,32 @@ fix_issue() {
 		return
 	fi
 
-	# Named target: everything else is still checked and reported, only the
-	# fixing is narrowed. Compared case-insensitively because the name travels
-	# through a UI before it comes back.
-	if [[ -n "$FIX_ONLY" ]] && [[ "$(printf '%s' "$check_name" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$FIX_ONLY" | tr '[:upper:]' '[:lower:]')" ]]; then
-		return
+	# Named targets: everything else is still checked and reported, only the
+	# fixing is narrowed. A comma-separated list like --only takes, because a
+	# caller fixing what is on its screen would otherwise run a whole audit per
+	# check. No check name contains a comma. Compared case-insensitively, since
+	# the names travel through a UI before they come back.
+	if [[ -n "$FIX_ONLY" ]]; then
+		local _want _have _match=false
+		_have="$(printf '%s' "$check_name" | tr '[:upper:]' '[:lower:]')"
+		while IFS= read -r _want; do
+			_want="${_want#"${_want%%[![:space:]]*}"}"
+			_want="${_want%"${_want##*[![:space:]]}"}"
+			# Not `[[ ... ]] && continue`: that returns 1 for a non-empty name,
+			# and under set -e the function dies on the first name that matches
+			# nothing. Same trap as bin/battery.sh.
+			if [[ -z "$_want" ]]; then continue; fi
+			if [[ "$_have" == "$(printf '%s' "$_want" | tr '[:upper:]' '[:lower:]')" ]]; then
+				_match=true
+				break
+			fi
+			# %s\n, not %s: without the trailing newline read drops the last
+			# field, which for a single name is the only one.
+		done < <(printf '%s\n' "$FIX_ONLY" | tr ',' '\n')
+		# return 0, not return: a bare return hands back the status of the test
+		# above, which is 1 when the name does not match, and under set -e that
+		# aborts the whole audit at the first check it skips.
+		[[ "$_match" == "true" ]] || return 0
 	fi
 
 	if [[ "$AUTO_FIX" == "true" ]]; then

@@ -23,14 +23,18 @@ export function appleScriptQuote(text: string): string {
  * `sudo` is not prepended: rcc asks for the rights it needs at the point it
  * needs them, and a blanket sudo would run the checks as root as well.
  */
-export function fixCommand(rcc: string, checkName: string): string {
+export function fixCommand(rcc: string, checkNames: string[]): string {
+	if (checkNames.length === 0) throw new Error("No check to fix.");
+	// One comma-separated list rather than one run per check: an audit takes
+	// about eight seconds, and fixing what is on screen would otherwise mean
+	// running it once per row. No check name contains a comma.
 	return [
 		shellQuote(rcc),
 		"audit",
 		"--fix",
 		"--force",
 		"--fix-only",
-		shellQuote(checkName),
+		shellQuote(checkNames.join(",")),
 	].join(" ");
 }
 

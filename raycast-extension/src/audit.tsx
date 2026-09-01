@@ -14,7 +14,7 @@ import {
 	useNavigation,
 } from "@raycast/api";
 import { showFailureToast, useExec, usePromise } from "@raycast/utils";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { AUDIT_CONF, readSkipList, skipCheck } from "./audit-conf";
 import {
 	type AuditCheck,
@@ -161,6 +161,34 @@ export default function Command() {
 		},
 	);
 
+	// Filtering is taken over from Raycast so that "everything shown" has a
+	// meaning the code can read. Same fields the placeholder promises.
+	const [searchText, setSearchText] = useState("");
+	const visible = useMemo(() => {
+		const query = searchText.trim().toLowerCase();
+		const all = data?.results ?? [];
+		if (query === "") return all;
+		return all.filter((check) =>
+			[check.name, check.category, check.value, check.status]
+				.join(" ")
+				.toLowerCase()
+				.includes(query),
+		);
+	}, [data, searchText]);
+
+	// What Cmd+Enter would act on: every shown row that has something to fix
+	// and has not been opted out of.
+	const fixableVisible = useMemo(
+		() =>
+			visible.filter(
+				(check) =>
+					check.status !== "pass" &&
+					check.fix_available !== false &&
+					!skipped.has(check.name),
+			),
+		[visible, skipped],
+	);
+
 	if (resolveError instanceof RccNotFoundError) return <MissingRcc />;
 
 	if (error) {
@@ -241,7 +269,10 @@ export default function Command() {
 	// A terminal and not a pane inside Raycast: a fix needs administrator
 	// rights, and there is no tty behind a Raycast view for sudo to prompt on.
 	// Touch ID and the password prompt only exist in a real terminal.
-	const fixOne = async (check: AuditCheck) => {
+	// Resolve rcc and refuse if it cannot narrow a fix. rcc 0.16.0 and earlier
+	// ignore --fix-only instead of rejecting it, so the same command line
+	// applies every fix on the machine: measured, seven instead of one.
+	const usableRcc = async (): Promise<string | undefined> => {
 		let rcc: string;
 		try {
 			rcc = resolveRcc();
@@ -252,12 +283,8 @@ export default function Command() {
 				message:
 					"Set the Raccoon CLI path in the extension preferences.",
 			});
-			return;
+			return undefined;
 		}
-
-		// rcc 0.16.0 and earlier ignore --fix-only instead of refusing it, which
-		// would turn one Enter into every fix on the machine. Measured: seven
-		// instead of one. Refuse rather than narrow-by-hope.
 		if (!(await supportsFixOnly(rcc))) {
 			await showToast({
 				style: Toast.Style.Failure,
@@ -265,13 +292,56 @@ export default function Command() {
 				message:
 					"--fix-only arrived in rcc 0.17.0. Older versions would apply every fix instead. Upgrade with `brew upgrade rcc`.",
 			});
-			return;
+			return undefined;
 		}
+		return rcc;
+	};
 
-		await runInTerminal(fixCommand(rcc, check.name));
+	const fixOne = async (check: AuditCheck) => {
+		const rcc = await usableRcc();
+		if (!rcc) return;
+
+		await runInTerminal(fixCommand(rcc, [check.name]));
 		await showToast({
 			style: Toast.Style.Success,
 			title: `Fixing ${check.name}`,
+			message: "Running in Terminal, where it can ask for admin rights.",
+		});
+		await closeMainWindow();
+	};
+
+	// Cmd+Enter: everything on screen that has something to fix. "Shown" and
+	// not "all": with a search term typed, the reader is looking at a subset,
+	// and the keystroke has to mean what the screen says.
+	const fixAllVisible = async () => {
+		if (fixableVisible.length === 0) {
+			await showToast({
+				style: Toast.Style.Failure,
+				title: "Nothing to fix here",
+				message:
+					"None of the checks on screen has a fix available right now.",
+			});
+			return;
+		}
+		const rcc = await usableRcc();
+		if (!rcc) return;
+
+		const names = fixableVisible.map((check) => check.name);
+		const confirmed = await confirmAlert({
+			title: `Fix ${names.length} checks?`,
+			message: names.join(", "),
+			icon: { source: Icon.Hammer, tintColor: Color.Red },
+			primaryAction: {
+				title: `Fix ${names.length}`,
+				style: Alert.ActionStyle.Destructive,
+			},
+		});
+		if (!confirmed) return;
+
+		await runInTerminal(fixCommand(rcc, names));
+		await showToast({
+			style: Toast.Style.Success,
+			title: `Fixing ${names.length} checks`,
 			message: "Running in Terminal, where it can ask for admin rights.",
 		});
 		await closeMainWindow();
@@ -343,6 +413,9 @@ export default function Command() {
 					? `Security Audit — ${counts.pass} pass, ${counts.warn} warn, ${counts.fail} fail`
 					: "Security Audit"
 			}
+			filtering={false}
+			searchText={searchText}
+			onSearchTextChange={setSearchText}
 			searchBarPlaceholder="Search checks by name, category or finding"
 		>
 			<List.EmptyView
@@ -357,7 +430,7 @@ export default function Command() {
 						: undefined
 				}
 			/>
-			{(data?.results ?? []).map((check, index) => {
+			{visible.map((check, index) => {
 				const isSkipped = skipped.has(check.name);
 				return (
 					<List.Item
@@ -412,6 +485,18 @@ export default function Command() {
 											onAction={() => fixOne(check)}
 										/>
 									) : null}
+									<Action
+										title={`Fix All ${fixableVisible.length} Shown`}
+										icon={{
+											source: Icon.Hammer,
+											tintColor: Color.Orange,
+										}}
+										shortcut={{
+											modifiers: ["cmd"],
+											key: "return",
+										}}
+										onAction={fixAllVisible}
+									/>
 									<Action.CopyToClipboard
 										title="Copy Verification Command"
 										content={check.command}
