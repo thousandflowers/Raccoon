@@ -99,18 +99,21 @@ function CheckDetail({
 					<List.Item.Detail.Metadata.Label
 						title="Fix available"
 						text={
-							!check.fix_available
-								? "No"
-								: skipped
-									? "Yes, but skipped in audit.conf"
-									: "Yes"
+							check.fix_available === undefined
+								? "Unknown (this rcc predates 0.17.0)"
+								: check.fix_available === false
+									? "No"
+									: skipped
+										? "Yes, but skipped in audit.conf"
+										: "Yes"
 						}
 						icon={{
-							source: !check.fix_available
-								? Icon.Minus
-								: skipped
-									? Icon.MinusCircle
-									: Icon.Hammer,
+							source:
+								check.fix_available === false
+									? Icon.Minus
+									: skipped
+										? Icon.MinusCircle
+										: Icon.Hammer,
 							tintColor:
 								check.fix_available && !skipped
 									? Color.Orange
@@ -398,7 +401,7 @@ export default function Command() {
 							<ActionPanel>
 								<ActionPanel.Section title={check.name}>
 									{check.status !== "pass" &&
-									check.fix_available &&
+									check.fix_available !== false &&
 									!isSkipped ? (
 										<Action
 											title={`Fix ${check.name}`}
@@ -426,7 +429,8 @@ export default function Command() {
 											}
 										/>
 									) : null}
-									{check.fix_available && !isSkipped ? (
+									{check.fix_available !== false &&
+									!isSkipped ? (
 										<Action
 											title="Never Offer to Fix This"
 											icon={Icon.MinusCircle}
