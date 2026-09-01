@@ -280,6 +280,22 @@
 				"slow"
 			],
 			"mode": "view"
+		},
+		{
+			"name": "fonts",
+			"title": "Show Fonts",
+			"subtitle": "Raccoon",
+			"description": "Where fonts live, duplicates, and any the system cannot read.",
+			"keywords": [
+				"font",
+				"fonts",
+				"typeface",
+				"duplicate",
+				"corrupted",
+				"fontbook",
+				"family"
+			],
+			"mode": "view"
 		}
 	],
 	"dependencies": {

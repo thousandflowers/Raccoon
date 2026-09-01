@@ -14,6 +14,7 @@ show_fonts_help() {
 	echo "Show installed fonts and check for duplicates"
 	echo ""
 	echo "Options:"
+	echo "  --json          Output in JSON format"
 	echo "  --help, -h      Show this help"
 }
 
@@ -27,14 +28,56 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--json)
-		_rcc_json_unimplemented fonts
+		JSON_OUTPUT=true
 		;;
 	*)
 		;;
 	esac
 done
 
+_fonts_count_in() {
+	find "$1" -mindepth 1 -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' '
+}
+
+# Files that fc-scan cannot read: a font installed but broken, which is the
+# only thing in this report anyone has to act on.
+_fonts_corrupted() {
+	local font n=0
+	command -v fc-scan >/dev/null 2>&1 || { printf '0'; return 0; }
+	while IFS= read -r font; do
+		[[ -f "$font" ]] || continue
+		fc-scan "$font" >/dev/null 2>&1 || n=$((n + 1))
+	done < <(find /Library/Fonts "$HOME/Library/Fonts" -maxdepth 1 -type f \
+		\( -name '*.ttf' -o -name '*.otf' -o -name '*.ttc' \) 2>/dev/null || true)
+	printf '%s' "$n"
+}
+
+_json_report() {
+	local sys user fc_available=false fonts=0 families=0 dupes=0
+	sys=$(_fonts_count_in /Library/Fonts)
+	user=$(_fonts_count_in "$HOME/Library/Fonts")
+	if command -v fc-list >/dev/null 2>&1; then
+		fc_available=true
+		fonts=$(fc-list : family 2>/dev/null | wc -l | tr -d ' ')
+		families=$(fc-list : family 2>/dev/null | sort -u | wc -l | tr -d ' ')
+		dupes=$(fc-list : family 2>/dev/null | sort | uniq -d | wc -l | tr -d ' ')
+	fi
+	printf '{\n'
+	printf '  "sources": [\n'
+	printf '    {"path": %s, "count": %s},\n' "$(rcc_json_string "/Library/Fonts")" "$sys"
+	printf '    {"path": %s, "count": %s}\n' "$(rcc_json_string "$HOME/Library/Fonts")" "$user"
+	printf '  ],\n'
+	printf '  "installed": %s,\n' "$((sys + user))"
+	printf '  "fontconfig": {"available": %s, "fonts": %s, "families": %s, "duplicate_families": %s},\n' \
+		"$fc_available" "$fonts" "$families" "$dupes"
+	printf '  "corrupted": %s\n}\n' "$(_fonts_corrupted)"
+}
+
 main() {
+	if [[ "${JSON_OUTPUT:-false}" == "true" ]]; then
+		_json_report
+		return 0
+	fi
 	print_section_header "Fonts Status"
 
 	local sys_fonts user_fonts

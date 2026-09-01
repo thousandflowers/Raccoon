@@ -5,6 +5,7 @@ import Memory from "./memory";
 import Certs from "./certs";
 import Startup from "./startup";
 import Docker from "./docker";
+import Fonts from "./fonts";
 import History from "./history";
 import Overlap from "./overlap";
 import Ports from "./ports";
@@ -33,6 +34,7 @@ const VIEWS: Record<string, () => ReactElement> = {
 	history: History,
 	certs: Certs,
 	startup: Startup,
+	fonts: Fonts,
 };
 
 /** Whether this command has a screen of its own rather than raw output. */
