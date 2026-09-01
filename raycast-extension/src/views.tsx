@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import Audit from "./audit";
 import Battery from "./battery";
 import Memory from "./memory";
+import Certs from "./certs";
 import Docker from "./docker";
 import History from "./history";
 import Overlap from "./overlap";
@@ -29,6 +30,7 @@ const VIEWS: Record<string, () => ReactElement> = {
 	overlap: Overlap,
 	docker: Docker,
 	history: History,
+	certs: Certs,
 };
 
 /** Whether this command has a screen of its own rather than raw output. */

@@ -246,6 +246,23 @@
 				"recent"
 			],
 			"mode": "view"
+		},
+		{
+			"name": "certs",
+			"title": "Show Certificates",
+			"subtitle": "Raccoon",
+			"description": "Keychain certificates, expired and expiring first.",
+			"keywords": [
+				"certificate",
+				"cert",
+				"ssl",
+				"tls",
+				"keychain",
+				"expired",
+				"expiring",
+				"https"
+			],
+			"mode": "view"
 		}
 	],
 	"dependencies": {

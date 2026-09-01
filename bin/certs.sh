@@ -15,6 +15,7 @@ show_certs_help() {
 	echo "  --expired       Show only expired certificates"
 	echo "  --expiring N   Show certificates expiring within N days"
 	echo "  --detail        Show full certificate details"
+	echo "  --json          Output in JSON format"
 	echo "  --help, -h      Show this help"
 }
 
@@ -32,7 +33,7 @@ while [[ $# -gt 0 ]]; do
 		exit 0
 		;;
 	--json)
-		_rcc_json_unimplemented certs
+		JSON_OUTPUT=true
 		;;
 	--expired)
 		SHOW_EXPIRED=true
@@ -56,13 +57,10 @@ while [[ $# -gt 0 ]]; do
 	shift
 done
 
-main() {
-	print_section_header "Certificates Status"
-	
-	print_step 1 3 "User Keychain Certificates"
-	
-	local details
-	details=$(security find-certificate -a -p 2>/dev/null | python3 -c "
+# The scan, once. Both the table and --json read the same lines:
+# cn|issuer|notAfter|status|self_signed, and a final SUMMARY: row.
+_certs_scan() {
+	security find-certificate -a -p 2>/dev/null | python3 -c "
 import sys
 import subprocess
 from datetime import datetime
@@ -131,7 +129,53 @@ for cert in certs:
         pass
 
 print(f'SUMMARY:{total}|{valid}|{expiring}|{expired}|{selfsigned}')
-")
+"
+}
+
+_json_report() {
+	local details summary cn issuer end status self first=1
+	details=$(_certs_scan)
+	summary=$(printf '%s\n' "$details" | grep "SUMMARY:" | sed 's/^SUMMARY://')
+
+	printf '{\n'
+	printf '  "counts": {"total": %s, "valid": %s, "expiring": %s, "expired": %s, "self_signed": %s},\n' \
+		"$(printf '%s' "$summary" | cut -d'|' -f1)" \
+		"$(printf '%s' "$summary" | cut -d'|' -f2)" \
+		"$(printf '%s' "$summary" | cut -d'|' -f3)" \
+		"$(printf '%s' "$summary" | cut -d'|' -f4)" \
+		"$(printf '%s' "$summary" | cut -d'|' -f5)"
+	printf '  "expiring_window_days": %s,\n' "$EXPIRING_WINDOW"
+
+	printf '  "certificates": ['
+	while IFS='|' read -r cn issuer end status self; do
+		[[ -z "$cn" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    {"name": %s, "issuer": %s, "expires": %s, "status": %s, "self_signed": %s}' \
+			"$(rcc_json_string "$cn")" "$(rcc_json_string "$issuer")" \
+			"$(rcc_json_string "$end")" "$(rcc_json_string "$status")" \
+			"$([[ "$self" == "yes" ]] && echo true || echo false)"
+	done < <(printf '%s\n' "$details" | grep -v "SUMMARY:")
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf '],\n'
+
+	printf '  "keychains": [\n    %s,\n    %s,\n    %s\n  ]\n}\n' \
+		"$(rcc_json_string "$HOME/Library/Keychains/login.keychain-db")" \
+		"$(rcc_json_string "/Library/Keychains/System.keychain")" \
+		"$(rcc_json_string "/System/Library/Keychains/SystemRoot.keychain")"
+}
+
+main() {
+	if [[ "${JSON_OUTPUT:-false}" == "true" ]]; then
+		_json_report
+		return 0
+	fi
+	print_section_header "Certificates Status"
+	
+	print_step 1 3 "User Keychain Certificates"
+	
+	local details
+	details=$(_certs_scan)
 	
 	local summary
 	# Strip the "SUMMARY:" prefix so cut -f1 is `total`, not "SUMMARY:total"
