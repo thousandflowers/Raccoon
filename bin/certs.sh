@@ -59,7 +59,7 @@ done
 main() {
 	print_section_header "Certificates Status"
 	
-	echo "${GRAY}[1/3] User Keychain Certificates...${NC}"
+	print_step 1 3 "User Keychain Certificates"
 	
 	local details
 	details=$(security find-certificate -a -p 2>/dev/null | python3 -c "
@@ -162,7 +162,7 @@ print(f'SUMMARY:{total}|{valid}|{expiring}|{expired}|{selfsigned}')
 	
 	if [[ "$SHOW_DETAIL" == true ]] || [[ "$SHOW_EXPIRED" == true ]] || [[ $SHOW_EXPIRING -gt 0 ]]; then
 		echo ""
-		echo "${GRAY}[2/3] Certificate Details...${NC}"
+		print_step 2 3 "Certificate Details"
 		
 		if [[ -n "$cert_lines" ]]; then
 			printf "%-35s %-18s %-12s %-10s\n" "Certificate" "Issuer" "Expires" "Status"
@@ -194,7 +194,7 @@ print(f'SUMMARY:{total}|{valid}|{expiring}|{expired}|{selfsigned}')
 	fi
 	
 	echo ""
-	print_step 3 4 "Keychain Locations"
+	print_step 3 3 "Keychain Locations"
 	print_info "$HOME/Library/Keychains/login.keychain-db"
 	print_info "/Library/Keychains/System.keychain"
 	print_info "/System/Library/Keychains/SystemRoot.keychain"

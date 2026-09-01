@@ -219,3 +219,28 @@ teardown() { teardown_raccoon_env; }
 	[[ "$status" -eq 0 ]]
 	[[ "$output" != *'no ":" separator'* ]]
 }
+
+# certs announced "[1/3]" and then "[3/4]": two hand-written labels with one
+# total and a print_step call with another. A reader counting steps was told
+# the command had three, then four, in the same run.
+@test "common: no script announces two different step totals" {
+	local script totals bad=""
+	for script in "$SCRIPT_DIR"/bin/*.sh; do
+		totals="$(
+			{
+				grep -oE 'print_step[[:space:]]+[0-9]+[[:space:]]+[0-9]+' "$script" |
+					awk '{ print $3 }'
+				grep -oE '\[[0-9]+/[0-9]+\]' "$script" |
+					sed -E 's:.*/([0-9]+)\]:\1:'
+			} | sort -u
+		)"
+		if [[ "$(printf '%s\n' "$totals" | grep -c .)" -gt 1 ]]; then
+			bad+="$(basename "$script"): $(printf '%s' "$totals" | tr '\n' ' ')"$'\n'
+		fi
+	done
+	[[ -z "$bad" ]] || {
+		echo "scripts that count their steps two ways:" >&2
+		echo "$bad" >&2
+		false
+	}
+}
