@@ -4,7 +4,7 @@
 	"title": "Raccoon",
 	"description": "macOS companion toolkit: disk, memory, ports, battery, network and a security audit, powered by the rcc CLI.",
 	"icon": "extension-icon.png",
-	"author": "Eugenio",
+	"author": "eugenio",
 	"categories": [
 		"System",
 		"Developer Tools",
