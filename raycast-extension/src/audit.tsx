@@ -231,6 +231,40 @@ export default function Command() {
 		);
 	};
 
+	// Enter on a warning or a failure fixes that one check and nothing else.
+	// --fix-only takes the name; --only would have taken its group, and the
+	// smallest group holds six checks, so a single Enter would have changed
+	// five other settings the reader never selected.
+	const fixOne = async (check: AuditCheck) => {
+		const confirmed = await confirmAlert({
+			title: `Fix ${check.name}?`,
+			message: `Raccoon will change this setting on this Mac. It found: ${check.value}`,
+			icon: { source: Icon.Hammer, tintColor: Color.Red },
+			primaryAction: {
+				title: `Fix ${check.name}`,
+				style: Alert.ActionStyle.Destructive,
+			},
+		});
+		if (!confirmed) return;
+		push(
+			<RccDetail
+				command={{
+					id: "audit-fix-one",
+					args: [
+						"audit",
+						"--fix",
+						"--force",
+						"--fix-only",
+						check.name,
+					],
+					title: `Fixing ${check.name}`,
+					description: `Applying the fix for ${check.name}`,
+					needsRoot: true,
+				}}
+			/>,
+		);
+	};
+
 	const skip = async (check: AuditCheck) => {
 		try {
 			const outcome = await skipCheck(check.name);
@@ -354,6 +388,18 @@ export default function Command() {
 						actions={
 							<ActionPanel>
 								<ActionPanel.Section title={check.name}>
+									{check.status !== "pass" &&
+									check.fix_available &&
+									!isSkipped ? (
+										<Action
+											title={`Fix ${check.name}`}
+											icon={{
+												source: Icon.Hammer,
+												tintColor: Color.Red,
+											}}
+											onAction={() => fixOne(check)}
+										/>
+									) : null}
 									<Action.CopyToClipboard
 										title="Copy Verification Command"
 										content={check.command}

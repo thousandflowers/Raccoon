@@ -192,6 +192,7 @@ EXPLAIN_MODE=false
 CIS_MODE=false
 VERBOSE_MODE=false
 ONLY_GROUPS=""
+FIX_ONLY=""
 LIST_CHECKS=false
 REMEDIATION_MODE=false
 BASELINE_SAVE=false
@@ -315,6 +316,16 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--only=*)
 		ONLY_GROUPS="${1#--only=}"
+		shift
+		;;
+	--fix-only)
+		# One check by name, for a caller that has a single finding in hand.
+		# --only takes groups, and the smallest group holds six checks, so
+		# without this a caller asking to fix one thing fixes five neighbours.
+		if [[ $# -ge 2 && "$2" != -* ]]; then FIX_ONLY="$2"; shift 2; else shift; fi
+		;;
+	--fix-only=*)
+		FIX_ONLY="${1#--fix-only=}"
 		shift
 		;;
 	--list-checks)
@@ -1115,6 +1126,13 @@ fix_issue() {
 	# Per-machine opt-out wins over everything: never queue, never apply.
 	if _fix_skipped "$check_name"; then
 		[[ "$QUIET_MODE" != "true" ]] && echo "  ${GRAY}ℹ Skipped (audit.conf): $check_name${NC}"
+		return
+	fi
+
+	# Named target: everything else is still checked and reported, only the
+	# fixing is narrowed. Compared case-insensitively because the name travels
+	# through a UI before it comes back.
+	if [[ -n "$FIX_ONLY" ]] && [[ "$(printf '%s' "$check_name" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$FIX_ONLY" | tr '[:upper:]' '[:lower:]')" ]]; then
 		return
 	fi
 
