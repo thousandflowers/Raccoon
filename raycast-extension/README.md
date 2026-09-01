@@ -1,9 +1,56 @@
 # Raccoon
 
-Run [Raccoon](https://github.com/thousandflowers/Raccoon) — a macOS companion toolkit — from Raycast.
+Read the state of your Mac from Raycast, and put right what is wrong without
+leaving the list.
 
-Raccoon reports on disk, memory, open ports, battery, network, Wi-Fi, SSH keys, certificates,
-launch agents, fonts, Docker and Xcode, and can run a security audit of the machine.
+Raccoon is a macOS companion toolkit. This extension is its front end: twenty-one
+commands, each with a view built for what that command actually reports.
+
+## What you get
+
+Every list is grouped and ordered by what you came for, and colour means the
+same thing in all of them:
+
+|        |                           |
+| ------ | ------------------------- |
+| red    | needs doing now           |
+| orange | deserves attention        |
+| green  | in order                  |
+| grey   | information, no judgement |
+
+`git` ranks repositories by where the work exists rather than how much there is,
+so two commits that were never pushed outrank four hundred uncommitted files.
+`ssh` ranks keys by what the finding costs: a private key with no passphrase is a
+credential in plain text, and it comes before one with loose permissions.
+`backup` says whether this Mac is backed up in its first line.
+
+## Two keystrokes
+
+**Enter** resolves the row under the cursor. **Cmd+Enter** resolves everything on
+screen. What that means differs per command, because the commands differ:
+
+|                | Enter                             | Cmd+Enter                          |
+| -------------- | --------------------------------- | ---------------------------------- |
+| Security Audit | apply that one fix                | fix everything shown               |
+| Memory         | quit that process                 | quit the listed ones               |
+| Ports          | close that port                   | close the reachable ones           |
+| Startup        | stop that login item or agent     | stop all of that kind              |
+| Wi-Fi          | forget that network               | forget all but the one you are on  |
+| Environment    | remove that dangling symlink      | remove all of them                 |
+| Certificates   | remove that expired certificate   | remove every expired one           |
+| Git            | push that clean repository        | push every clean one               |
+| SSH            | add a passphrase, fix permissions | fix every key that needs it        |
+| Xcode          | delete DerivedData                | that, and shut the simulators down |
+| Trash          | empty it                          | the same; there is one trash       |
+
+Where nothing is put right by a command — battery, disk, network, backup, fonts,
+PATH overlaps — both keystrokes open the one place the setting actually lives.
+
+Anything that changes the machine asks first and shows the exact command. It then
+runs in Terminal rather than silently: several of these need administrator
+rights and Touch ID has nowhere to prompt behind a Raycast view, a command that
+fails should fail where you can read why, and an action that removes something
+should leave a record of what it removed.
 
 ## Setup
 
@@ -13,45 +60,16 @@ This extension drives the `rcc` command-line tool. Install it once:
 brew install thousandflowers/raccoon/rcc
 ```
 
-If `rcc` lives somewhere unusual, set its full path in the extension preferences.
-
-## Commands
-
-| Command | What it does |
-| ------- | ------------ |
-| Search Raccoon Commands | Browse and run every `rcc` subcommand |
-| Show Disk Space | Disks, volumes and the largest space hogs |
-| Show Memory Usage | Memory pressure and the hungriest processes |
-| List Open Ports | Open TCP/UDP ports with the owning process |
-| Show Battery Health | Cycle count, max capacity, charging status |
-| Run Security Audit | Full security audit, with a confirmed one-press fix |
-| Configure Admin Session | Ask for Touch ID once instead of once per privileged command |
-
-Everything runs inside Raycast; no Terminal window is ever opened. Output streams into the
-view as it arrives, so long commands (`upgrade`, `audit --deep`) show progress and can be
-stopped.
+The extension finds `rcc` in the usual Homebrew locations. If yours lives
+somewhere else, set the **Raccoon CLI** preference to its full path.
 
 ## Administrator rights
 
-`audit`, `upgrade`, `apps` and `fleet` need root; the other 24 commands never ask for anything.
+The security audit and its fixes need root. Rather than a Touch ID prompt per
+command, run **Configure Admin Session** once: it installs a `visudo`-checked
+sudoers drop-in, and the **Admin Session** preference decides whether it lasts
+sixty minutes or until restart.
 
-macOS ties a sudo authentication to the process tree when there is no controlling terminal, and
-Raycast starts a fresh process for every command. So out of the box each privileged run asks for
-Touch ID again - no extension code can share that ticket.
+## Links
 
-**Configure Admin Session** fixes it by installing a small sudoers drop-in that keys the record
-to your user instead:
-
-```
-/etc/sudoers.d/raccoon
-
-Defaults:<you> timestamp_type=global
-Defaults:<you> timestamp_timeout=60
-```
-
-The duration is an extension preference: **Expires after 60 minutes** (default) or **Until
-restart**. The file is checked with `visudo -c` before installation, and only the final copy runs
-as root, so a malformed drop-in can never reach `/etc/sudoers.d`.
-
-This relaxes sudo for every process you own, not only Raccoon, for that duration. Undo it from
-the same command, or with `sudo rm /etc/sudoers.d/raccoon`.
+- [Raccoon on GitHub](https://github.com/thousandflowers/Raccoon)
