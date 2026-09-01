@@ -3,9 +3,45 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
-## [0.17.0] - 2026-08-31
+## [0.18.0] - 2026-09-01
+
+0.17.0 was tagged and never released. Its CI failed on three tests asserting
+that eight commands refuse `--json`, which the same release had just taught them
+to answer, so the job that publishes never ran and the tap stayed on 0.16.0.
+Nothing reached anyone under that tag, so everything 0.17.0 prepared ships here
+alongside the work that followed it.
 
 ### Added
+
+- **Every command that produces a report answers `--json`.** Twenty-one of the
+  twenty-two: `backup`, `certs`, `disk`, `docker`, `env`, `fonts`, `git`,
+  `history`, `network`, `ssh`, `startup` and `xcode` joined the nine that
+  already did. `apps` is the exception and stays one on purpose — like
+  `upgrade` it streams `__RCC_PROGRESS__` markers because it is an action, not
+  a report, and its output is not clean text to begin with.
+
+- **The `curl | bash` installer draws the raccoon while it works.** Same face
+  the TUI draws, four eye shapes, one caption per step. It degrades on purpose:
+  a pipe, a CI log or a terminal that cannot move the cursor gets plain lines,
+  decided by `[[ -t 1 ]]`, and nothing in it is required for the install.
+
+- **The Raycast extension answers two keystrokes in all nineteen views.** Enter
+  resolves the row under the cursor, Cmd+Enter resolves everything on screen.
+  What resolving is differs per command: quit that process, close that port,
+  stop that login item, forget that network, remove that dangling symlink or
+  that expired certificate, push that clean repository, add a passphrase to that
+  key, delete DerivedData, empty the trash — or, where nothing is put right by a
+  command, open the one place the setting actually lives. Before this, five
+  views did something on Enter and fourteen only reloaded, including on rows
+  drawn in red.
+
+- **A view per command, built for what that command reports.** Nineteen of
+  them, none a table: colour means one thing everywhere (red needs doing now,
+  orange deserves attention, green is in order, grey is information), and each
+  list is grouped and ordered by what the reader came for. `git` ranks by where
+  the work exists rather than how much there is — two commits that were never
+  pushed outrank four hundred uncommitted files. `ssh` ranks by what the finding
+  costs. `backup` says the answer in its first line.
 
 - `rcc audit --fix-only NAMES` fixes the named checks and nothing else.
   `--only` takes groups, and the smallest group holds six checks, so a caller
@@ -41,6 +77,15 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 
 ### Changed
 
+- `rcc ssh` scans `~/.ssh` once. Its three checks each walked the directory and
+  ran `ssh-keygen` from inside their own loop, so every key was read three times
+  and the answers agreed by coincidence. The table's output is unchanged, down
+  to the parenthesised `(ED25519)` it has always shown.
+
+- `rcc git` builds its table from counts rather than a rendered sentence, which
+  also drops the trailing `", "` every row used to carry unless it happened to
+  end on a no-upstream count.
+
 - `rcc fleet` with no subcommand now prints its subcommands instead of running an audit. The default was `audit`, so the shortest thing anyone could type opened SSH connections to every host in `~/.raccoon/fleet.conf` - the most invasive thing the command can do, reached by typing the least. **This is a visible change of behaviour**: a script with a bare `rcc fleet` in it will get the help text and do nothing. `rcc fleet audit` is unchanged and is how the audit is run. Every other command was checked for the same shape; the only other subcommand default is `rcc fleet group`, which falls back to `list` and reads nothing but a text file.
 - The menu is four categories - Maintenance, System, Network, Development - and lists commands, not ways of launching them. The six flag forms of audit (`deep`, `quiet`, `fix`, `json`, `history`, `watch`) are out of it: a flag's place is `rcc audit --help` and the man page, where all six already were. `fleet` is one row that opens its five subcommands in place rather than five rows of the twenty-five, which is what made the first screen read as a fleet manager. `wifi` is in the menu at last: it has had a script since the beginning, its own animation since 0.16.0, and no way into the interface. Twenty-two rows, one per script in `bin/`, and the tests now check each list against the scripts that exist rather than against each other - comparing the two menus to one another is what let both of them go on missing `wifi`.
 - `rcc ports` reports the local port. On a connected socket it reported the
@@ -67,6 +112,52 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 - `rcc --help` lists the same twenty-eight commands in the new order. The order is one editorial decision, not two, so it follows the menu; the format is unchanged, two columns and no category rows, which is what `raycast/generate.sh` parses. Regenerating produces the same twenty-eight script commands byte for byte.
 
 ### Fixed
+
+- **`rcc audit` asked for Touch ID a second time, part way through the report.**
+  Two defects in a row. `start_sudo_keepalive` runs its refresh loop in a
+  subshell, a subshell inherits the caller's shell options, every script that
+  starts it runs `set -euo pipefail`, and the `sudo -n true` inside the loop was
+  unguarded — so one failed refresh killed the whole keepalive without printing
+  anything. The timestamp then ran out mid-run and `_sudo` called plain `sudo`,
+  which prompts. Under a caller that owns the terminal it now asks
+  non-interactively and degrades: the remaining root checks are skipped and say
+  so, which is a worse report than a full one but an honest one, and it cannot
+  hang behind a screen nobody is looking at.
+
+- **The sudo handover looked like a crash.** sudo needs the real terminal —
+  Touch ID and the password prompt only exist outside the alt screen — so the
+  TUI has to step aside, and what replaced it was two lines of prose on a bare
+  shell. It now draws the same face the TUI draws, in the same colour: the
+  notice is rendered through the interface's own styles rather than a
+  hand-written escape, which was bold white against a honey-gold menu.
+
+- **The menu opened with nothing selected.** Row zero is the "Maintenance"
+  heading, a label with nothing to run and no highlight, so the first Down
+  keypress was spent landing on the first command instead of moving to the
+  second. `g` and `G` already walked the cursor off a heading; startup, Esc out
+  of search and backspace out of an empty search did not.
+
+- `rcc battery` exited 1 and printed nothing on a Mac without a battery, and
+  reported "fully charged: no" at 100% because `SPPowerDataType` prints
+  `Charging:` twice and the record became two lines.
+
+- `rcc git` crashed with `repos[@]: unbound variable` on a Mac with no
+  repositories: in bash 3.2 an empty array expanded under `set -u` is unbound,
+  not an empty list.
+
+- The `fleet` box drew as a row of replacement characters. `LC_ALL=C` makes `tr`
+  substitute bytes, which cuts multi-byte box characters in half, and makes
+  padding count bytes rather than columns.
+
+- `rcc certs` counted its steps two ways in the same run, printing `[1/3]` and
+  then `[3/4]`.
+
+- `rcc fonts --json` printed nothing at all on a Mac with no `~/Library/Fonts`.
+
+- `rcc disk --json` never returned: the flag was parsed in a `while` loop with
+  no `shift`, so it spun on its own argument.
+
+- `rcc disk --help` did not mention the flag it had just been given.
 
 - The demo GIFs named the software installed on the machine they were captured
   on. `rcc-startup.gif` listed Notion, Raycast, AutoRaise and DockDoor,
@@ -151,16 +242,19 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
 
 ### Known defects
 
-- `--json` is still silently ignored by seven commands. This release made eight
-  refuse it with exit 64 rather than print the human report, but `apps`,
-  `backup`, `env`, `git`, `ssh`, `fleet` and `upgrade` were not among them: they
-  accept the flag and print the report anyway, which is the behaviour the change
-  set out to remove. Seven of the twenty-two implement `--json` for real
-  (`audit`, `battery`, `docker`, `memory`, `overlap`, `ports`, `trash`, `wifi`). `upgrade`
-  is the odd one: it emits `__RCC_PROGRESS__` markers on stdout, so even its
-  human output is not clean text. Left undone because the list of eight was
-  drawn from the commands with a report worth serialising, and extending the
-  refusal to the rest is a second behaviour change nobody has asked for.
+- `rcc apps` still ignores `--json`. It is the one command left, and it is left
+  on purpose: like `upgrade` it streams `__RCC_PROGRESS__` markers on stdout
+  because it is an action rather than a report, so there is no clean text to
+  serialise in the first place. Giving it structured output means deciding what
+  an in-progress upgrade looks like as a document, which is a design question
+  nobody has asked yet.
+
+- The Raycast extension does not ship with this release. `release.yml` builds
+  the CLI and the Go TUI and bumps the Homebrew formula; it does not touch
+  `raycast-extension/`, so none of the view work above reaches anyone through
+  `brew upgrade`. It is a separate channel — `npm run dev` locally, or a
+  publish to the Raycast store — and that publish is a decision, not a build
+  step.
 
 - `rcc audit --csv` still prints the boxed report and then appends the CSV to
   the same stdout, which is what `--json` did until this release. A reader has
@@ -194,18 +288,6 @@ Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](h
   a revalidate, so during a reload the screen would show the *old* time next to a
   loading indicator, and a stale clock beside a spinner is worse than no clock.
   When every option asks for something else to move, the thing is not ready.
-
-- `docs/gifs/hero.gif`, the image at the top of the README, is not produced by
-  anything. The Remotion harness renders twenty compositions, all of them
-  `docs/gifs/rcc-<id>.gif`; there is no `hero` composition and no `hero.txt`
-  fixture. Recapturing every fixture will not touch it, which is what makes this
-  structural rather than stale: the first image anyone sees opening the project
-  is the one image nothing can regenerate.
-- Eight commands - `certs`, `disk`, `docker`, `fonts`, `history`, `network`,
-  `startup`, `xcode` - have no machine-readable output at all. They refuse
-  `--json` with exit 64 rather than pretending, but the flag is still unwritten.
-  Implementing them is 0.18.0 work, and the shape it should take is worth
-  learning from the first consumer that exists.
 
 ## [0.16.0] - 2026-08-31
 
