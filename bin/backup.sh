@@ -19,6 +19,9 @@ for arg in "$@"; do
 		show_backup_help
 		exit 0
 		;;
+	--json)
+		JSON_OUTPUT=true
+		;;
 	*)
 		;;
 	esac
@@ -105,7 +108,59 @@ check_tm_exclusions() {
 	fi
 }
 
+# Hours since the last backup, or -1 when there has never been one. The number
+# is what decides whether this is fine, late, or a problem: a date on its own
+# needs the reader to do the arithmetic.
+_backup_age_hours() {
+	local latest date_ ts now
+	latest=$(tmutil latestbackup 2>/dev/null || printf '')
+	[[ -n "$latest" ]] || { printf -- '-1'; return 0; }
+	date_=$(basename "$latest" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || printf '')
+	[[ -n "$date_" ]] || { printf -- '-1'; return 0; }
+	ts=$(date -j -f "%Y-%m-%d" "$date_" +%s 2>/dev/null || printf '0')
+	[[ "$ts" != "0" ]] || { printf -- '-1'; return 0; }
+	now=$(date +%s)
+	printf '%s' "$(((now - ts) / 3600))"
+}
+
+_json_report() {
+	local dest kind phase latest date_ hours first path
+	dest=$(tmutil destinationinfo 2>/dev/null | grep "Name:" | head -1 | cut -d: -f2- | xargs || printf '')
+	if [[ -z "$dest" ]]; then
+		dest=$(tmutil destinationinfo -X 2>/dev/null | perl -wne 'print $1 if /<key>Name<\/key>\s*<string>(.*?)<\/string>/s' 2>/dev/null || printf '')
+	fi
+	kind=$(tmutil destinationinfo 2>/dev/null | grep "Kind:" | head -1 | cut -d: -f2- | xargs || printf '')
+	phase=$(tmutil currentphase 2>/dev/null || printf 'unknown')
+	latest=$(tmutil latestbackup 2>/dev/null || printf '')
+	date_=$(basename "${latest:-}" 2>/dev/null | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || printf '')
+	hours=$(_backup_age_hours)
+
+	printf '{\n'
+	printf '  "destination": {"configured": %s, "name": %s, "kind": %s},\n' \
+		"$([[ -n "$dest" ]] && echo true || echo false)" \
+		"$(rcc_json_string "$dest")" "$(rcc_json_string "$kind")"
+	printf '  "phase": %s,\n' "$(rcc_json_string "$phase")"
+	printf '  "running": %s,\n' "$([[ "$phase" != "BackupNotRunning" && "$phase" != "unknown" ]] && echo true || echo false)"
+	printf '  "last_backup": {"date": %s, "hours_ago": %s},\n' \
+		"$(rcc_json_string "$date_")" "$hours"
+
+	printf '  "exclusions": ['
+	first=1
+	while IFS= read -r path; do
+		[[ -z "$path" ]] && continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    %s' "$(rcc_json_string "$path")"
+	done < <(mdfind "kMDItemFSLabel = 6" 2>/dev/null | head -10 || true)
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf ']\n}\n'
+}
+
 main() {
+	if [[ "${JSON_OUTPUT:-false}" == "true" ]]; then
+		_json_report
+		return 0
+	fi
 	print_section_header "Time Machine"
 	check_tm_destination
 	check_tm_phase

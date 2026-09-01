@@ -12,7 +12,7 @@ teardown() { teardown_raccoon_env; }
 # again in two months has to be able to tell the difference.
 
 NOT_IMPLEMENTED=""
-IMPLEMENTED="battery certs disk docker env fonts history network overlap ports startup trash wifi xcode"
+IMPLEMENTED="backup battery certs disk docker env fonts history network overlap ports startup trash wifi xcode"
 
 @test "json: the ones that never implemented --json exit 64" {
 	local c

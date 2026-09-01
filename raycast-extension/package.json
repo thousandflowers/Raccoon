@@ -348,6 +348,21 @@
 				"developer"
 			],
 			"mode": "view"
+		},
+		{
+			"name": "backup",
+			"title": "Show Backup Status",
+			"subtitle": "Raccoon",
+			"description": "Whether this Mac is backed up, and how long ago.",
+			"keywords": [
+				"backup",
+				"time machine",
+				"timemachine",
+				"restore",
+				"snapshot",
+				"destination"
+			],
+			"mode": "view"
 		}
 	],
 	"dependencies": {

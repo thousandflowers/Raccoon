@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import Audit from "./audit";
 import Battery from "./battery";
 import Memory from "./memory";
+import Backup from "./backup";
 import Certs from "./certs";
 import Startup from "./startup";
 import Disk from "./disk";
@@ -43,6 +44,7 @@ const VIEWS: Record<string, () => ReactElement> = {
 	disk: Disk,
 	network: Network,
 	xcode: Xcode,
+	backup: Backup,
 };
 
 /** Whether this command has a screen of its own rather than raw output. */
