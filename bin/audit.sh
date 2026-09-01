@@ -108,6 +108,7 @@ show_audit_help() {
 	echo "  --fix          Attempt to fix issues automatically"
 	echo "  --fix --dry-run Show fixes without applying"
 	echo "  --fix --force Apply fixes without confirmation"
+	echo "  --fix-only NAME Fix only the named check (implies one target, not a group)"
 	echo "  --quiet       Suppress non-essential output"
 	echo "  --report FILE  Save report to file"
 	echo "  --html        Output in HTML format"

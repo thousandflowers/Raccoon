@@ -2,6 +2,7 @@ import {
 	Action,
 	ActionPanel,
 	Alert,
+	closeMainWindow,
 	Color,
 	confirmAlert,
 	Icon,
@@ -26,6 +27,7 @@ import { findCommand } from "./commands";
 import { MissingRcc, REPO_URL } from "./missing-rcc";
 import { RccDetail } from "./rcc-detail";
 import { RccNotFoundError, resolveRcc, RUNTIME_PATH } from "./rcc";
+import { fixCommand, runInTerminal, supportsFixOnly } from "./terminal";
 
 /**
  * How long to let the audit run.
@@ -231,38 +233,45 @@ export default function Command() {
 		);
 	};
 
-	// Enter on a warning or a failure fixes that one check and nothing else.
-	// --fix-only takes the name; --only would have taken its group, and the
-	// smallest group holds six checks, so a single Enter would have changed
-	// five other settings the reader never selected.
+	// Enter on a warning or a failure fixes that one check, in Terminal.
+	//
+	// A terminal and not a pane inside Raycast: a fix needs administrator
+	// rights, and there is no tty behind a Raycast view for sudo to prompt on.
+	// Touch ID and the password prompt only exist in a real terminal.
 	const fixOne = async (check: AuditCheck) => {
-		const confirmed = await confirmAlert({
-			title: `Fix ${check.name}?`,
-			message: `Raccoon will change this setting on this Mac. It found: ${check.value}`,
-			icon: { source: Icon.Hammer, tintColor: Color.Red },
-			primaryAction: {
-				title: `Fix ${check.name}`,
-				style: Alert.ActionStyle.Destructive,
-			},
+		let rcc: string;
+		try {
+			rcc = resolveRcc();
+		} catch {
+			await showToast({
+				style: Toast.Style.Failure,
+				title: "rcc not found",
+				message:
+					"Set the Raccoon CLI path in the extension preferences.",
+			});
+			return;
+		}
+
+		// rcc 0.16.0 and earlier ignore --fix-only instead of refusing it, which
+		// would turn one Enter into every fix on the machine. Measured: seven
+		// instead of one. Refuse rather than narrow-by-hope.
+		if (!(await supportsFixOnly(rcc))) {
+			await showToast({
+				style: Toast.Style.Failure,
+				title: "This rcc cannot fix one check at a time",
+				message:
+					"--fix-only arrived in rcc 0.17.0. Older versions would apply every fix instead. Upgrade with `brew upgrade rcc`.",
+			});
+			return;
+		}
+
+		await runInTerminal(fixCommand(rcc, check.name));
+		await showToast({
+			style: Toast.Style.Success,
+			title: `Fixing ${check.name}`,
+			message: "Running in Terminal, where it can ask for admin rights.",
 		});
-		if (!confirmed) return;
-		push(
-			<RccDetail
-				command={{
-					id: "audit-fix-one",
-					args: [
-						"audit",
-						"--fix",
-						"--force",
-						"--fix-only",
-						check.name,
-					],
-					title: `Fixing ${check.name}`,
-					description: `Applying the fix for ${check.name}`,
-					needsRoot: true,
-				}}
-			/>,
-		);
+		await closeMainWindow();
 	};
 
 	const skip = async (check: AuditCheck) => {
