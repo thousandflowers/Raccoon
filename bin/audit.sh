@@ -915,6 +915,16 @@ show_diff() {
 
 SCHEDULE_PLIST="$HOME/Library/LaunchAgents/com.raccoon.audit.plist"
 
+# launchd is one per user, not one per HOME. The test suite runs with a
+# throwaway HOME, wrote its plist there, loaded it into the real launchd and
+# then deleted the HOME — leaving a job registered against a file that no
+# longer exists, and replacing whatever schedule the person actually had.
+# Under RACCOON_TEST the plist is written and launchd is left alone.
+_schedule_launchctl() {
+	[[ -n "${RACCOON_TEST:-}" ]] && return 0
+	launchctl "$@" 2>/dev/null || true
+}
+
 # Schedule a recurring deep audit (with notifications). FREQ is daily, weekly,
 # or monthly, mapped to the matching StartCalendarInterval.
 schedule_audit() {
@@ -966,8 +976,8 @@ ${interval}
 </plist>
 EOFPLIST
 
-	launchctl unload "$SCHEDULE_PLIST" 2>/dev/null || true
-	launchctl load "$SCHEDULE_PLIST" 2>/dev/null || true
+	_schedule_launchctl unload "$SCHEDULE_PLIST"
+	_schedule_launchctl load "$SCHEDULE_PLIST"
 	echo "  Audit scheduled — $label"
 }
 
@@ -983,7 +993,7 @@ schedule_status() {
 }
 
 schedule_remove() {
-	launchctl unload "$SCHEDULE_PLIST" 2>/dev/null || true
+	_schedule_launchctl unload "$SCHEDULE_PLIST"
 	rm -f "$SCHEDULE_PLIST"
 	echo "Schedule removed."
 }
