@@ -126,7 +126,12 @@ function CheckDetail({
 	);
 }
 
-export default function Command() {
+/**
+ * `deep` runs the full sweep rather than the quick one. `rcc audit deep`,
+ * `audit quiet` and `audit json` are all `--deep` underneath — they differ in
+ * how they print, which is a distinction a screen does not have.
+ */
+export default function Command({ deep = false }: { deep?: boolean } = {}) {
 	const { push } = useNavigation();
 
 	// resolveRcc throws when the binary is nowhere to be found, and a hook cannot
@@ -150,7 +155,7 @@ export default function Command() {
 
 	const { isLoading, data, error, revalidate } = useExec(
 		rccPath ?? "rcc",
-		["audit", "--json"],
+		deep ? ["audit", "--deep", "--json"] : ["audit", "--json"],
 		{
 			execute: rccPath !== null,
 			timeout: AUDIT_TIMEOUT_MS,
@@ -387,6 +392,18 @@ export default function Command() {
 				shortcut={Keyboard.Shortcut.Common.Refresh}
 				onAction={revalidate}
 			/>
+			{/* What `rcc audit json` was for. As a command it opened this same
+			    screen, because the screen is the JSON rendered; as an action it
+			    is the thing a reader actually wanted from it — the document, to
+			    take somewhere else. */}
+			{data ? (
+				<Action.CopyToClipboard
+					title="Copy Report as JSON"
+					icon={Icon.Code}
+					content={JSON.stringify(data, null, 2)}
+					shortcut={Keyboard.Shortcut.Common.Copy}
+				/>
+			) : null}
 			<Action
 				title="Show Raw Output"
 				icon={Icon.Text}
