@@ -78,3 +78,31 @@ jobs:
         run: brew install bats-core
       - name: Run bats tests
         run: bats tests/
+
+  raycast-extension:
+    # The extension was outside CI entirely while it grew to twenty-one screens
+    # and two hundred tests: every check on it ran on one laptop, and a green
+    # pipeline said nothing about more than half the repository.
+    #
+    # macOS because @raycast/api is a macOS package, and `ray lint` is what
+    # validates the store metadata — the screenshot sizes included, which is
+    # the one rule that fails a submission rather than a build.
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: raycast-extension
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint, and validate the store metadata
+        run: npm run lint
+      - name: Run tests
+        run: npm test
+      - name: Build the extension
+        run: npm run build
