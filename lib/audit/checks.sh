@@ -58,16 +58,32 @@ run_core_checks() {
 	# sentinel is "No new software available", and each pending update is a
 	# line beginning with "* ". The old grep for "Recommended Update" never
 	# matched modern output, so it always reported "Up to date".
+	#
+	# RCC_SKIP_SOFTWARE_UPDATE exists for CI. `softwareupdate -l` takes over
+	# seven minutes on a fresh runner — 14m43s of a 16m49s pipeline, paid twice
+	# per release — and what it finds there is meaningless: the pending updates
+	# of a machine destroyed ten minutes later describe nobody's Mac.
+	#
+	# It reports "Not checked", never "Up to date". A green check that nobody
+	# performed is worse than a slow one: it is the same defect as counting
+	# zero snapshots because diskutil was missing, and it would be reported
+	# with the same confidence as a real answer.
 	local sw_output
-	sw_output="$(softwareupdate -l 2>&1)" || true
-	if echo "$sw_output" | grep -qi "No new software available"; then
-		core_results+=("pass:Software Updates: Up to date")
-	elif echo "$sw_output" | grep -qE '^[[:space:]]*\* '; then
-		local updates
-		updates="$(echo "$sw_output" | grep -cE '^[[:space:]]*\* ')"
-		core_results+=("warn:Software Updates: ${updates} pending")
+	if [[ -n "${RCC_SKIP_SOFTWARE_UPDATE:-}" ]]; then
+		# A branch, not an early return: returning here would silently drop any
+		# check added after this one, and it would look like it worked.
+		core_results+=("warn:Software Updates: Not checked")
 	else
-		core_results+=("warn:Software Updates: Unable to determine")
+		sw_output="$(softwareupdate -l 2>&1)" || true
+		if echo "$sw_output" | grep -qi "No new software available"; then
+			core_results+=("pass:Software Updates: Up to date")
+		elif echo "$sw_output" | grep -qE '^[[:space:]]*\* '; then
+			local updates
+			updates="$(echo "$sw_output" | grep -cE '^[[:space:]]*\* ')"
+			core_results+=("warn:Software Updates: ${updates} pending")
+		else
+			core_results+=("warn:Software Updates: Unable to determine")
+		fi
 	fi
 	
 	print_category "Core Security" "${core_results[@]}"
