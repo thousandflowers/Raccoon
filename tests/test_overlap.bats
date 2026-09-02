@@ -316,3 +316,19 @@ _record() {
     assert_success
     assert_output "[]"
 }
+
+# --- measured, not read: the findings of 2026-09-02 ---------------------------
+
+@test "overlap: a /usr/bin symlink into /System/Library is Apple's, not an orphan" {
+	# qlmanage, fontrestore and the acfs tools are shipped this way; fifty
+	# of them read as orphans because the rule matched the target, not the link.
+	_mkexec "$FIX/System/Library/Frameworks/QuickLook.framework/Resources/qlmanage.app/Contents/MacOS/qlmanage"
+	mkdir -p "$FIX/usr/bin"
+	ln -s "$FIX/System/Library/Frameworks/QuickLook.framework/Resources/qlmanage.app/Contents/MacOS/qlmanage" "$FIX/usr/bin/qlmanage"
+	_mkexec "$FIX/Library/Developer/CommandLineTools/usr/bin/clang"
+	ln -s "$FIX/Library/Developer/CommandLineTools/usr/bin/clang" "$FIX/usr/bin/clang"
+	RCC_OVERLAP_PATH="$FIX/usr/bin" run bash "$SCRIPT_DIR/bin/overlap.sh" --json
+	assert_success
+	[[ "$(_record qlmanage)" == *'"manager": "system"'* ]]
+	[[ "$(_record clang)" == *'"manager": "xcode"'* ]]
+}

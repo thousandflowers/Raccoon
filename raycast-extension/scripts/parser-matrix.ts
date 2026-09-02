@@ -90,6 +90,7 @@ const ENVS: Record<string, NodeJS.ProcessEnv> = {
 type Failure = { cmd: string; env: string; kind: string; detail: string };
 const failures: Failure[] = [];
 let cells = 0;
+let declined = 0;
 
 for (const [cmd, parse] of Object.entries(PARSERS)) {
 	for (const [envName, env] of Object.entries(ENVS)) {
@@ -103,7 +104,19 @@ for (const [cmd, parse] of Object.entries(PARSERS)) {
 			}));
 		} catch (e) {
 			// A non-zero exit still hands us stdout; rcc reports absence as data.
-			stdout = (e as { stdout?: string }).stdout ?? "";
+			const failed = e as {
+				stdout?: string;
+				stderr?: string;
+				code?: number;
+			};
+			stdout = failed.stdout ?? "";
+			// Exit 3 with "Not checked" is rcc declining to answer because a
+			// tool is off the PATH: no document on purpose, and the honest
+			// outcome for the environments below that hide /usr/sbin.
+			if (failed.code === 3 && /Not checked/.test(failed.stderr ?? "")) {
+				declined++;
+				continue;
+			}
 			if (!stdout.trim()) {
 				failures.push({
 					cmd,
@@ -165,7 +178,9 @@ for (const [cmd, parse] of Object.entries(PARSERS)) {
 	}
 }
 
-console.log(`\ncells: ${cells}  failures: ${failures.length}\n`);
+console.log(
+	`\ncells: ${cells}  declined (tool off PATH, said so): ${declined}  failures: ${failures.length}\n`,
+);
 for (const f of failures) {
 	console.log(`FAIL  ${f.cmd} / ${f.env}\n      ${f.kind}: ${f.detail}`);
 }

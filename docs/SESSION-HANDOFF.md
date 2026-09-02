@@ -1,11 +1,10 @@
-# Handoff — 2026-09-02, 04:30
+# Handoff — 2026-09-02, morning
 
-Replaces the handoff of the same name written at the start of this session
-(commit `639a799`, still in history). Everything that one listed is done: its
-two unpushed commits are on `main`, its two known `--json` bugs shipped in
-0.18.1, and `metadata/` is no longer empty.
-
-Every claim below has the command that proves it. Run them.
+Replaces the handoff written at 04:30 the same day (commit `3b81d84`, still
+in history). That one said nine of twenty-one commands had been audited and
+five were wrong, and that twelve were unexamined. This session examined the
+twelve — by measuring, not reading — and fixed what it found. Every claim
+below has the command that proves it. Run them.
 
 ---
 
@@ -13,164 +12,130 @@ Every claim below has the command that proves it. Run them.
 
 ```
 repo        /Users/eugeniozamengopontrelli/Raccoon
-branch      fix/backup-counts-local-snapshots  (5 commits, pushed, PR #60 open)
-main        51b3fd0 — merge of PR #59, matches origin/main, tree clean
-released    v0.18.1, verified: brew upgrade gives 0.18.1 and the fixes are
-            present in the installed binary
-store       raycast/extensions#30701 — no longer a draft, in review
+branch      fix/backup-counts-local-snapshots  (PR #60 open; 13 commits
+            ahead of origin/main, 7 of them NOT pushed — see "Not pushed")
+main        51b3fd0 — matches origin/main, untouched this session
+released    v0.18.1 (brew). Nothing tagged this session.
+store       raycast/extensions#30701 in review. The fixes for its two red
+            checks and four review findings are committed HERE and are not
+            in the PR until `npm run publish` runs again.
 ```
 
----
+## Not pushed, not published — on purpose
 
-## What this session was about
-
-It began with `rcc fonts` failing in Raycast — `Expected double-quoted property
-name in JSON at position 254` — on a machine already running the newest
-release, having already been told once that the emitter was fixed.
-
-**One bug class explains nearly all of it: a report answering from the wrong
-place, stated with the confidence of a measured answer.** Six instances, all
-shipped, none caught by a test:
-
-1. `fonts` read two of four font directories and printed the sum as
-   `installed`. 812 where the truth was 1184.
-2. `fonts` took 14.8s (an `fc-scan` per file), past the ten seconds `useExec`
-   allows, so Raycast killed it mid-document and the extension blamed rcc for
-   the fragment.
-3. `disk` and `backup` never looked for local APFS snapshots. Two dozen held
-   space the author believed he had freed.
-4. `trash` read `~/.Trash` alone; a file deleted on an external volume was
-   counted nowhere.
-5. `history` looked for fish in `~/.local/share/fish/history/default` — a path
-   no version of fish writes — and reported 0 as confidently as zsh's 1463.
-   Fixing the path was not enough: fish writes two lines per command.
-6. The backup screen read the external destination, found none, and titled
-   itself **"This Mac has never been backed up"** on a machine holding 24
-   hourly Time Machine snapshots from the day before.
-
-The Raycast extension went from nine commands with no screen to zero, under one
-rule: **opening a screen does not act.** `apps` opens in `--dry-run`; `fleet`
-reads its config file and contacts nothing.
-
----
-
-## Open work, in priority order
-
-### 1. An audit was left running. Its results are not in this document.
-
-A Workflow was auditing the twelve commands never examined for that same bug
-class — `network`, `ports`, `memory`, `docker`, `xcode`, `env`, `wifi`,
-`overlap`, `battery`, `ssh`, `certs`, `startup` — with three adversarial
-verifiers per finding. It had not finished when the session ended.
-
-```
-runId    wf_46177378-729
-script   ~/.claude/projects/-Users-eugeniozamengopontrelli-Raccoon/
-         a3c406cf-fde3-469a-b2b3-27bf6ea533dc/workflows/scripts/
-         raccoon-wrong-place-audit-wf_46177378-729.js
-journal  ~/.claude/projects/-Users-eugeniozamengopontrelli/
-         a3c406cf-fde3-469a-b2b3-27bf6ea533dc/subagents/workflows/
-         wf_46177378-729/journal.jsonl
-```
-
-Read the journal first — it records each agent's actual return value. Resume
-with `Workflow({scriptPath, resumeFromRunId: "wf_46177378-729"})`; completed
-agents return from cache.
-
-**Why this matters more than it looks.** Nine of twenty-one commands were
-audited by hand earlier in the session, and **five of those nine were wrong**.
-Twelve remain unexamined. At that rate there is more there.
-
-The method is the point and is not optional: **audit by measuring, not by
-reading.** All six bugs above lived in code that reads as correct and had green
-tests. Run the command, ask macOS the same question independently, compare the
-two numbers.
-
-### 2. PR #60 is open
-
-Five commits: the backup screen fix, the fish history fix, the CI time fix, and
-two moving a spare icon out of the extension folder.
+The author's rule: no push, no PR, no tag, no release, no publish without
+being told in a separate message. So, when told:
 
 ```sh
-gh pr view 60 && gh pr checks 60
+cd /Users/eugeniozamengopontrelli/Raccoon
+git push origin fix/backup-counts-local-snapshots      # updates PR #60
+cd raycast-extension && npm run publish                # updates raycast/extensions#30701
 ```
 
-CI was green on the first three; the last two were pushed after and need
-re-checking before merge.
-
-### 3. Three screens have never been opened by a human
-
-`Upgrade`, `Audit History`, `Scheduled Audit`. Built, typechecked, parsers
-tested — but nobody has looked at them. `Fleet` and `Apps`, the two that could
-do damage, were verified another way: the compiled bundle's `fleet.tsx` block
-contains zero occurrences of `useRccStream`, `useExec`, `runRcc`, `streamRcc`,
-`spawn` or `execFile`.
-
-```sh
-cd raycast-extension && npm run dev
-```
-
-### 4. The store submission is in review
-
-`raycast/extensions#30701`. Raycast's team responds in days. Their requests are
-satisfied by a commit here followed by another `npm run publish` — which copies
-a **snapshot**, so anything committed after a publish is absent from the PR
-until you publish again. That caught this session once.
-
-Six screenshots in `metadata/`, all 2000×1250. The first is the audit of this
-Mac and shows Stealth Mode off, Bluetooth on, ports open — the third being
-Remote Login. Flagged twice; the author chose to keep it.
+`npm run publish` copies a snapshot of `raycast-extension/` into the fork's
+`ext/raccoon` branch. The PR still holds `design/extension-icon-raccoon.png`
+from before it was moved out; check after publishing that the copy removed it.
 
 ---
 
-## Things this repository has now taught twice
+## What this session did
 
-- **`grep -c` prints `0` and exits 1** when it matches nothing, so under `set -e`
-  it takes the script with it. `lib/audit/checks.sh:344` carries a comment;
-  `bin/network.sh` and `bin/history.sh` did it anyway.
-- **Two implementations of one answer will drift.** `fonts` and `history` each
-  had separate text and `--json` paths; both were wrong about the same thing,
-  and the first fix landed in only one of them.
-- **"Could not check" is not "none".** Without `diskutil` the snapshot count is
-  0 either way, and on a full disk those are opposite answers.
-- **A skipped test proves nothing.** The external-volume trash test skipped
-  itself when `/Volumes` was not writable. The root is a parameter now.
-- **A test that assumes its environment fails only in CI.** The unskipped
-  software-update test inherited `RCC_SKIP_SOFTWARE_UPDATE` from the workflow
-  env. It unsets it explicitly now.
-- **Do not edit files while a test suite runs.** A `bats` run mid-edit produced
-  a false failure on `disk` that cost twenty minutes.
-- **`ray develop` stops rebuilding, silently,** when two source files share a
-  basename (`audit-history.ts` and `audit-history.tsx`). No error; the build
-  just stays at an old timestamp. Renaming fixed it.
-- **Raycast store screenshots must be exactly 2000×1250** and `ray lint`
-  enforces it. Window Capture is not required: a macOS window capture is
-  1724×1174 with a transparent surround, so scaling the whole window and
-  centring it on a 2000×1250 canvas distorts nothing. Resizing directly does —
-  1.47 against 1.60.
-- **CI cost 17 minutes for one line.** `softwareupdate -l` was 14m43s of it,
-  paid twice per release. `RCC_SKIP_SOFTWARE_UPDATE` now makes that check report
-  "Not checked" — never "Up to date".
+### The store PR (raycast/extensions#30701)
+
+Two failing checks and four Greptile findings, all addressed (commit `9b11474`):
+
+- **Prettier**: the monorepo has no `.editorconfig`, so CI reformatted all 90
+  files to two spaces. `.prettierrc` now carries the tab style with the
+  extension. Verify like CI does: `npx prettier --no-editorconfig --check "src/**/*.{ts,tsx}"`.
+- **Screenshots**: five of six failed the padding check because the window sat
+  at 6.5% from the top, outside the 8–17% band the validator scans. Recomposed
+  from the original captures on the Desktop at 75% width, centred. Raycast's
+  own validator (`scripts/check_raycast_images.py` from raycast/extensions,
+  a copy is in this session's scratchpad) passes all six.
+- **Login items** (P1, security): a name with an apostrophe ended the shell
+  quote. AppleScript-quoted, then shell-quoted, with a test.
+- **Upgrade** (P1): ran `rcc upgrade` on open. Opens in `--dry-run` now,
+  through a shared `DryRunFirst` screen with `apps`.
+- **Preferences** (P2): generated `Preferences` type; tsconfig includes
+  `raycast-env.d.ts`.
+- **Trash** (P2): kept as Finder — Raycast's `trash()` cannot empty the Trash.
+  The docstring says so.
+
+### The twelve commands, audited by measuring
+
+Findings that survived a measured comparison, all fixed, each with a bats test
+that measures rather than asserts exit 0. Per command, what was wrong:
+
+- **ports** — 81 outbound connections labelled "Reachable", bulk kill offered
+  on the browser and the shell (extension). lsof off PATH → "No ports found".
+  lsof as a user hides root's sshd on 22 and did not say so.
+- **memory** — ranked by RSS; the 23 GB process (56 MB RSS) never appeared.
+  "Total RSS" double-counted shared pages. sysctl off PATH → "Total RAM 0 GB".
+  Machine-wide figures now reach `--json`.
+- **env** — Raycast screen audited the extension's 7-dir PATH, not the
+  reader's 26. Symlinked PATH dir never descended. Empty tool version.
+  Text/JSON duplicate rules disagreed.
+- **network** — hardcoded nine interfaces (Tailscale's utun8 invisible).
+  172.20.x "WireGuard". Firewall tool failure → "disabled". System proxies
+  never read. AirPlay/rapportd/networkserviceproxy misidentified. "14/10 scans".
+- **xcode** — `installed` = `command -v xcrun`, always true. Two simulator
+  implementations (10 vs 15 vs 17). Vision Pro filtered out. DerivedData
+  counted itself.
+- **docker** — RECLAIMABLE in `size`; "hours" as status; header as a row;
+  daemon down = "No images found" under a tick.
+- **certs** — 13/42 names mangled and PATH-dependent; delete by name hit a
+  valid cert sharing the expired one's name; local-vs-GMT expiry; `--expiring`
+  listed valid certs; nonexistent keychain in the list.
+- **wifi** — link up with SSID withheld = "Not connected"; tools off PATH →
+  "no networks", exit 0; bulk forget promised to keep a network it could not
+  identify.
+- **startup** — labels were filename fragments (every bootout wrong); 539
+  "running" of which 352 idle; System Events refused = "no login items";
+  SMAppService background items unlisted; dead login item marked as opening.
+- **battery** — "0 cycles, 0% (poor)" in text when unmeasured; "on battery"
+  for a MacBook on AC holding its charge; README promised temperature.
+- **ssh** — measured (one key; passphrase, perms, .pub all agree with
+  ssh-keygen and stat). No finding. Caveat unmeasured here: a hardware key
+  (`-sk`) always fails `ssh-keygen -y` and would read as "no passphrase: no".
+- **overlap** — 35 vs 34 clashes against an independent count (one
+  edge: a doc dir under /Library/TeX/texbin). Fifty `/usr/bin` symlinks into
+  `/System/Library` read as orphans; attributed to `system` now, CLT/Xcode to
+  `xcode`, MacTeX to `tlmgr`. The remaining 400 orphans are XQuartz, Mono
+  and pip --user: genuinely unmanaged.
+
+One shared mechanism: `rcc_require_tools` in `lib/core/common.sh`. A tool
+missing from PATH is exit 3 with a message and NO document on stdout. The
+extension shows the message. `scripts/parser-matrix.ts` counts these as
+"declined", not failures.
+
+### JSON shape changes (the extension reads both old and new)
+
+`memory` is now an object (`memory` + `processes`, `footprint_kb`/`rss_kb`);
+`startup.user_agents` are objects with `label`; `certs` rows carry
+`keychain`/`sha256`; `wifi` has `connected`/`ssid_hidden`; `battery` has
+`power_source`; `docker.space` has `total`/`active`; `xcode` has
+`developer_dir`. Listed in CHANGELOG.md under Unreleased. This is a 0.19.0.
 
 ---
 
-## Constraints the author has stated
+## Open, in order of value
 
-Not preferences. Rules.
-
-- **No push, no PR, no tag, no release, no publishing** without being told so in
-  a separate message, each time.
-- **Branch and PR, never straight to `main`**, even though `main` is unprotected.
-  To move commits already made locally: `git switch -c <branch>` then
-  `git branch -f main origin/main`. Never `reset --hard`.
-- **`raycast-extension/assets/extension-icon.png` is read only.** The author's
-  own drawing, 512×512, no vector source.
-- **Never run `bin/fleet.sh` with no arguments.** It starts an audit and SSHes
-  to real machines.
-- **Never delete what you did not create.** Archive with `mv`.
-- Answers in Italian; code, commits and identifiers in English.
-- **No markdown tables in replies.** Prose or lists.
-- Verify by running the thing. "It looks right" is not done.
+1. **Publish and push** (above), when told. Then re-run the store checks on
+   the PR and answer Greptile if it re-reviews.
+2. **PR #60** now carries 13 commits and is no longer about backups. Merge as
+   is or split; the author decides.
+3. **Three screens never opened by a human**: Upgrade (now dry-run first),
+   Audit History, Scheduled Audit. `cd raycast-extension && npm run dev`.
+4. **A stale launchd job from the test suite**: `com.raccoon.audit` is loaded
+   in gui/501 from a plist in a deleted bats temp HOME (program =
+   this repo's bin/audit.sh). The tests bootstrap it and never boot it out.
+   `launchctl print gui/$(id -u)/com.raccoon.audit | grep path` shows it.
+   Not removed this session — not this session's to remove. The test that
+   loads it should `launchctl bootout` in teardown.
+5. **Not done, known**: wifi link quality (channel, RSSI) is in
+   system_profiler and not in the report; `network.dns` flattens supplemental
+   resolvers; `docker` says nothing about orphaned Docker Desktop state when
+   the CLI is gone; `startup --clean` still prompts interactively.
 
 ---
 
@@ -178,29 +143,37 @@ Not preferences. Rules.
 
 ```sh
 cd /Users/eugeniozamengopontrelli/Raccoon
-
-git log --oneline origin/main..HEAD     # the 5 unmerged commits
-gh pr view 60 && gh pr checks 60
-rcc --version                           # 0.18.1, from Homebrew
-bats tests/                             # 531 tests; ~2 min now, was ~17
+git log --oneline origin/main..HEAD          # 13 commits
+bats tests/                                  # ~600 tests
 shellcheck -S warning -x rcc bin/*.sh lib/core/*.sh lib/audit/*.sh
-
 cd raycast-extension
 npx tsc --noEmit && npm run lint && npm test && npm run build
-ls metadata/                            # six PNGs at 2000x1250
+npx prettier --no-editorconfig --check "src/**/*.{ts,tsx}" "scripts/*.ts"
+npm run test:matrix -- /Users/eugeniozamengopontrelli/Raccoon/rcc   # 90 cells
 ```
 
-The check that found the real scale of the original bug is **not in the
-repository**. It runs every `--json` command under five environments and feeds
-each result to the extension's own parser rather than a generic JSON check, so
-it catches schema drift as well as syntax:
+Measure, do not read. The method that found all of this:
 
-```
-/private/tmp/claude-501/-Users-eugeniozamengopontrelli/
-  a3c406cf-fde3-469a-b2b3-27bf6ea533dc/scratchpad/parser-matrix.ts
+```sh
+./rcc ports --json | jq '[.[]|select(.state=="LISTEN" and (.address|startswith("*:")))]|length'
+netstat -an -p tcp | awk '$NF=="LISTEN" && $4 ~ /^\*\./' | wc -l         # must agree
+./rcc memory --json --top 1 | jq '.processes[0].pid' | xargs -I{} sh -c 'top -l1 -o mem -n1 -stats pid | tail -1; echo {}'
+./rcc startup --json | jq -r '.user_agents[]|select(.loaded)|.label' | xargs -I{} launchctl print gui/$(id -u)/{} >/dev/null && echo "every label exists"
+env -i PATH=/usr/bin:/bin HOME=$HOME ./rcc network --json; echo "exit=$? (must be 3)"
 ```
 
-Copy it into `raycast-extension/`, run `node parser-matrix.ts <path-to-rcc>`,
-remove it after. Last run: 90 cells, 0 failures against the repo; 9 failures
-against the released 0.18.0, where only 2 were known. **It belongs in the
-repository.** It has been lost once and rebuilt once.
+---
+
+## Constraints the author has stated
+
+Not preferences. Rules.
+
+- **No push, no PR, no tag, no release, no publishing** without being told
+  so in a separate message, each time.
+- **Branch and PR, never straight to `main`.** Never `reset --hard`.
+- **`raycast-extension/assets/extension-icon.png` is read only.**
+- **Never run `bin/fleet.sh` with no arguments.** It SSHes to real machines.
+- **Never delete what you did not create.** Archive with `mv`.
+- Answers in Italian; code, commits and identifiers in English.
+- **No markdown tables in replies.**
+- Verify by running the thing. "It looks right" is not done.
