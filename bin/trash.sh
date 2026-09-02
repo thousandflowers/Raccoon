@@ -41,21 +41,75 @@ for arg in "$@"; do
 	esac
 done
 
+# The trash of every mounted volume that has one.
+#
+# macOS gives each volume its own `.Trashes/<uid>`: delete a file on an
+# external disk and it goes there, not to ~/.Trash. A report that reads only
+# the home one tells someone their trash is empty while a hundred gigabytes
+# sit on the drive they just unplugged.
+#
+# The boot volume is skipped — its trash is ~/.Trash, already counted — and so
+# is the synthetic snapshot mount, which is not a volume anyone puts files on.
+# The root is a parameter so a test can point it somewhere it may write:
+# /Volumes needs root, and a check that skips itself proves nothing.
+_trash_volume_dirs() {
+	local root="${1:-/Volumes}" vol uid
+	uid=$(id -u)
+	for vol in "$root"/*; do
+		[[ -d "$vol" ]] || continue
+		case "$(basename "$vol")" in
+			com.apple.TimeMachine.*) continue ;;
+		esac
+		# The boot volume appears here as a symlink to /.
+		[[ "$(readlink "$vol" 2>/dev/null)" == "/" ]] && continue
+		[[ -d "$vol/.Trashes/$uid" ]] || continue
+		printf '%s\n' "$vol/.Trashes/$uid"
+	done
+}
+
+# Size and item count of one trash directory, as `size<TAB>count`.
+_trash_measure() {
+	local dir="$1" size count
+	size=$( { du -sh "$dir" 2>/dev/null || true; } | awk '{print $1}')
+	[[ -z "$size" ]] && size="0"
+	count=$( { find "$dir" -mindepth 1 -maxdepth 1 2>/dev/null || true; } | wc -l | tr -dc '0-9')
+	[[ -z "$count" ]] && count="0"
+	printf '%s\t%s' "$size" "$count"
+}
+
 main() {
 	local trash_path="$HOME/.Trash"
 
 	# JSON is a clean machine-readable fast-path: emit only the object, no tables.
 	if [[ "$JSON_OUTPUT" == "true" ]]; then
-		local size="0" count="0"
+		local size="0" count="0" measured
 		if [[ -d "$trash_path" ]]; then
 			# Absorb a failing find/du INSIDE the pipe (|| true) — a trailing
 			# `|| echo 0` would concatenate onto wc's "0" and break the JSON.
-			size=$( { du -sh "$trash_path" 2>/dev/null || true; } | awk '{print $1}')
-			[[ -z "$size" ]] && size="0"
-			count=$( { find "$trash_path" -mindepth 1 -maxdepth 1 2>/dev/null || true; } | wc -l | tr -dc '0-9')
-			[[ -z "$count" ]] && count="0"
+			measured=$(_trash_measure "$trash_path")
+			size=${measured%%$'\t'*}
+			count=${measured##*$'\t'}
 		fi
-		printf '{"path":"%s","size":"%s","count":%s}\n' "$trash_path" "$size" "$count"
+		# rcc_json_string, not a bare %s: a volume named  O'Brien's disk  would
+		# otherwise close the string early and hand the reader a broken document.
+		printf '{"path":%s,"size":%s,"count":%s,\n' \
+			"$(rcc_json_string "$trash_path")" \
+			"$(rcc_json_string "$size")" \
+			"$(rcc_json_number "$count")"
+		printf ' "volumes":['
+		local vdir vmeasured vfirst=1
+		while IFS= read -r vdir; do
+			[[ -z "$vdir" ]] && continue
+			vmeasured=$(_trash_measure "$vdir")
+			[[ $vfirst -eq 1 ]] || printf ','
+			vfirst=0
+			printf '\n   {"path":%s,"size":%s,"count":%s}' \
+				"$(rcc_json_string "$vdir")" \
+				"$(rcc_json_string "${vmeasured%%$'\t'*}")" \
+				"$(rcc_json_number "${vmeasured##*$'\t'}")"
+		done < <(_trash_volume_dirs "${RCC_VOLUMES_ROOT:-/Volumes}")
+		[[ $vfirst -eq 1 ]] || printf '\n '
+		printf ']}\n'
 		return 0
 	fi
 

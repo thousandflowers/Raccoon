@@ -66,3 +66,26 @@ teardown() { teardown_raccoon_env; }
     assert_output_contains '"corrupted"'
     printf '%s' "$output" | python3 -c 'import json,sys; json.load(sys.stdin)'
 }
+
+@test "fonts: the system font folders are counted too" {
+    # /System/Library/Fonts holds 83 faces and Supplemental another 290 on a
+    # stock Mac. Counting only /Library/Fonts and ~/Library/Fonts is why the
+    # report printed `installed: 812` beside `fontconfig: 940` and explained
+    # neither: a third of the fonts on the machine were invisible to it.
+    run bash "$SCRIPT_DIR/bin/fonts.sh" --json
+    assert_success
+    assert_output_contains "/System/Library/Fonts"
+    assert_output_contains "Supplemental"
+    printf '%s' "$output" | python3 -c 'import json,sys; json.load(sys.stdin)'
+}
+
+@test "fonts: installed is the sum of every source it lists" {
+    run bash "$SCRIPT_DIR/bin/fonts.sh" --json
+    assert_success
+    printf '%s' "$output" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+total = sum(s["count"] for s in d["sources"])
+assert d["installed"] == total, f"installed {d[chr(34)+chr(34)]} != sum {total}" if False else f"installed {d} != sum {total}"
+'
+}

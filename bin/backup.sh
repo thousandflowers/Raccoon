@@ -124,6 +124,27 @@ _backup_age_hours() {
 	printf '%s' "$(((now - ts) / 3600))"
 }
 
+# Local snapshots: Time Machine's other half.
+#
+# When the backup disk is not attached, Time Machine keeps hourly snapshots on
+# the internal disk instead, and they hold blocks belonging to files already
+# deleted. A backup report that speaks only of the external destination misses
+# the copies that are actually on this machine, and misses the reason its disk
+# never empties.
+#
+# Asked of the Data volume by name: `diskutil apfs listSnapshots /` answers for
+# the sealed System volume and finds one OS-update snapshot, so a report built
+# on that says 1 where the truth is two dozen. Neither call needs sudo.
+_backup_can_read_snapshots() {
+	command -v diskutil >/dev/null 2>&1
+}
+
+_backup_snapshot_count() {
+	_backup_can_read_snapshots || { printf '0'; return 0; }
+	diskutil apfs listSnapshots /System/Volumes/Data 2>/dev/null \
+		| grep -c 'com.apple.TimeMachine' || true
+}
+
 _json_report() {
 	local dest kind phase latest date_ hours first path
 	dest=$(tmutil destinationinfo 2>/dev/null | grep "Name:" | head -1 | cut -d: -f2- | xargs || printf '')
@@ -144,6 +165,11 @@ _json_report() {
 	printf '  "running": %s,\n' "$([[ "$phase" != "BackupNotRunning" && "$phase" != "unknown" ]] && echo true || echo false)"
 	printf '  "last_backup": {"date": %s, "hours_ago": %s},\n' \
 		"$(rcc_json_string "$date_")" "$hours"
+
+	local snap_ok="false"
+	_backup_can_read_snapshots && snap_ok="true"
+	printf '  "local_snapshots": {"available": %s, "count": %s},\n' \
+		"$snap_ok" "$(rcc_json_number "$(_backup_snapshot_count)")"
 
 	printf '  "exclusions": ['
 	first=1
