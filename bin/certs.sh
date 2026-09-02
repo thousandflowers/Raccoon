@@ -57,125 +57,181 @@ while [[ $# -gt 0 ]]; do
 	shift
 done
 
-# The scan, once. Both the table and --json read the same lines:
-# cn|issuer|notAfter|status|self_signed, and a final SUMMARY: row.
+# The keychains the user's search list holds, one path per line. This is what
+# `security find-certificate` reads when given no keychain, so listing anything
+# else as a source would be a claim, not a measurement. The old list named
+# /System/Library/Keychains/SystemRoot.keychain, a file that does not exist.
+_certs_keychains() {
+	{
+		security list-keychains -d user 2>/dev/null
+		security list-keychains -d system 2>/dev/null
+	} | sed -n 's/^[[:space:]]*"\(.*\)"$/\1/p' | awk '!seen[$0]++'
+}
+
+# The scan, once. Both the table and --json read the same lines, tab-separated:
+# sha256, keychain, name, issuer, notAfter, status, self_signed — and a final
+# SUMMARY: row.
+#
+# Every certificate carries the keychain it came from and its SHA-256, because
+# a name is not an address: `security delete-certificate -c NAME` takes the
+# first match, and on this Mac the expired WWDR root's name also belongs to a
+# valid one. Names come from the RFC 2253 form of the subject so they do not
+# change with whichever openssl is first on PATH. Expiry is compared in UTC to
+# the second: a certificate with an hour left is expiring, not expired.
 _certs_scan() {
-	security find-certificate -a -p 2>/dev/null | python3 -c "
-import sys
+	python3 - "$EXPIRING_WINDOW" "$@" <<'PY'
+import re
 import subprocess
-from datetime import datetime
+import sys
+from datetime import datetime, timedelta, timezone
 
-data = sys.stdin.read()
-certs = data.split('-----BEGIN CERTIFICATE-----')
-certs = [c for c in certs if c.strip()]
+window = timedelta(days=int(sys.argv[1]))
+keychains = sys.argv[2:]
+now = datetime.now(timezone.utc)
 
-total = 0
-valid = 0
-expiring = 0
-expired = 0
-selfsigned = 0
-now = datetime.now()
 
-for cert in certs:
-    pem = '-----BEGIN CERTIFICATE-----' + cert
-    try:
-        proc = subprocess.Popen(['openssl', 'x509', '-noout', '-subject', '-issuer', '-enddate'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out, _ = proc.communicate(input=pem.encode())
-        lines = out.decode().strip().split('\n')
-        subject = ''
-        issuer = ''
-        enddate = ''
-        for l in lines:
-            if l.startswith('subject='):
-                subject = l.replace('subject=', '')
-            elif l.startswith('issuer='):
-                issuer = l.replace('issuer=', '')
-            elif l.startswith('notAfter='):
-                enddate = l.replace('notAfter=', '')
-        
-        if not enddate:
+def rdn(field, dn):
+    # RFC 2253: comma-separated, a comma inside a value escaped with a backslash.
+    for part in re.split(r'(?<!\\),', dn):
+        key, _, value = part.partition('=')
+        if key.strip() == field:
+            return re.sub(r'\\(.)', r'\1', value.strip())
+    return ''
+
+
+def name_of(dn):
+    return rdn('CN', dn) or rdn('OU', dn) or rdn('O', dn) or dn
+
+
+def not_checked(why):
+    sys.stderr.write('Not checked: ' + why + '\n')
+    sys.exit(3)
+
+
+counts = dict(total=0, valid=0, expiring=0, expired=0, self_signed=0)
+for keychain in keychains:
+    listing = subprocess.run(
+        ['security', 'find-certificate', '-a', '-p', '-Z', keychain],
+        capture_output=True, text=True)
+    if listing.returncode != 0:
+        not_checked(f'could not read {keychain}: {listing.stderr.strip()}')
+    for block in listing.stdout.split('SHA-256 hash: ')[1:]:
+        sha256 = block.split('\n', 1)[0].strip()
+        start = block.find('-----BEGIN CERTIFICATE-----')
+        if start < 0:
             continue
-            
+        x509 = subprocess.run(
+            ['openssl', 'x509', '-noout', '-subject', '-issuer', '-enddate',
+             '-nameopt', 'RFC2253'],
+            input=block[start:], capture_output=True, text=True)
+        if x509.returncode != 0:
+            not_checked(f'openssl could not read a certificate in {keychain}: '
+                        f'{x509.stderr.strip()}')
+        fields = {}
+        for line in x509.stdout.splitlines():
+            key, _, value = line.partition('=')
+            fields[key.strip()] = value.strip()
+        end = fields.get('notAfter', '')
         try:
-            exp = datetime.strptime(enddate.replace(' GMT', ''), '%b %d %H:%M:%S %Y')
-        except:
-            continue
-            
-        diff = (exp - now).days
-        
-        if diff < 0:
+            expires = datetime.strptime(end.replace(' GMT', ''),
+                                        '%b %d %H:%M:%S %Y')
+        except ValueError:
+            not_checked(f'unreadable expiry {end!r} in {keychain}')
+        remaining = expires.replace(tzinfo=timezone.utc) - now
+        if remaining < timedelta(0):
             status = 'expired'
-        elif diff <= ${EXPIRING_WINDOW}:
+        elif remaining <= window:
             status = 'expiring'
         else:
             status = 'valid'
-            
-        cn = subject.split('CN=')[-1].split('/')[0] if 'CN=' in subject else subject
-        issuer_cn = issuer.split('CN=')[-1].split('/')[0] if 'CN=' in issuer else issuer
-        is_self = 'yes' if cn == issuer_cn else 'no'
-        
-        print(f'{cn}|{issuer_cn}|{enddate}|{status}|{is_self}')
-        
-        total += 1
-        if status == 'valid':
-            valid += 1
-        elif status == 'expiring':
-            expiring += 1
-        elif status == 'expired':
-            expired += 1
-        if is_self == 'yes':
-            selfsigned += 1
-    except:
-        pass
+        subject, issuer = fields.get('subject', ''), fields.get('issuer', '')
+        self_signed = subject == issuer
+        counts['total'] += 1
+        counts[status] += 1
+        counts['self_signed'] += self_signed
+        print('\t'.join([sha256, keychain, name_of(subject), name_of(issuer),
+                         end, status, 'yes' if self_signed else 'no']))
+print('SUMMARY:%d|%d|%d|%d|%d' % (counts['total'], counts['valid'],
+                                   counts['expiring'], counts['expired'],
+                                   counts['self_signed']))
+PY
+}
 
-print(f'SUMMARY:{total}|{valid}|{expiring}|{expired}|{selfsigned}')
-"
+# Which rows the table shows. With no filter, all of them; --expired keeps the
+# expired ones, --expiring N the ones inside the window. The old rule for
+# --expiring hid only the expired rows, so it listed every valid certificate as
+# if it were about to lapse while --json, with the same flag, said 0.
+_certs_row_shown() {
+	local status="$1"
+	if [[ "$SHOW_EXPIRED" != true && $SHOW_EXPIRING -eq 0 ]]; then
+		return 0
+	fi
+	[[ "$SHOW_EXPIRED" == true && "$status" == "expired" ]] && return 0
+	[[ $SHOW_EXPIRING -gt 0 && "$status" == "expiring" ]] && return 0
+	return 1
 }
 
 _json_report() {
-	local details summary cn issuer end status self first=1
-	details=$(_certs_scan)
+	local details summary sha kc cn issuer end status self first=1
+	local keychains=()
+	while IFS= read -r kc; do
+		[[ -n "$kc" ]] && keychains+=("$kc")
+	done < <(_certs_keychains)
+	details=$(_certs_scan ${keychains[@]+"${keychains[@]}"})
 	summary=$(printf '%s\n' "$details" | grep "SUMMARY:" | sed 's/^SUMMARY://')
 
 	printf '{\n'
 	printf '  "counts": {"total": %s, "valid": %s, "expiring": %s, "expired": %s, "self_signed": %s},\n' \
-		"$(printf '%s' "$summary" | cut -d'|' -f1)" \
-		"$(printf '%s' "$summary" | cut -d'|' -f2)" \
-		"$(printf '%s' "$summary" | cut -d'|' -f3)" \
-		"$(printf '%s' "$summary" | cut -d'|' -f4)" \
-		"$(printf '%s' "$summary" | cut -d'|' -f5)"
+		"$(rcc_json_number "$(printf '%s' "$summary" | cut -d'|' -f1)")" \
+		"$(rcc_json_number "$(printf '%s' "$summary" | cut -d'|' -f2)")" \
+		"$(rcc_json_number "$(printf '%s' "$summary" | cut -d'|' -f3)")" \
+		"$(rcc_json_number "$(printf '%s' "$summary" | cut -d'|' -f4)")" \
+		"$(rcc_json_number "$(printf '%s' "$summary" | cut -d'|' -f5)")"
 	printf '  "expiring_window_days": %s,\n' "$EXPIRING_WINDOW"
 
 	printf '  "certificates": ['
-	while IFS='|' read -r cn issuer end status self; do
-		[[ -z "$cn" ]] && continue
+	while IFS=$'\t' read -r sha kc cn issuer end status self; do
+		[[ -z "$sha" ]] && continue
 		[[ $first -eq 1 ]] || printf ','
 		first=0
-		printf '\n    {"name": %s, "issuer": %s, "expires": %s, "status": %s, "self_signed": %s}' \
+		printf '\n    {"name": %s, "issuer": %s, "expires": %s, "status": %s, "self_signed": %s, "keychain": %s, "sha256": %s}' \
 			"$(rcc_json_string "$cn")" "$(rcc_json_string "$issuer")" \
 			"$(rcc_json_string "$end")" "$(rcc_json_string "$status")" \
-			"$([[ "$self" == "yes" ]] && echo true || echo false)"
+			"$([[ "$self" == "yes" ]] && echo true || echo false)" \
+			"$(rcc_json_string "$kc")" "$(rcc_json_string "$sha")"
 	done < <(printf '%s\n' "$details" | grep -v "SUMMARY:")
 	[[ $first -eq 1 ]] || printf '\n  '
 	printf '],\n'
 
-	printf '  "keychains": [\n    %s,\n    %s,\n    %s\n  ]\n}\n' \
-		"$(rcc_json_string "$HOME/Library/Keychains/login.keychain-db")" \
-		"$(rcc_json_string "/Library/Keychains/System.keychain")" \
-		"$(rcc_json_string "/System/Library/Keychains/SystemRoot.keychain")"
+	printf '  "keychains": ['
+	first=1
+	for kc in ${keychains[@]+"${keychains[@]}"}; do
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    %s' "$(rcc_json_string "$kc")"
+	done
+	[[ $first -eq 1 ]] || printf '\n  '
+	printf ']\n}\n'
 }
 
 main() {
+	rcc_require_tools security openssl python3
 	if [[ "${JSON_OUTPUT:-false}" == "true" ]]; then
 		_json_report
 		return 0
 	fi
 	print_section_header "Certificates Status"
-	
-	print_step 1 3 "User Keychain Certificates"
-	
+
+	print_step 1 3 "Keychain Certificates"
+
+	local kc
+	local keychains=()
+	while IFS= read -r kc; do
+		[[ -n "$kc" ]] && keychains+=("$kc")
+	done < <(_certs_keychains)
+
 	local details
-	details=$(_certs_scan)
+	details=$(_certs_scan ${keychains[@]+"${keychains[@]}"})
 	
 	local summary
 	# Strip the "SUMMARY:" prefix so cut -f1 is `total`, not "SUMMARY:total"
@@ -211,17 +267,8 @@ main() {
 		if [[ -n "$cert_lines" ]]; then
 			printf "%-35s %-18s %-12s %-10s\n" "Certificate" "Issuer" "Expires" "Status"
 			print_info "────────────────────────────────────────────────────────────────────────"
-			while IFS='|' read -r cn issuer end_date status _; do
-				local show=true
-				
-				if [[ "$SHOW_EXPIRED" == true ]] && [[ "$status" != "expired" ]]; then
-					show=false
-				fi
-				if [[ $SHOW_EXPIRING -gt 0 ]] && [[ "$status" == "expired" ]]; then
-					show=false
-				fi
-				
-				if [[ "$show" == true ]]; then
+			while IFS=$'\t' read -r _ _ cn issuer end_date status _; do
+				if _certs_row_shown "$status"; then
 					local status_color
 					case "$status" in
 						valid) status_color="${GREEN}$status${NC}" ;;
@@ -238,11 +285,12 @@ main() {
 	fi
 	
 	echo ""
-	print_step 3 3 "Keychain Locations"
-	print_info "$HOME/Library/Keychains/login.keychain-db"
-	print_info "/Library/Keychains/System.keychain"
-	print_info "/System/Library/Keychains/SystemRoot.keychain"
-	print_success "Keychain locations listed"
+	print_step 3 3 "Keychains Searched"
+	for kc in ${keychains[@]+"${keychains[@]}"}; do
+		print_info "$kc"
+	done
+	[[ ${#keychains[@]} -gt 0 ]] || print_warning "No keychain in the search list"
+	print_success "${#keychains[@]} keychains searched. System Roots are trusted by macOS and left out."
 	
 	echo ""
 	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"

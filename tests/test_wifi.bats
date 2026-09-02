@@ -45,3 +45,42 @@ teardown() {
 	assert_success
 	[[ "$output" != *"Mostrare le password"* ]]
 }
+
+# --- measured, not read: the findings of 2026-09-02 ---------------------------
+
+@test "wifi --json says whether the link is up, apart from whether the name is known" {
+	run bash "$SCRIPT_DIR/bin/wifi.sh" --json
+	assert_success
+	printf '%s' "$output" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+assert isinstance(d["connected"], bool)
+assert isinstance(d["ssid_hidden"], bool)
+# The name can only be hidden on a link that is up.
+assert not (d["ssid_hidden"] and not d["connected"])
+assert not (d["ssid_hidden"] and d["active_ssid"])
+'
+}
+
+@test "wifi without /usr/sbin is 'not checked', not 'Not connected' with no networks" {
+	# networksetup and ipconfig live in /usr/sbin. The old script answered
+	# "en0", "Not connected" and "No saved networks" with exit 0 without them.
+	run env -i PATH=/usr/bin:/bin HOME="$HOME" bash "$SCRIPT_DIR/bin/wifi.sh" --json
+	[[ "$status" -eq 3 ]]
+	[[ "$output" == *"Not checked"* ]]
+	[[ "$output" != *'"known_networks"'* ]]
+}
+
+@test "wifi text mode does not print 'Not connected' while the link is up" {
+	run bash "$SCRIPT_DIR/bin/wifi.sh" --json
+	assert_success
+	local up
+	up=$(printf '%s' "$output" | python3 -c 'import json,sys; print(json.load(sys.stdin)["connected"])')
+	run bash "$SCRIPT_DIR/bin/wifi.sh" --active
+	assert_success
+	if [[ "$up" == "True" ]]; then
+		[[ "$output" != *"Not connected"* ]]
+	else
+		[[ "$output" == *"Not connected"* ]]
+	fi
+}

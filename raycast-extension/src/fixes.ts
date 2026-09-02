@@ -96,18 +96,21 @@ export function bootoutAgents(labels: string[]): string {
 }
 
 /**
- * Delete an expired certificate from the login keychain.
+ * Delete an expired certificate from the login keychain, by SHA-256.
  *
  * Scoped to login.keychain-db on purpose: the System keychain holds roots that
  * other software depends on, and an expired one there is not the reader's to
- * clean up from a list.
+ * clean up from a list. By hash, not by name: `-c NAME` deletes the first
+ * certificate with that name, and names repeat — the expired WWDR root on one
+ * Mac shares its name with a valid one.
  */
-export function deleteCertificates(names: string[]): string {
-	if (names.length === 0) throw new Error("No certificate to delete.");
-	return names
+export function deleteCertificates(sha256s: string[]): string {
+	const valid = sha256s.filter((h) => /^[0-9A-Fa-f]{64}$/.test(h));
+	if (valid.length === 0) throw new Error("No certificate to delete.");
+	return valid
 		.map(
-			(n) =>
-				`security delete-certificate -c ${q(n)} ~/Library/Keychains/login.keychain-db`,
+			(h) =>
+				`security delete-certificate -Z ${q(h)} ~/Library/Keychains/login.keychain-db`,
 		)
 		.join("; ");
 }

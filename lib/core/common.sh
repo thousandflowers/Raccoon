@@ -105,6 +105,21 @@ print_info() {
     echo "${GRAY}○${NC} $*"
 }
 
+# A required tool that is not on PATH is a failure to report, not a zero to
+# print. "0 ports", "Total RAM 0 GB", "Not connected", "no login items": each
+# of those came out of /usr/sbin being absent from a caller's PATH and was
+# printed as a measurement. Nothing goes to stdout, so a --json reader sees no
+# document rather than an empty one. Exit 3 means "not checked": neither a
+# finding nor a crash.
+rcc_require_tools() {
+    local tool
+    for tool in "$@"; do
+        command -v "$tool" >/dev/null 2>&1 && continue
+        print_error "Not checked: '${tool}' is not on PATH. It usually lives in /usr/sbin or /sbin."
+        exit 3
+    done
+}
+
 # One JSON string escape for every command that emits JSON. It lived twice, in
 # audit.sh and wifi.sh, and the third copy was going to be the one that forgot
 # the backslash. Backslash first: escaping quotes first would then escape the
