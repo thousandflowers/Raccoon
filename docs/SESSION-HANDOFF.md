@@ -13,7 +13,7 @@ below has the command that proves it. Run them.
 ```
 repo        /Users/eugeniozamengopontrelli/Raccoon
 branch      fix/backup-counts-local-snapshots  (PR #60 open; 12 commits
-            ahead of origin/main, 7 of them NOT pushed — see "Not pushed")
+            ahead of origin/main; everything after c077c45 is NOT pushed — see "Not pushed")
 main        51b3fd0 — matches origin/main, untouched this session
 released    v0.18.1 (brew). Nothing tagged this session.
 store       raycast/extensions#30701 in review. The fixes for its two red
