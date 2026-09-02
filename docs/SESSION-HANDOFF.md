@@ -12,7 +12,7 @@ below has the command that proves it. Run them.
 
 ```
 repo        /Users/eugeniozamengopontrelli/Raccoon
-branch      fix/backup-counts-local-snapshots  (PR #60 open; 13 commits
+branch      fix/backup-counts-local-snapshots  (PR #60 open; 12 commits
             ahead of origin/main, 7 of them NOT pushed — see "Not pushed")
 main        51b3fd0 — matches origin/main, untouched this session
 released    v0.18.1 (brew). Nothing tagged this session.
@@ -122,7 +122,7 @@ extension shows the message. `scripts/parser-matrix.ts` counts these as
 
 1. **Publish and push** (above), when told. Then re-run the store checks on
    the PR and answer Greptile if it re-reviews.
-2. **PR #60** now carries 13 commits and is no longer about backups. Merge as
+2. **PR #60** now carries 12 commits and is no longer about backups. Merge as
    is or split; the author decides.
 3. **Three screens never opened by a human**: Upgrade (now dry-run first),
    Audit History, Scheduled Audit. `cd raycast-extension && npm run dev`.
@@ -143,7 +143,7 @@ extension shows the message. `scripts/parser-matrix.ts` counts these as
 
 ```sh
 cd /Users/eugeniozamengopontrelli/Raccoon
-git log --oneline origin/main..HEAD          # 13 commits
+git log --oneline origin/main..HEAD          # 12 commits
 bats tests/                                  # ~600 tests
 shellcheck -S warning -x rcc bin/*.sh lib/core/*.sh lib/audit/*.sh
 cd raycast-extension
