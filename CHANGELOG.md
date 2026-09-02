@@ -3,7 +3,11 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
-## [Unreleased]
+## [1.0.0] - 2026-09-02
+
+1.0 because `--json` is now a contract: the Raycast extension in the store
+reads it, so from here a change to a document's shape is a major version
+and an addition is a minor one.
 
 Twelve commands audited by measuring, not reading: run the command, ask
 macOS the same question another way, compare the two numbers. Thirty-odd

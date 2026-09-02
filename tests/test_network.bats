@@ -120,8 +120,13 @@ for i in d["interfaces"]:
 }
 
 @test "network: an iPhone hotspot address is private space, not WireGuard" {
-	# The function alone, on the ranges that used to be misread.
-	run bash -c 'source "$1"; categorize_interface 172.20.10.3; categorize_interface 172.31.255.1; categorize_interface 172.32.0.1; categorize_interface 2a02:b027::1; categorize_interface fd7a:115c:a1e0::1; categorize_interface 100.100.1.1; categorize_interface 10.0.0.5' _ <(sed -n '/^categorize_interface()/,/^}/p' "$SCRIPT_DIR/bin/network.sh")
+	# The function alone, on the ranges that used to be misread. Written to a
+	# file rather than handed over as <(...): a process substitution does not
+	# survive `run` under the system's bash 3.2, which is first on CI's PATH.
+	local fn="$HOME/categorize_interface.sh"
+	sed -n '/^categorize_interface()/,/^}/p' "$SCRIPT_DIR/bin/network.sh" > "$fn"
+	run bash -c 'source "$1"; shift; for a in "$@"; do categorize_interface "$a"; done' _ "$fn" \
+		172.20.10.3 172.31.255.1 172.32.0.1 2a02:b027::1 fd7a:115c:a1e0::1 100.100.1.1 10.0.0.5
 	assert_success
 	[[ "${lines[0]}" == "Private" ]]
 	[[ "${lines[1]}" == "Private" ]]

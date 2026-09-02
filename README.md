@@ -107,11 +107,11 @@ rcc audit --baseline      # snapshot now; later runs diff against it
 rcc audit --verbose       # show the exact command + raw output behind each check
 ```
 
-`--json` is implemented by 7 of the 22 commands (`audit`, `battery`, `memory`,
-`overlap`, `ports`, `trash`, `wifi`). Eight more refuse it with exit 64 and a
-one-line reason rather than printing the human report and calling it JSON. On
-`audit`, `--csv` still appends its rows below the boxed report instead of
-replacing it.
+`--json` is implemented by 21 of the 22 commands; `apps` is the one that
+updates things rather than reporting them. A report never invents a number: a
+tool missing from PATH is exit 3 with "Not checked" and no document, and a
+figure the system did not give is `null`, not 0. On `audit`, `--csv` still
+appends its rows below the boxed report instead of replacing it.
 
 ```bash
 rcc audit --cis           # map checks to the CIS Apple macOS Benchmark + coverage
