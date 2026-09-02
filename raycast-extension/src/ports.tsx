@@ -28,18 +28,21 @@ import { RccNotFoundError, resolveRcc, RUNTIME_PATH } from "./rcc";
 const TINT: Record<Exposure, Color> = {
 	exposed: Color.Orange,
 	local: Color.Green,
+	connected: Color.Blue,
 	idle: Color.SecondaryText,
 };
 
 const ICON: Record<Exposure, Icon> = {
 	exposed: Icon.Globe,
 	local: Icon.House,
+	connected: Icon.Link,
 	idle: Icon.Circle,
 };
 
 const LABEL: Record<Exposure, string> = {
 	exposed: "Reachable",
 	local: "This Mac only",
+	connected: "Connected",
 	idle: "Not bound",
 };
 
@@ -173,7 +176,7 @@ export default function Command() {
 			isLoading={isLoading}
 			navigationTitle={
 				ports.length > 0
-					? `Ports — ${ports.length} open, ${reachable} reachable`
+					? `Ports — ${reachable} reachable, ${ports.length} sockets`
 					: "Ports"
 			}
 			searchBarPlaceholder="Search by port, process or address"
