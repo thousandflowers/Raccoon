@@ -3,6 +3,49 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [0.18.1] - 2026-09-02
+
+A release about looking in the right place. Every fix here is the same defect
+wearing different clothes: a report that answered confidently from the wrong
+source, and a reader who had no way to tell.
+
+### Fixed
+
+- **`fonts` counted a third of the machine's fonts and called it all of them.**
+  It read `/Library/Fonts` and `~/Library/Fonts`, skipped
+  `/System/Library/Fonts` and its Supplemental folder, and printed the total
+  as `installed` — with fontconfig's larger number directly underneath and no
+  word about the gap. All four sources are listed now; the total went from 812
+  to 1184 on the machine this was found on.
+
+- **`fonts` took fifteen seconds**, because it ran `fc-scan` once per font
+  file. That is past the ten seconds a Raycast command is given, so the process
+  was killed mid-document and the reader was told rcc emits broken JSON. One
+  `fc-scan` answers the same question in under a second, and the same count is
+  checked against planted unreadable files. The text report kept a second copy
+  of that loop, so the Go TUI stayed slow after the JSON was fixed — and the
+  two could have disagreed about one machine. They share a function now.
+
+- **Local APFS snapshots were invisible.** `disk` and `backup` now report them.
+  They hold blocks belonging to files already deleted, which is why a disk stays
+  full after the Trash is emptied — two dozen of them sat unreported on the
+  machine that found this. Both ask the Data volume by name: `diskutil apfs
+  listSnapshots /` answers for the sealed System volume and finds the single
+  OS-update snapshot, so a report built on it says 1 where the truth is 24.
+  Neither call needs sudo.
+
+- **"Could not check" is no longer reported as "none".** Without `diskutil` on
+  PATH the snapshot count is 0 either way, and on a disk that is full of
+  snapshots those are opposite answers. Both reports now say which one it is.
+
+- **`trash` read `~/.Trash` alone.** Every volume keeps its own
+  `.Trashes/<uid>`: a file deleted on an external disk was counted nowhere. Its
+  path also reached the document through a bare `%s`, so a volume named
+  `O'Brien's disk` would have closed the JSON string early.
+
+- **`network --json` printed the connection count twice**, a bare number on a
+  line of its own, whenever `netstat` was not on PATH.
+
 ## [0.18.0] - 2026-09-01
 
 0.17.0 was tagged and never released. Its CI failed on three tests asserting
