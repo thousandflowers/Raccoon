@@ -125,6 +125,16 @@ export function startBackup(): string {
 	return "tmutil startbackup --auto";
 }
 
+/**
+ * The port list as root. lsof shows a non-root caller only its own sockets
+ * and does not say so: sshd on 22 is invisible from the list a port check
+ * exists to produce. This is the one screen whose answer needs the other
+ * half, and the other half needs a terminal to ask for the password.
+ */
+export function portsAsRoot(rcc: string): string {
+	return `sudo ${q(rcc)} ports`;
+}
+
 /** Show every place a name resolves from, in PATH order. */
 export function whichAll(name: string): string {
 	return `which -a ${q(name)}`;

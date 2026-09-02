@@ -242,3 +242,24 @@ assert_valid_json() {
 	assert_success
 	[[ "$(printf '%s' "$output" | grep -c '^| 800')" -eq 3 ]]
 }
+
+# --- measured, not read: the findings of 2026-09-02 ---------------------------
+
+@test "ports: without lsof it is 'not checked', never 'No ports found'" {
+	# lsof lives in /usr/sbin. The old script printed [] and exit 0 without it.
+	run env -i PATH=/usr/bin:/bin HOME="$HOME" bash "$SCRIPT_DIR/bin/ports.sh" --json
+	[[ "$status" -eq 3 ]]
+	[[ "$output" == *"Not checked"*"lsof"* ]]
+	[[ "$output" != "["* ]]
+	run env -i PATH=/usr/bin:/bin HOME="$HOME" bash "$SCRIPT_DIR/bin/ports.sh"
+	[[ "$status" -eq 3 ]]
+	[[ "$output" != *"No ports found"* ]]
+}
+
+@test "ports: the text says whose sockets it can see" {
+	[[ $EUID -ne 0 ]] || skip "as root every socket is listed"
+	run bash "$SCRIPT_DIR/bin/ports.sh"
+	assert_success
+	assert_output_contains "other users"
+	assert_output_contains "sudo rcc ports"
+}

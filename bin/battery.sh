@@ -39,6 +39,28 @@ _battery_charge() {
 	pmset -g batt 2>/dev/null | grep -oE '[0-9]+%' | head -1 | tr -d '%' || true
 }
 
+# Where the power comes from, per pmset's first line: "ac", "battery" or
+# nothing. Not the same as charging: a MacBook on its adapter with macOS
+# holding the charge at 80% is on AC and not charging, and the extension
+# used to call that "on battery".
+_power_source() {
+	local line
+	line=$(pmset -g batt 2>/dev/null | head -1 || true)
+	case "$line" in
+		*"'AC Power'"*) printf 'ac' ;;
+		*"'Battery Power'"*) printf 'battery' ;;
+		*) printf '' ;;
+	esac
+}
+
+_power_source_label() {
+	case "$(_power_source)" in
+		ac) printf 'AC adapter' ;;
+		battery) printf 'Battery' ;;
+		*) printf '%s' "${GRAY}not reported${NC}" ;;
+	esac
+}
+
 get_battery_info() {
 	local battery_info
 	battery_info=$(system_profiler SPPowerDataType 2>/dev/null)
@@ -109,40 +131,41 @@ display_battery_status() {
 		charge=$(_battery_charge)
 	fi
 
-	[[ -z "$charge" ]] && charge="0"
-	[[ -z "$cycle_count" ]] && cycle_count="0"
-	[[ -z "$max_capacity" ]] && max_capacity="0"
-	[[ -z "$condition" ]] && condition="N/A"
-	[[ -z "$charging" ]] && charging="No"
-	[[ -z "$full" ]] && full="No"
-
-	local health_color health_percent
-	if [[ $max_capacity -ge 80 ]]; then
-		health_color="${GREEN}"
-		health_percent="good"
-	elif [[ $max_capacity -ge 60 ]]; then
-		health_color="${YELLOW}"
-		health_percent="fair"
+	# A figure system_profiler did not report is "not reported", never 0: the
+	# old defaults graded a 694-cycle, 85% battery as "0 cycles, 0% (poor)"
+	# whenever system_profiler was off PATH, while --json said null.
+	local capacity_cell
+	if [[ -n "$max_capacity" ]]; then
+		local health_color health_percent
+		if [[ $max_capacity -ge 80 ]]; then
+			health_color="${GREEN}"; health_percent="good"
+		elif [[ $max_capacity -ge 60 ]]; then
+			health_color="${YELLOW}"; health_percent="fair"
+		else
+			health_color="${RED}"; health_percent="poor"
+		fi
+		capacity_cell="${health_color}${max_capacity}%${NC} (${health_percent})"
 	else
-		health_color="${RED}"
-		health_percent="poor"
+		capacity_cell="${GRAY}not reported${NC}"
 	fi
 
 	print_section_header "Battery Status"
 
-	print_table_header "Metric|Value" 15 20
-	print_table_row "Cycle Count|${cycle_count:-0}" 15 20
-	print_table_row "Max Capacity|${health_color}${max_capacity}%${NC} (${health_percent})" 15 20
-	print_table_row "Condition|${condition:-N/A}" 15 20
-	print_table_row "Charge Level|${charge:-0}%" 15 20
-	print_table_row "Charging|${charging:-No}" 15 20
-	print_table_row "Fully Charged|${full:-No}" 15 20
+	print_table_header "Metric|Value" 15 24
+	print_table_row "Cycle Count|${cycle_count:-${GRAY}not reported${NC}}" 15 24
+	print_table_row "Max Capacity|${capacity_cell}" 15 24
+	print_table_row "Condition|${condition:-${GRAY}not reported${NC}}" 15 24
+	print_table_row "Charge Level|${charge:+${charge}%}${charge:-${GRAY}not reported${NC}}" 15 24
+	print_table_row "Power Source|$(_power_source_label)" 15 24
+	print_table_row "Charging|${charging:-${GRAY}not reported${NC}}" 15 24
+	print_table_row "Fully Charged|${full:-${GRAY}not reported${NC}}" 15 24
 
 	echo ""
 	print_success "Completed"
 }
 
 main() {
+	rcc_require_tools pmset system_profiler
 	if [[ "$JSON_OUTPUT" == "true" ]]; then
 		local data
 		data=$(get_battery_info)
@@ -173,9 +196,13 @@ main() {
 		local condition_json="null"
 		[[ -z "$condition" ]] || condition_json=$(printf '"%s"' "$condition")
 
+		local power_source_json="null"
+		[[ -z "$(_power_source)" ]] || power_source_json=$(printf '"%s"' "$(_power_source)")
+
 		cat <<EOF
 {
   "present": $present,
+  "power_source": $power_source_json,
   "cycle_count": $cycle_count,
   "max_capacity_percent": $max_capacity,
   "condition": $condition_json,
