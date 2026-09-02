@@ -1,4 +1,4 @@
-import { Color, Icon, List } from "@raycast/api";
+import { Action, ActionPanel, Color, Icon, Keyboard, List } from "@raycast/api";
 import { openApp, openSettings, reveal, SETTINGS } from "./fixes";
 import { RccList } from "./rcc-list";
 import { RowActions } from "./resolve";
@@ -105,6 +105,70 @@ function Rows({ d, actions }: { d: DiskReport; actions: React.ReactNode }) {
 					);
 				})}
 			</List.Section>
+
+			{/* The reason a disk stays full after you empty the Trash: a snapshot
+			    holds on to the blocks of files already deleted. Shown between the
+			    volumes and the container because it explains the gap between
+			    them — and shown as "not checked" rather than "none" when rcc
+			    could not look, because on a full disk those are opposite answers. */}
+			{!d.snapshots.available || d.snapshots.count > 0 ? (
+				<List.Section title="Local snapshots">
+					<List.Item
+						icon={{
+							source: d.snapshots.available
+								? Icon.Clock
+								: Icon.QuestionMark,
+							tintColor: !d.snapshots.available
+								? Color.SecondaryText
+								: d.snapshots.count > 10
+									? Color.Orange
+									: Color.SecondaryText,
+						}}
+						title={
+							d.snapshots.available
+								? `${d.snapshots.count} snapshots`
+								: "Not checked"
+						}
+						subtitle={
+							d.snapshots.available
+								? "They hold blocks from files you have already deleted"
+								: "diskutil was not on the PATH rcc was given"
+						}
+						accessories={
+							d.snapshots.available
+								? [
+										...(d.snapshots.oldest
+											? [
+													{
+														text: `oldest ${d.snapshots.oldest}`,
+													},
+												]
+											: []),
+										{
+											tag: {
+												value: `${d.snapshots.reclaimable} reclaimable`,
+												color:
+													d.snapshots.reclaimable > 0
+														? Color.Orange
+														: Color.SecondaryText,
+											},
+										},
+									]
+								: []
+						}
+						actions={
+							<ActionPanel>
+								<Action.CopyToClipboard
+									title="Copy the Command That Frees Them"
+									content="tmutil deletelocalsnapshots /"
+									shortcut={Keyboard.Shortcut.Common.Copy}
+								/>
+								{actions}
+							</ActionPanel>
+						}
+					/>
+				</List.Section>
+			) : null}
 
 			{d.apfs_container.reference ? (
 				<List.Section title="APFS container">

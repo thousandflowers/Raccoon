@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { expectObject, extractJson } from "./json-out.ts";
+import {
+	expectObject,
+	extractJson,
+	readJson,
+	JSON_TIMEOUT_MS,
+} from "./json-out.ts";
 
 test("a report printed before the JSON is still read", () => {
 	const parsed = extractJson('[1/3] scanning...\n{"a":1}', "certs");
@@ -65,4 +70,49 @@ test("empty output says so instead of guessing", () => {
 
 test("valid JSON that is not an object is refused by name", () => {
 	assert.throws(() => expectObject("[1,2]", "memory"), /not a report object/);
+});
+
+test("a command killed by its timeout is reported as cut off, not as bad JSON", () => {
+	// The shape that reached a user: `fonts --json` outran useExec's timeout,
+	// Raycast killed it, and the document stopped one line before its closing
+	// brace. Parsing that fragment blamed rcc for a defect it does not have.
+	const truncated =
+		'{\n  "installed": 812,\n  "fontconfig": {"fonts": 940},\n';
+	assert.throws(
+		() =>
+			readJson("fonts", (s) => expectObject(s, "fonts"))({
+				stdout: truncated,
+				stderr: "",
+				exitCode: null,
+				signal: "SIGTERM",
+			}),
+		/cut off/,
+	);
+});
+
+test("the cut-off message names the timeout, so the reader knows what to raise", () => {
+	assert.throws(
+		() =>
+			readJson("fonts", () => ({}))({
+				stdout: "",
+				stderr: "",
+				exitCode: null,
+				signal: "SIGTERM",
+			}),
+		new RegExp(String(JSON_TIMEOUT_MS / 1000)),
+	);
+});
+
+test("an ordinary failure is not mistaken for a timeout", () => {
+	// exitCode 2 is how rcc reports findings; it is not a failure to parse.
+	const doc = '{"installed": 1}';
+	assert.deepEqual(
+		readJson("fonts", (s) => expectObject(s, "fonts"))({
+			stdout: doc,
+			stderr: "",
+			exitCode: 2,
+			signal: null,
+		}),
+		{ installed: 1 },
+	);
 });

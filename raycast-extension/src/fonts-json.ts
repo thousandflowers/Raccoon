@@ -47,8 +47,18 @@ export function parseFonts(stdout: string): FontsReport {
 }
 
 /** The short name of a font directory: the two differ only in their prefix. */
+/**
+ * Who put the fonts in a folder, which is the only thing that decides whether
+ * you can do anything about them.
+ *
+ * Order matters and got this wrong once: `/System/Library/Fonts` does not
+ * start with `/Library/`, so it fell through to the check for a home folder
+ * and came out labelled "Yours" — the fonts you are least able to touch,
+ * named as the ones that are most yours.
+ */
 export function sourceLabel(path: string): string {
-	if (path.startsWith("/Library/")) return "System";
+	if (path.startsWith("/System/Library/")) return "macOS";
+	if (path.startsWith("/Library/")) return "All users";
 	if (path.includes("/Library/Fonts")) return "Yours";
 	return path;
 }

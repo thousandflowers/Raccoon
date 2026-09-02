@@ -9,6 +9,7 @@ import {
 	useNavigation,
 } from "@raycast/api";
 import { useExec } from "@raycast/utils";
+import { JSON_TIMEOUT_MS, readJson } from "./json-out.ts";
 import {
 	type BatteryReport,
 	type Health,
@@ -122,7 +123,8 @@ export default function Command() {
 		{
 			execute: rccPath !== null,
 			env: { ...process.env, NO_COLOR: "1", PATH: RUNTIME_PATH },
-			parseOutput: ({ stdout }) => parseBattery(stdout),
+			timeout: JSON_TIMEOUT_MS,
+			parseOutput: readJson("battery", parseBattery),
 		},
 	);
 

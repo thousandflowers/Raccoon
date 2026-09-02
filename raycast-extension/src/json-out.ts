@@ -122,3 +122,57 @@ export function expectArray(stdout: string, command: string): unknown[] {
 	}
 	return parsed;
 }
+
+/**
+ * How long a `--json` command may take before Raycast kills it.
+ *
+ * `useExec` defaults to ten seconds, and `fonts` needed fifteen: it ran
+ * `fc-scan` once per font file. Both halves are fixed — that scan is a single
+ * call now — and this is the headroom for the machine slower than the one it
+ * was measured on. The slowest command left takes about five seconds.
+ */
+export const JSON_TIMEOUT_MS = 60_000;
+
+/** The fields of `useExec`'s result that reading it correctly depends on. */
+type ExecResult = {
+	stdout: string;
+	stderr: string;
+	error?: Error;
+	exitCode: number | null;
+	signal: NodeJS.Signals | null;
+};
+
+/**
+ * `parseOutput` for a view that reads a `--json` report.
+ *
+ * A killed command still reaches `parseOutput`, with `signal` set and a stdout
+ * that stops wherever the process was when it died. Parsing that fragment is
+ * how a reader came to be told "this is a defect in rcc" about a report whose
+ * only problem was that it ended one line before its closing brace — the
+ * emitter was fine, the clock ran out. A truncated document is not a malformed
+ * one and must not be read as if it were.
+ *
+ * A non-zero exit code on its own is not a failure: rcc reports findings that
+ * way and its document is complete. Only a signal or a spawn error means the
+ * output stopped early.
+ */
+export function readJson<T>(
+	command: string,
+	parse: (stdout: string) => T,
+): (result: ExecResult) => T {
+	return ({ stdout, signal, error }) => {
+		if (signal || error) {
+			const why = signal ? ` (${signal})` : "";
+			throw new Error(
+				[
+					`rcc ${command} was cut off after ${JSON_TIMEOUT_MS / 1000}s${why} ` +
+						"and its report is incomplete.",
+					error?.message ?? "",
+				]
+					.join("\n")
+					.trim(),
+			);
+		}
+		return parse(stdout);
+	};
+}

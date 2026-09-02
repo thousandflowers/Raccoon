@@ -36,3 +36,47 @@ test("SMART has three states, and 'not supported' is not a failure", () => {
 test("output that is not JSON says so", () => {
 	assert.throws(() => parseDisk("-- Disk Status"), /did not print JSON/);
 });
+
+test("snapshots are read when rcc reports them", () => {
+	const doc = JSON.stringify({
+		disks: [],
+		volumes: [],
+		apfs_container: {},
+		snapshots: {
+			available: true,
+			count: 24,
+			reclaimable: 24,
+			oldest: "2026-09-01-030405",
+		},
+		network_mounts: [],
+	});
+	const report = parseDisk(doc);
+	assert.equal(report.snapshots.count, 24);
+	assert.equal(report.snapshots.reclaimable, 24);
+	assert.equal(report.snapshots.oldest, "2026-09-01-030405");
+});
+
+test("could not check is not the same answer as none", () => {
+	// Without diskutil on PATH rcc cannot look. Reporting 0 would tell someone
+	// whose disk is full of snapshots that they have none.
+	const blind = JSON.stringify({
+		disks: [],
+		volumes: [],
+		apfs_container: {},
+		snapshots: { available: false, count: 0, reclaimable: 0, oldest: "" },
+		network_mounts: [],
+	});
+	assert.equal(parseDisk(blind).snapshots.available, false);
+});
+
+test("an rcc too old to know about snapshots reads as not checked", () => {
+	const old = JSON.stringify({
+		disks: [],
+		volumes: [],
+		apfs_container: {},
+		network_mounts: [],
+	});
+	const report = parseDisk(old);
+	assert.equal(report.snapshots.available, false);
+	assert.equal(report.snapshots.count, 0);
+});

@@ -9,6 +9,7 @@ import {
 	useNavigation,
 } from "@raycast/api";
 import { useExec } from "@raycast/utils";
+import { JSON_TIMEOUT_MS, readJson } from "./json-out.ts";
 import { killPids } from "./fixes";
 import { ResolveActions } from "./resolve";
 import { findCommand } from "./commands";
@@ -53,7 +54,8 @@ export default function Command() {
 		{
 			execute: rccPath !== null,
 			env: { ...process.env, NO_COLOR: "1", PATH: RUNTIME_PATH },
-			parseOutput: ({ stdout }) => parseMemory(stdout),
+			timeout: JSON_TIMEOUT_MS,
+			parseOutput: readJson("memory", parseMemory),
 		},
 	);
 

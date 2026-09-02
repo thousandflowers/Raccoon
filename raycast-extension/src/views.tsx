@@ -1,5 +1,10 @@
 import type { ReactElement } from "react";
 import Audit from "./audit";
+import Upgrade from "./upgrade";
+import Apps from "./apps";
+import AuditHistory from "./audit-history";
+import AuditWatch from "./audit-watch";
+import Fleet from "./fleet";
 import Battery from "./battery";
 import Memory from "./memory";
 import Backup from "./backup";
@@ -30,7 +35,14 @@ import { RccDetail } from "./rcc-detail";
  * view is wired in one place.
  */
 const VIEWS: Record<string, () => ReactElement> = {
+	upgrade: Upgrade,
+	apps: Apps,
 	audit: Audit,
+	"audit-deep": () => <Audit deep />,
+	"audit-fix": () => <Audit deep />,
+	"audit-history": AuditHistory,
+	"audit-watch": AuditWatch,
+	fleet: Fleet,
 	battery: Battery,
 	memory: Memory,
 	ports: Ports,
@@ -51,14 +63,36 @@ const VIEWS: Record<string, () => ReactElement> = {
 	ssh: Ssh,
 };
 
+/**
+ * Commands the launcher does not offer, because in a screen they are not
+ * distinct commands at all.
+ *
+ * `audit quiet` is `--deep --quiet`, and `audit json` is `--deep --json`:
+ * both are ways of printing to a terminal, not ways of looking. Rendered they
+ * are the same screen as `audit deep`, so listing them offers a reader three
+ * rows that do one thing. The JSON is still reachable — as an action on the
+ * audit screen, where it is a thing you take away rather than a thing you read.
+ */
+const HIDDEN = new Set(["audit-quiet", "audit-json"]);
+
+/** The key a command is registered under: `audit deep` -> `audit-deep`. */
+export function viewKey(command: RccCommand): string {
+	return command.args.join("-");
+}
+
+/** Whether the launcher lists this command at all. */
+export function isHidden(command: RccCommand): boolean {
+	return HIDDEN.has(viewKey(command));
+}
+
 /** Whether this command has a screen of its own rather than raw output. */
 export function hasView(command: RccCommand): boolean {
-	return command.args.length === 1 && command.args[0] in VIEWS;
+	return viewKey(command) in VIEWS;
 }
 
 export function viewFor(command: RccCommand): ReactElement {
 	if (hasView(command)) {
-		const View = VIEWS[command.args[0]];
+		const View = VIEWS[viewKey(command)];
 		return <View />;
 	}
 	return <RccDetail command={command} />;

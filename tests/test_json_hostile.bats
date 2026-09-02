@@ -46,6 +46,24 @@ assert_json() {
 	rm -rf "$tmp"
 }
 
+@test "json: no substitution prints its value twice" {
+	# `grep -c` prints 0 on no match AND exits 1, so `|| printf 0` printed a
+	# second one and `"connections": 0` became `"connections": 0\n0`. It showed
+	# only where netstat is off the PATH, which is the environment a spawned
+	# process gets. This is the shape, not the instance: any count that ends up
+	# on its own line is the same bug.
+	local c out
+	for c in $IMPLEMENTED; do
+		out="$(env -i PATH="/usr/bin:/bin" HOME="$HOME" NO_COLOR=1 "$REPO/rcc" "$c" --json 2>/dev/null || true)"
+		# A bare number on its own line is never valid inside these documents.
+		if printf '%s\n' "$out" | grep -qE '^[[:space:]]*[0-9]+[[:space:]]*$'; then
+			echo "rcc $c --json has a stray number on its own line:" >&2
+			printf '%s\n' "$out" | head -20 >&2
+			return 1
+		fi
+	done
+}
+
 @test "json: valid with nothing on PATH but the system directories" {
 	# fc-list, docker, mas and the rest live in Homebrew. A command that reports
 	# on a tool it cannot find must say so in JSON, not stop mid-document.

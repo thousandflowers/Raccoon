@@ -11,7 +11,14 @@ import {
 import { useState } from "react";
 import { MissingRcc, REPO_URL } from "./missing-rcc";
 import type { RccCommand } from "./commands";
-import { pendingFixCount, toMarkdown, withSudoHint } from "./markdown";
+import {
+	pendingFixCount,
+	progressBar,
+	progressOf,
+	toMarkdown,
+	withoutProgress,
+	withSudoHint,
+} from "./markdown";
 import { isFailure } from "./exit";
 import { RccNotFoundError } from "./rcc";
 import { useRccStream } from "./use-rcc-stream";
@@ -57,7 +64,14 @@ export function RccDetail({ command }: { command: RccCommand }) {
 			"```",
 		].join("\n");
 	} else if (output) {
-		markdown = withSudoHint(toMarkdown(output));
+		// `upgrade` and `apps` report their step count as they go. Showing it as
+		// a bar is the whole point of that protocol — printing the raw markers,
+		// which is what happened until now, shows the reader the wiring instead.
+		const progress = isLoading ? progressOf(output) : undefined;
+		markdown = [
+			...(progress ? [progressBar(progress), "", "---", ""] : []),
+			withSudoHint(toMarkdown(output)),
+		].join("\n");
 	} else if (isLoading) {
 		markdown = `Running \`rcc ${args.join(" ")}\``;
 	} else {
@@ -120,7 +134,7 @@ export function RccDetail({ command }: { command: RccCommand }) {
 					)}
 					<Action.CopyToClipboard
 						title="Copy Output"
-						content={output}
+						content={withoutProgress(output)}
 						shortcut={{ modifiers: ["cmd"], key: "c" }}
 					/>
 					<Action

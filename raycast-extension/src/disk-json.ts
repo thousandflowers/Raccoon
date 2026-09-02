@@ -28,13 +28,30 @@ export type DiskReport = {
 	volumes: Volume[];
 	apfs_container: { reference: string; size: string; free: string };
 	network_mounts: Array<{ source: string; mount: string }>;
+	/**
+	 * Local APFS snapshots, which hold blocks belonging to deleted files.
+	 *
+	 * `available` is not decoration: without diskutil on PATH rcc cannot look,
+	 * and a count of 0 would then mean "none found" and "could not check" at
+	 * once — on a disk that is full because of them, those are opposite
+	 * answers. An rcc older than this field reports nothing, which reads the
+	 * same as not having checked, which is what it did.
+	 */
+	snapshots: {
+		available: boolean;
+		count: number;
+		reclaimable: number;
+		oldest: string;
+	};
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
+const num = (v: unknown) => (typeof v === "number" ? v : 0);
 
 export function parseDisk(stdout: string): DiskReport {
 	const r = expectObject(stdout, "disk");
 	const c = (r.apfs_container ?? {}) as Record<string, unknown>;
+	const snap = (r.snapshots ?? {}) as Record<string, unknown>;
 	return {
 		disks: Array.isArray(r.disks)
 			? r.disks.map((v) => {
@@ -64,6 +81,12 @@ export function parseDisk(stdout: string): DiskReport {
 			reference: str(c.reference),
 			size: str(c.size),
 			free: str(c.free),
+		},
+		snapshots: {
+			available: snap.available === true,
+			count: num(snap.count),
+			reclaimable: num(snap.reclaimable),
+			oldest: str(snap.oldest),
 		},
 		network_mounts: Array.isArray(r.network_mounts)
 			? r.network_mounts.map((v) => {
