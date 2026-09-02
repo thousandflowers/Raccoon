@@ -1,4 +1,4 @@
-import { shellQuote } from "./terminal.ts";
+import { appleScriptQuote, shellQuote } from "./terminal.ts";
 
 /**
  * The shell command behind Enter and Cmd+Enter, one builder per command that
@@ -23,7 +23,14 @@ export function killPids(pids: number[]): string {
 	return `kill ${valid.join(" ")}`;
 }
 
-/** Empty the Trash through Finder, so it behaves like emptying it by hand. */
+/**
+ * Empty the Trash through Finder, so it behaves like emptying it by hand.
+ *
+ * Not Raycast's `trash()`: that API moves a path *into* the Trash and has no
+ * counterpart for emptying it. Finder is the one thing on the system that
+ * empties every volume's Trash at once and honours the reader's own settings
+ * for it.
+ */
 export function emptyTrash(): string {
 	return `osascript -e 'tell application "Finder" to empty trash'`;
 }
@@ -63,10 +70,13 @@ export function forgetNetworks(iface: string, ssids: string[]): string {
 /** Remove an item from Login Items, the same list System Settings shows. */
 export function removeLoginItems(names: string[]): string {
 	if (names.length === 0) throw new Error("No login item to remove.");
+	// Quoted twice on purpose: once as an AppleScript string, then the whole
+	// script as one shell argument. A name with an apostrophe in it used to end
+	// the shell quote early and run whatever followed it.
 	return names
 		.map(
 			(n) =>
-				`osascript -e 'tell application "System Events" to delete login item ${JSON.stringify(n)}'`,
+				`osascript -e ${q(`tell application "System Events" to delete login item ${appleScriptQuote(n)}`)}`,
 		)
 		.join("; ");
 }
