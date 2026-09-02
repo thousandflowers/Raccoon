@@ -1457,7 +1457,12 @@ main() {
 	# Touch ID (pam_tid) works even when launched headless from the TUI, so try
 	# it unconditionally rather than gating on a tty. Only mark sudo unavailable
 	# when auth genuinely can't happen.
-	if ensure_sudo; then
+	#
+	# Not for --schedule and --history: one reads a plist and asks launchd, the
+	# other reads files under ~/.raccoon. Both asked for administrator rights
+	# anyway, and the Raycast screen that opens with `schedule status` put a
+	# password dialog on the screen the moment it was opened.
+	if [[ -z "$SCHEDULE_ACTION" && "$SHOW_HISTORY" != "true" ]] && ensure_sudo; then
 		SUDO_AVAILABLE=true
 		# A deep scan can outlive the 5-minute sudo timestamp (softwareupdate
 		# alone takes minutes), and a re-prompt landing mid-report is exactly the

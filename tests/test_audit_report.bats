@@ -391,3 +391,30 @@ JSON
 	assert_audit_exit
 	grep -q "<key>Day</key>" "$HOME/Library/LaunchAgents/com.raccoon.audit.plist"
 }
+
+# --- measured, not read: the findings of 2026-09-02 ---------------------------
+
+# A sudo that only writes down that it was asked. RACCOON_TEST is unset for
+# these runs because ensure_sudo returns before touching sudo under it, which
+# is exactly what would hide the defect.
+_sudo_recorder() {
+	SHIM="${BATS_TEST_TMPDIR}/sudo-shim"
+	mkdir -p "$SHIM"
+	printf '#!/bin/bash\necho "sudo $*" >> "%s/sudo.log"\nexit 1\n' "$SHIM" > "$SHIM/sudo"
+	chmod +x "$SHIM/sudo"
+}
+
+@test "audit --schedule status never asks for administrator rights" {
+	_sudo_recorder
+	RACCOON_TEST= PATH="$SHIM:$PATH" run bash "$SCRIPT_DIR/bin/audit.sh" --schedule status
+	assert_success
+	assert_output_contains "No active schedule"
+	[[ ! -f "$SHIM/sudo.log" ]]
+}
+
+@test "audit --history never asks for administrator rights" {
+	_sudo_recorder
+	RACCOON_TEST= PATH="$SHIM:$PATH" run bash "$SCRIPT_DIR/bin/audit.sh" --history
+	assert_success
+	[[ ! -f "$SHIM/sudo.log" ]]
+}
