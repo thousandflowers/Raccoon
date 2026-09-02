@@ -1,6 +1,7 @@
 import { Action, ActionPanel, Icon, Keyboard, List } from "@raycast/api";
 import { COMMANDS, type RccCommand } from "./commands";
-import { hasView, viewFor } from "./views";
+import { iconFor } from "./command-icons";
+import { hasView, isHidden, viewFor } from "./views";
 
 function accessories(command: RccCommand): List.Item.Accessory[] {
 	const items: List.Item.Accessory[] = [];
@@ -19,10 +20,10 @@ function accessories(command: RccCommand): List.Item.Accessory[] {
 export default function Command() {
 	return (
 		<List searchBarPlaceholder="Search Raccoon commands">
-			{COMMANDS.map((command) => (
+			{COMMANDS.filter((command) => !isHidden(command)).map((command) => (
 				<List.Item
 					key={command.id}
-					icon={hasView(command) ? Icon.AppWindowList : Icon.Text}
+					icon={iconFor(command.id)}
 					title={command.title}
 					subtitle={command.description}
 					accessories={accessories(command)}
