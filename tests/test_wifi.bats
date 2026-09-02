@@ -81,6 +81,8 @@ assert not (d["ssid_hidden"] and d["active_ssid"])
 	if [[ "$up" == "True" ]]; then
 		[[ "$output" != *"Not connected"* ]]
 	else
-		[[ "$output" == *"Not connected"* ]]
+		# A Mac with no Wi-Fi port (a CI runner) says so; one with a port that
+		# is idle says "Not connected". Neither is the other's answer.
+		[[ "$output" == *"Not connected"* || "$output" == *"No Wi-Fi interface"* ]]
 	fi
 }
