@@ -17,6 +17,64 @@ const DEAD_PROMPT = /\[y\/N\]\s*$/;
 /** "Fix 8 issue(s) automatically? [y/N]" -> 8 */
 const PENDING_FIXES = /Fix (\d+) issue\(s\) automatically\?/;
 
+/**
+ * rcc's own progress protocol: `__RCC_PROGRESS__:<done>:<total>:<what>`.
+ *
+ * `upgrade` and `apps` are actions, not reports. On a terminal they redraw a
+ * bar in place; with stdout on a pipe they print one of these lines per step
+ * instead, for whoever is driving them to render. Nothing on this side read
+ * them, so a reader watching `rcc upgrade` got thirty lines of protocol.
+ *
+ * The info field is the rest of the line, colons and all: "pip: checking
+ * outdated..." has to survive whole.
+ */
+const PROGRESS = /^__RCC_PROGRESS__:(\d+):(\d+):(.*)$/;
+
+export type Progress = { current: number; total: number; info: string };
+
+/** The last step rcc reported, or nothing if this command reports no progress. */
+export function progressOf(output: string): Progress | undefined {
+	let last: Progress | undefined;
+	for (const line of output.split("\n")) {
+		const match = PROGRESS.exec(line);
+		if (match) {
+			last = {
+				current: Number(match[1]),
+				total: Number(match[2]),
+				info: match[3],
+			};
+		}
+	}
+	return last;
+}
+
+/**
+ * The output with rcc's progress protocol taken out, still plain text.
+ *
+ * `toMarkdown` drops these lines on its way to a rendered view, but the view is
+ * not the only place the output goes: Copy Output hands it to the clipboard,
+ * and copying thirty lines of `__RCC_PROGRESS__` into a bug report or a message
+ * is how the markers reached a reader who had already been shown a clean view.
+ */
+export function withoutProgress(output: string): string {
+	return output
+		.split("\n")
+		.filter((line) => !PROGRESS.test(line))
+		.join("\n");
+}
+
+const BAR_WIDTH = 20;
+
+/** That step as a line a Detail can show while the command is still running. */
+export function progressBar({ current, total, info }: Progress): string {
+	const filled =
+		total > 0
+			? Math.min(BAR_WIDTH, Math.round((current / total) * BAR_WIDTH))
+			: 0;
+	const bar = "█".repeat(filled) + "░".repeat(BAR_WIDTH - filled);
+	return `\`${bar}\`  **${current}/${total}**${info ? ` · ${info}` : ""}`;
+}
+
 /** Contiguous runs of box characters that actually contain a `+---+` border. */
 function boxRanges(lines: string[]): Array<[number, number]> {
 	const ranges: Array<[number, number]> = [];
@@ -41,7 +99,9 @@ function boxRanges(lines: string[]): Array<[number, number]> {
  * line gets a hard break so status lines do not collapse into one paragraph.
  */
 export function toMarkdown(output: string): string {
-	const lines = output.split("\n").filter((line) => !DEAD_PROMPT.test(line));
+	const lines = output
+		.split("\n")
+		.filter((line) => !DEAD_PROMPT.test(line) && !PROGRESS.test(line));
 	const inBox = new Array<boolean>(lines.length).fill(false);
 	const opens = new Set<number>();
 	const closes = new Set<number>();

@@ -38,3 +38,31 @@ teardown() { teardown_raccoon_env; }
     [[ $status -eq 0 || $status -eq 1 ]]
 }
 
+
+# The count used to come from one fc-scan per font file: ~800 processes, fifteen
+# seconds, past the ten Raycast allows. The command was killed mid-document and
+# the reader was told rcc emits broken JSON. One fc-scan answers the same
+# question, and these two say so — that it still finds an unreadable font, and
+# that the document reaches its closing brace.
+
+@test "fonts: a font fontconfig cannot read is counted" {
+    command -v fc-scan >/dev/null 2>&1 || skip "fc-scan not installed"
+    mkdir -p "$HOME/Library/Fonts"
+    printf 'this is not a font' > "$HOME/Library/Fonts/broken.ttf"
+    run bash "$SCRIPT_DIR/bin/fonts.sh" --json
+    assert_success
+    # At least the one planted here; the system folder may hold others.
+    local count
+    count=$(printf '%s' "$output" | sed -n 's/.*"corrupted": *\([0-9][0-9]*\).*/\1/p')
+    [[ -n "$count" ]] || { echo "no corrupted count in: $output"; return 1; }
+    (( count >= 1 )) || { echo "expected at least 1 corrupted, got $count"; return 1; }
+}
+
+@test "fonts: --json reaches its closing brace" {
+    run bash "$SCRIPT_DIR/bin/fonts.sh" --json
+    assert_success
+    # The truncation that reached a user stopped after "fontconfig", one line
+    # short: the document parsed as far as it went and failed on what followed.
+    assert_output_contains '"corrupted"'
+    printf '%s' "$output" | python3 -c 'import json,sys; json.load(sys.stdin)'
+}

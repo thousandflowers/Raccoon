@@ -46,15 +46,30 @@ _fonts_count_in() {
 
 # Files that fc-scan cannot read: a font installed but broken, which is the
 # only thing in this report anyone has to act on.
+# How many installed font files fontconfig cannot read.
+#
+# One fc-scan for every font, not one per font. Scanning ~800 files individually
+# took fifteen seconds, past the ten Raycast gives a command: the process was
+# killed mid-document and the reader was told rcc emits broken JSON, when the
+# only thing wrong was that it was slow. The same list now costs half a second.
+#
+# fc-scan prints a line for each file it could read, so a candidate that never
+# comes back is one it could not. Counting the difference rather than the
+# failures keeps the answer identical to the per-file version — checked against
+# planted unreadable files — without a process per font.
 _fonts_corrupted() {
-	local font n=0
 	command -v fc-scan >/dev/null 2>&1 || { printf '0'; return 0; }
-	while IFS= read -r font; do
-		[[ -f "$font" ]] || continue
-		fc-scan "$font" >/dev/null 2>&1 || n=$((n + 1))
-	done < <(find /Library/Fonts "$HOME/Library/Fonts" -maxdepth 1 -type f \
-		\( -name '*.ttf' -o -name '*.otf' -o -name '*.ttc' \) 2>/dev/null || true)
-	printf '%s' "$n"
+	local dirs=(/Library/Fonts "$HOME/Library/Fonts")
+	# `wc -l`, not `grep -c`: grep exits 1 when it counts nothing, and this
+	# repository has shipped that bug twice (see lib/audit/checks.sh:344).
+	local n
+	n=$(comm -23 \
+		<(find "${dirs[@]}" -maxdepth 1 -type f \
+			\( -name '*.ttf' -o -name '*.otf' -o -name '*.ttc' \) 2>/dev/null \
+			| sort -u) \
+		<(fc-scan --format '%{file}\n' "${dirs[@]}" 2>/dev/null | sort -u) \
+		| wc -l)
+	printf '%s' "$((n))"
 }
 
 _json_report() {

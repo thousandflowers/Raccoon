@@ -9,6 +9,7 @@ import {
 	useNavigation,
 } from "@raycast/api";
 import { useExec } from "@raycast/utils";
+import { JSON_TIMEOUT_MS, readJson } from "./json-out.ts";
 import type { ReactNode } from "react";
 import { findCommand } from "./commands";
 import { MissingRcc, REPO_URL } from "./missing-rcc";
@@ -56,7 +57,8 @@ export function RccList<T>({
 		{
 			execute: rccPath !== null,
 			env: { ...process.env, NO_COLOR: "1", PATH: RUNTIME_PATH },
-			parseOutput: ({ stdout }) => parse(stdout),
+			timeout: JSON_TIMEOUT_MS,
+			parseOutput: readJson(command, parse),
 		},
 	);
 
