@@ -8,8 +8,6 @@ on:
 
 env:
   GO_VERSION: "1.23"
-
-env:
   # `softwareupdate -l` needs over seven minutes on a fresh runner and
   # answers a question about a machine that will not exist in ten. It was
   # 14m43s of a 16m49s run, paid twice per release. The check reports
