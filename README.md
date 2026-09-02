@@ -35,6 +35,7 @@ So I merged it with the script I already ran on my sisters' Macs - disk space, o
 - [What Raccoon is not](#what-raccoon-is-not)
 - [Is it safe to pipe to `bash`?](#is-it-safe-to-pipe-to-bash)
 - [Go TUI](#go-tui)
+- [Raycast extension](#raycast-extension)
 - [Shell completion](#shell-completion) · [Man page](#man-page) · [Project structure](#project-structure) · [Contributing](#contributing)
 
 ---
@@ -468,6 +469,29 @@ subcommands (`run`, `group add`, `audit --group`) stay on the CLI, where you can
 pass them.
 
 ---
+
+---
+
+## Raycast extension
+
+Every command that produces a report has a screen in [Raycast](https://raycast.com), in `raycast-extension/`. Twenty-one of them: disk, memory, ports, battery, audit, trash, Wi-Fi, PATH overlaps, Docker, shell history, certificates, startup items, fonts, environment, network, Xcode, backups, git repositories and SSH keys, plus a launcher that lists every `rcc` command and a screen for configuring the admin session.
+
+They are not the terminal output in a window. Each reads `rcc <command> --json` and renders it natively: sections you can search, rows you can act on, and a detail pane where it earns one. `audit` offers its fixes as confirmed actions rather than as a prompt the terminal would have asked; `upgrade` shows a row per package manager as it works, instead of thirty lines scrolling past; `disk` names the local snapshots that are holding on to space you thought you freed.
+
+One rule runs through all of them: **opening a screen does not act.** `apps` opens in `--dry-run` and updating for real is a separate, confirmed action, because it replaces applications you may be using. `fleet` reads its configuration file and contacts nothing — scanning is an action that first says how many machines it is about to reach over SSH. Pressing Enter on a row in a launcher should never be enough to change a machine.
+
+**It is not in the Raycast Store yet.** To run it from source:
+
+```bash
+brew install thousandflowers/raccoon/rcc   # the extension needs the CLI
+cd raycast-extension
+npm install
+npm run dev
+```
+
+Raycast picks it up while `npm run dev` is running. If `rcc` is not in a Homebrew location, point the extension at it: Raycast Settings → Extensions → Raccoon → **Raccoon CLI**.
+
+The extension ships no copy of Raccoon: it runs the `rcc` you installed, so the two never disagree about what your Mac looks like.
 
 ## Shell completion
 
