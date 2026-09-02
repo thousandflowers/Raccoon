@@ -36,9 +36,32 @@ for arg in "$@"; do
 	esac
 done
 
+# Where each shell keeps its history, in one place. Both the JSON and the text
+# report used to spell these out separately, and both spelled fish wrong:
+# ~/.local/share/fish/history/default is not a path any version of fish writes.
+# A fish user's count was therefore always 0, reported as confidently as a real
+# number.
+_HIST_ZSH="$HOME/.zsh_history"
+_HIST_BASH="$HOME/.bash_history"
+# fish 3.x and later, default session. A `fish_history` variable renames it to
+# <session>_history, which is rare enough to leave alone but is why this is not
+# simply "the file in that folder".
+_HIST_FISH="$HOME/.local/share/fish/fish_history"
+
 _history_lines() {
 	[[ -f "$1" ]] || { printf '0'; return 0; }
 	wc -l < "$1" 2>/dev/null | tr -d ' \n' || printf '0'
+}
+
+# fish writes two lines per command — `- cmd: ...` then `  when: ...` — so
+# counting lines reports twice what the user typed. Count the entries.
+_history_lines_fish() {
+	[[ -f "$1" ]] || { printf '0'; return 0; }
+	# `grep -c` exits 1 when it counts nothing, which under set -e would take
+	# the script with it. Same trap as everywhere else in this repository.
+	local n
+	n=$(grep -c '^- cmd:' "$1" 2>/dev/null || true)
+	printf '%s' "$((n))"
 }
 
 # The recent commands, first word only: the rest of a line is arguments, and
@@ -58,12 +81,11 @@ _history_recent() {
 }
 
 _json_report() {
-	local zsh_h="$HOME/.zsh_history" bash_h="$HOME/.bash_history"
-	local fish_h="$HOME/.local/share/fish/history/default"
+	local zsh_h="$_HIST_ZSH" bash_h="$_HIST_BASH"
 	local z b f cmd first=1
 	z=$(_history_lines "$zsh_h")
 	b=$(_history_lines "$bash_h")
-	f=$(_history_lines "$fish_h")
+	f=$(_history_lines_fish "$_HIST_FISH")
 	printf '{\n'
 	printf '  "counts": {"zsh": %s, "bash": %s, "fish": %s, "total": %s},\n' \
 		"$z" "$b" "$f" "$((z + b + f))"
@@ -88,25 +110,16 @@ main() {
 	echo "${GRAY}[1/2] Command Counts...${NC}"
 	print_table_header "Shell|Commands" 10 10
 
-	local zsh_history="$HOME/.zsh_history"
-	local zsh_lines=0
-	if [[ -f "$zsh_history" ]]; then
-		zsh_lines=$(wc -l < "$zsh_history" | xargs || echo "0")
-	fi
+	# The same three helpers the JSON uses, so the two reports cannot disagree
+	# about one machine — which they did, both being wrong about fish.
+	local zsh_lines bash_lines fish_lines
+	zsh_lines=$(_history_lines "$_HIST_ZSH")
 	print_table_row "zsh|$zsh_lines" 10 10
 
-	local bash_history="$HOME/.bash_history"
-	local bash_lines=0
-	if [[ -f "$bash_history" ]]; then
-		bash_lines=$(wc -l < "$bash_history" | xargs || echo "0")
-	fi
+	bash_lines=$(_history_lines "$_HIST_BASH")
 	print_table_row "bash|$bash_lines" 10 10
 
-	local fish_history="$HOME/.local/share/fish/history/default"
-	local fish_lines=0
-	if [[ -f "$fish_history" ]]; then
-		fish_lines=$(wc -l < "$fish_history" 2>/dev/null | xargs || echo "0")
-	fi
+	fish_lines=$(_history_lines_fish "$_HIST_FISH")
 	print_table_row "fish|$fish_lines" 10 10
 
 	local total=$((zsh_lines + bash_lines + fish_lines))
@@ -118,7 +131,7 @@ main() {
 	print_table_header "Recent Command" 35
 
 	local recent_count=0
-	if [[ -f "$zsh_history" ]]; then
+	if [[ -f "$_HIST_ZSH" ]]; then
 		while IFS= read -r line || [[ -n "$line" ]]; do
 			[[ -z "$line" ]] && continue
 			local cmd
@@ -128,7 +141,7 @@ main() {
 				((recent_count++)) || true
 				[[ $recent_count -ge 5 ]] && break
 			}
-		done < <(tail -n 20 "$zsh_history" 2>/dev/null)
+		done < <(tail -n 20 "$_HIST_ZSH" 2>/dev/null)
 	fi
 
 	if [[ $recent_count -eq 0 ]]; then

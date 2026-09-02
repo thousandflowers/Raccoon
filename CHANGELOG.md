@@ -3,6 +3,100 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [Unreleased]
+
+Twelve commands audited by measuring, not reading: run the command, ask
+macOS the same question another way, compare the two numbers. Thirty-odd
+places where the report answered from the wrong source, stated with the
+confidence of a measurement. Every fix below has a bats test that measures
+it against launchctl, security, top, lsof, ifconfig, simctl or docker rather
+than asserting exit 0.
+
+### Changed
+
+- **A tool missing from PATH is "not checked", never zero.** `ports`,
+  `memory`, `network`, `wifi`, `battery`, `certs` and `startup` all printed a
+  measured-looking empty machine — "No ports found", "Total RAM 0 GB", "Not
+  connected", "0 certificates" — when `/usr/sbin` was not on the caller's
+  PATH. They now exit 3 with the tool's name and print no document at all,
+  so a `--json` reader sees a failure rather than an empty report.
+- **`memory --json` is a report, not a list.** `{"memory": {...},
+  "processes": [...]}`, with the machine-wide figures (used, wired, active,
+  cached, compressed, swap) that the text had always had and the JSON never
+  did. Processes carry `footprint_kb` and `rss_kb`.
+- **`startup --json` lists agents as objects** with launchd's `label`, the
+  plist `file`, whether it is `loaded` and from which plist, plus
+  `background_items`, `login_items_missing`, `login_items_error`, and
+  `system_agents_loaded` / `loaded_services` in the counts.
+- **`certs --json` carries `keychain` and `sha256` per certificate**, and
+  `keychains` lists what was actually searched.
+- **`wifi --json` says `connected` and `ssid_hidden`**, apart from the name.
+- **`battery --json` says `power_source`** ("ac", "battery" or null).
+- **`docker --json` space rows carry `total` and `active`**, and `size` is
+  the size.
+- **`xcode --json` carries `developer_dir`.**
+
+### Fixed
+
+- **`ports`** labelled every non-loopback socket reachable — 81 outbound
+  connections on one Mac, the browser and the shell among them — and the
+  Raycast bulk action offered to kill the processes holding them. A TCP
+  socket that is not listening is a conversation, not a door. The text now
+  says that lsof, as a user, cannot see other users' sockets: root's sshd on
+  22 was invisible from the one list a port check exists to produce.
+- **`memory`** ranked by RSS, which leaves compressed memory out: the
+  process costing 23 GB on this Mac had 56 MB of RSS and never made the top
+  ten while a 216 MB row did. It ranks by footprint now. "Total RSS" summed
+  shared pages once per process — 12 GB "in use" against 8.7 GB resident.
+- **`env`** never descended into a PATH entry that is itself a symlink (4
+  broken links reported, 5 real); a tool that prints nothing for
+  `--version` came out with an empty version; the text and `--json`
+  duplicate rules disagreed on an empty PATH element. The Raycast screen
+  audited the extension's own seven-directory PATH instead of the reader's
+  26-entry one; it runs under the login shell's PATH now.
+- **`network`** read a hardcoded list of nine interface names, so
+  Tailscale's utun8 was invisible while Tailscale was reported connected;
+  called an iPhone hotspot's 172.20.10.3 "WireGuard" and every 2a02:
+  address "Other"; reported the application firewall "disabled" when the
+  tool could not run; never read System Settings' proxies; called AirPlay's
+  ports a proxy service, rapportd Remote Desktop and Apple's
+  networkserviceproxy third-party software; and printed "Certain (14/10
+  scans)".
+- **`xcode`** decided `installed` by `command -v xcrun`, which is part of
+  macOS on every Mac, so the Command Line Tools alone reported Xcode
+  installed with an empty version. Simulators had two implementations that
+  printed 10 and 15 devices for the same 17; Apple Vision Pro and iPod touch
+  were filtered out; two iPad Pros lost the chip that tells them apart;
+  DerivedData counted its own folder as a project.
+- **`docker`** put RECLAIMABLE in `size` and never emitted the size; the
+  text printed "hours" as every container's status, the item count as the
+  size and the header as a row; a daemon that is down read as "No images
+  found" under a green tick; lists were cut at ten rows silently.
+- **`certs`** names were the tail of a subject string cut at "/", so 13 of
+  42 were "CN, OU=…" and changed with whichever openssl was on PATH; the
+  Raycast delete addressed certificates by that name, and `security -c NAME`
+  takes the first match — the expired WWDR root shares its name with a valid
+  one. Deletion is by SHA-256 now, login keychain only. Expiry compared local
+  time to GMT, so an hour of validity read as expired. `--expiring N` in text
+  listed every valid certificate. The keychain list named a file that does
+  not exist.
+- **`wifi`** called a link that was up, with DHCP bound, "Not connected"
+  because macOS withholds the SSID from command-line tools without Location
+  Services access. It says connected, name withheld. The Raycast bulk
+  "forget" no longer promises to keep a current network it cannot identify.
+  The guessed "en0" fallback is gone.
+- **`startup`** reported agents by filename fragment, not launchd label, so
+  every Raycast "Stop This Agent" addressed a service that does not exist;
+  counted 539 "running services" of which 352 had no process; said "no login
+  items" when System Events refused; listed nothing of what apps register
+  through System Settings (eight loaded here) or of a job loaded from a
+  plist that has since moved; marked a login item whose target is gone as
+  opening at login.
+- **`battery`** printed "0 cycles, 0% (poor)" in text when system_profiler
+  did not answer, while `--json` said null; and the Raycast screen called a
+  MacBook on its adapter holding the charge "on battery". The README no
+  longer promises a temperature.
+
 ## [0.18.1] - 2026-09-02
 
 A release about looking in the right place. Every fix here is the same defect

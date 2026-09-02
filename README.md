@@ -231,7 +231,7 @@ rcc network               # interfaces, Wi-Fi, DNS, routing
 rcc wifi                  # active network, known SSIDs, Keychain passwords
 rcc memory                # system stats + processes sorted by RAM
 rcc ports                 # open ports & listening services
-rcc battery               # health %, cycles, temperature
+rcc battery               # health %, cycles, charging
 rcc backup                # Time Machine status
 ```
 
@@ -350,7 +350,7 @@ its own updater applies it. **Nothing in `rcc apps` writes to `/Applications`.**
 | `wifi` | Active network, known SSIDs, Keychain passwords |
 | `memory` | System memory + processes by RAM |
 | `ports` | Open ports & listening services |
-| `battery` | Health %, cycles, temperature |
+| `battery` | Health %, cycles, charging |
 | `backup` | Time Machine status |
 | `env` | Shell environment & PATH breakdown |
 | `overlap` | Maps each PATH entry to the manager behind it (brew, npm, cargo, go, pipx, macports, nix, system, shim); `--json` |

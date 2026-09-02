@@ -30,6 +30,9 @@ for arg in "$@"; do
 	esac
 done
 
+# The tools worth reporting: the ones a broken PATH breaks first.
+ENV_TOOLS=(git curl wget python3 node brew docker)
+
 check_path_entries() {
 	local count=0
 	local missing=0
@@ -74,7 +77,7 @@ check_broken_symlinks() {
 				link_name=$(basename "$link")
 				print_table_row "$link_name|${RED}$target${NC}" 45 30
 			fi
-		done < <(find "$path_dir" -maxdepth 1 -type l 2>/dev/null)
+		done < <(find "$path_dir/" -maxdepth 1 -type l 2>/dev/null)
 	done <<< "${PATH}:"
 
 	if [[ $total -eq 0 ]]; then
@@ -82,25 +85,36 @@ check_broken_symlinks() {
 	fi
 }
 
+# PATH entries listed more than once, one per line, in PATH order. One rule
+# for both renderings: the text branch used to keep its own, which printed a
+# blank "duplicate" row for an empty element and, on the next line, "No
+# duplicates found", while --json reported none.
+_env_duplicates() {
+	local seen="" dir
+	while IFS= read -r -d ':' dir; do
+		[[ -z "$dir" ]] && continue
+		if printf '%s' "$seen" | grep -qxF "$dir"; then
+			printf '%s\n' "$dir"
+		else
+			seen+=$'\n'"$dir"
+		fi
+	done <<< "${PATH}:"
+}
+
 check_duplicate_path() {
-	local seen=""
-	local duplicates=""
+	local dir found=0
 
 	print_section_header "Duplicate PATH Entries"
 
 	print_table_header "Path|Status" 45 10
 
-	IFS=':' read -ra path_parts <<< "$PATH"
-	for dir in "${path_parts[@]}"; do
-		if echo "$seen" | grep -qxF "$dir"; then
-			print_table_row "$dir|${YELLOW}duplicate${NC}" 45 10
-			duplicates+="$dir"
-		else
-			seen+=$'\n'"$dir"
-		fi
-	done
+	while IFS= read -r dir; do
+		[[ -n "$dir" ]] || continue
+		print_table_row "$dir|${YELLOW}duplicate${NC}" 45 10
+		found=1
+	done < <(_env_duplicates)
 
-	if [[ -z "$duplicates" ]]; then
+	if [[ $found -eq 0 ]]; then
 		print_table_row "${GRAY}No duplicates found${NC}|${GREEN}OK${NC}" 45 10
 	fi
 }
@@ -110,10 +124,9 @@ check_tool_versions() {
 
 	print_table_header "Tool|Version" 15 40
 
-	for tool in git curl wget python3 node brew docker; do
-		if command -v "$tool" >/dev/null 2>&1; then
-			local version
-			version=$("$tool" --version 2>/dev/null | head -1 || "$tool" -v 2>/dev/null | head -1 || echo "found")
+	local tool version
+	for tool in "${ENV_TOOLS[@]}"; do
+		if version=$(_env_tool_version "$tool"); then
 			print_table_row "$tool|$version" 15 40
 		else
 			print_table_row "$tool|${GRAY}not found${NC}" 15 40
@@ -121,12 +134,15 @@ check_tool_versions() {
 	done
 }
 
-# The tools worth reporting: the ones a broken PATH breaks first.
-ENV_TOOLS=(git curl wget python3 node brew docker)
-
+# The first line of `--version`, or "found" for a tool that is on the PATH and
+# prints nothing. The old `|| printf 'found'` bound to the pipeline, whose
+# status is head's, so it never ran and the row came out empty — which the
+# extension then rendered as "not installed".
 _env_tool_version() {
 	command -v "$1" > /dev/null 2>&1 || return 1
-	"$1" --version 2>/dev/null | head -1 || printf 'found'
+	local version
+	version=$("$1" --version 2>/dev/null | head -1 || true)
+	printf '%s' "${version:-found}"
 }
 
 _json_report() {
@@ -162,24 +178,23 @@ _json_report() {
 				"$(rcc_json_string "$(basename "$link")")" \
 				"$(rcc_json_string "$link")" \
 				"$(rcc_json_string "$target")"
-		done < <(find "$path_dir" -maxdepth 1 -type l 2>/dev/null || true)
+		# The trailing slash matters: a PATH entry that is itself a symlink
+		# (~/.local/bin -> somewhere) is never descended into without it, and
+		# the broken link inside went uncounted. 4 reported where there were 5.
+		done < <(find "$path_dir/" -maxdepth 1 -type l 2>/dev/null || true)
 	done <<< "${PATH}:"
 	[[ $first -eq 1 ]] || printf '\n  '
 	printf '],\n'
 
 	printf '  "duplicates": ['
 	first=1
-	local seen="" dir
-	while IFS= read -r -d ':' dir; do
-		[[ -z "$dir" ]] && continue
-		if printf '%s' "$seen" | grep -qxF "$dir"; then
-			[[ $first -eq 1 ]] || printf ','
-			first=0
-			printf '\n    %s' "$(rcc_json_string "$dir")"
-		else
-			seen+=$'\n'"$dir"
-		fi
-	done <<< "${PATH}:"
+	local dir
+	while IFS= read -r dir; do
+		[[ -n "$dir" ]] || continue
+		[[ $first -eq 1 ]] || printf ','
+		first=0
+		printf '\n    %s' "$(rcc_json_string "$dir")"
+	done < <(_env_duplicates)
 	[[ $first -eq 1 ]] || printf '\n  '
 	printf '],\n'
 

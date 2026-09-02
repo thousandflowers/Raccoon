@@ -31,84 +31,100 @@ for arg in "$@"; do
 	esac
 done
 
+# Docker's own --format strings, tab-separated, for both renderings. Parsing
+# the human table by column was how the text report printed a CREATED
+# fragment ("hours") as every container's status, put the item count in the
+# Size column and read the header as a row, while --json put RECLAIMABLE in
+# "size" and never emitted the size at all.
+_docker_images() { docker images --format '{{.Repository}}\t{{.Tag}}\t{{.Size}}' 2>/dev/null || true; }
+_docker_containers() { docker ps -a --format '{{.ID}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || true; }
+_docker_volumes() { docker volume ls --format '{{.Name}}\t{{.Driver}}' 2>/dev/null || true; }
+_docker_space() { docker system df --format '{{.Type}}\t{{.TotalCount}}\t{{.Active}}\t{{.Size}}\t{{.Reclaimable}}' 2>/dev/null || true; }
+
+_docker_installed() { command -v docker >/dev/null 2>&1; }
+# The CLI can be there with the daemon down. Every list is empty then, and
+# "No images found" under a green tick is the wrong thing to say about it.
+_docker_running() { docker info >/dev/null 2>&1; }
+
 # Everything the report shows, as one document. The question this command
 # answers is "is Docker there, and what is it holding", so absence is a value
 # and not an error: a Mac without Docker gets installed:false, not a failure.
 _json_report() {
-	local images containers volumes sys_df first
+	local first a b c d e
 	printf '{\n'
-	printf '  "installed": %s,\n' "$(command -v docker >/dev/null 2>&1 && echo true || echo false)"
+	printf '  "installed": %s,\n' "$(_docker_installed && echo true || echo false)"
 
-	if ! command -v docker >/dev/null 2>&1; then
+	if ! _docker_installed || ! _docker_running; then
 		printf '  "running": false,\n  "images": [],\n  "containers": [],\n  "volumes": [],\n  "space": []\n}\n'
 		return 0
 	fi
-
-	# `docker info` fails when the daemon is down but the CLI is installed:
-	# two different states the text report collapsed into one line.
-	printf '  "running": %s,\n' "$(docker info >/dev/null 2>&1 && echo true || echo false)"
+	printf '  "running": true,\n'
 
 	printf '  "images": ['
 	first=1
-	while read -r line; do
-		[[ -z "$line" ]] && continue
+	while IFS=$'\t' read -r a b c; do
+		[[ -n "$a" ]] || continue
 		[[ $first -eq 1 ]] || printf ','
 		first=0
 		printf '\n    {"repository": %s, "tag": %s, "size": %s}' \
-			"$(rcc_json_string "$(echo "$line" | awk '{print $1}')")" \
-			"$(rcc_json_string "$(echo "$line" | awk '{print $2}')")" \
-			"$(rcc_json_string "$(echo "$line" | awk '{print $NF}')")"
-	done < <(docker images 2>/dev/null | tail -n +2)
+			"$(rcc_json_string "$a")" "$(rcc_json_string "$b")" "$(rcc_json_string "$c")"
+	done < <(_docker_images)
 	[[ $first -eq 1 ]] || printf '\n  '
 	printf '],\n'
 
 	printf '  "containers": ['
 	first=1
-	while read -r line; do
-		[[ -z "$line" ]] && continue
+	while IFS=$'\t' read -r a b c; do
+		[[ -n "$a" ]] || continue
 		[[ $first -eq 1 ]] || printf ','
 		first=0
 		printf '\n    {"id": %s, "image": %s, "status": %s}' \
-			"$(rcc_json_string "$(echo "$line" | awk '{print $1}')")" \
-			"$(rcc_json_string "$(echo "$line" | awk '{print $2}')")" \
-			"$(rcc_json_string "$(echo "$line" | sed -E 's/.*[[:space:]]{2,}(Up|Exited|Created|Restarting|Paused|Dead)/\1/;s/[[:space:]]{2,}.*$//')")"
-	done < <(docker ps -a 2>/dev/null | tail -n +2)
+			"$(rcc_json_string "$a")" "$(rcc_json_string "$b")" "$(rcc_json_string "$c")"
+	done < <(_docker_containers)
 	[[ $first -eq 1 ]] || printf '\n  '
 	printf '],\n'
 
 	printf '  "volumes": ['
 	first=1
-	while read -r line; do
-		[[ -z "$line" ]] && continue
-		local name driver
-		driver=$(echo "$line" | awk '{print $1}')
-		name=$(echo "$line" | awk '{print $2}')
-		[[ -z "$name" || "$name" == "NAME" ]] && continue
+	while IFS=$'\t' read -r a b; do
+		[[ -n "$a" ]] || continue
 		[[ $first -eq 1 ]] || printf ','
 		first=0
-		printf '\n    {"name": %s, "driver": %s}' \
-			"$(rcc_json_string "$name")" "$(rcc_json_string "$driver")"
-	done < <(docker volume ls 2>/dev/null | tail -n +2)
+		printf '\n    {"name": %s, "driver": %s}' "$(rcc_json_string "$a")" "$(rcc_json_string "$b")"
+	done < <(_docker_volumes)
 	[[ $first -eq 1 ]] || printf '\n  '
 	printf '],\n'
 
 	printf '  "space": ['
 	first=1
-	while read -r line; do
-		[[ -z "$line" ]] && continue
-		local type_ size reclaim
-		type_=$(echo "$line" | sed -E 's/[[:space:]]{2,}.*$//')
-		[[ -z "$type_" || "$type_" == "TYPE" ]] && continue
-		size=$(echo "$line" | awk '{print $(NF-1)}')
-		reclaim=$(echo "$line" | awk '{print $NF}')
+	while IFS=$'\t' read -r a b c d e; do
+		[[ -n "$a" ]] || continue
 		[[ $first -eq 1 ]] || printf ','
 		first=0
-		printf '\n    {"type": %s, "size": %s, "reclaimable": %s}' \
-			"$(rcc_json_string "$type_")" "$(rcc_json_string "$size")" \
-			"$(rcc_json_string "$reclaim")"
-	done < <(docker system df 2>/dev/null)
+		printf '\n    {"type": %s, "total": %s, "active": %s, "size": %s, "reclaimable": %s}' \
+			"$(rcc_json_string "$a")" "$(rcc_json_number "$b")" "$(rcc_json_number "$c")" \
+			"$(rcc_json_string "$d")" "$(rcc_json_string "$e")"
+	done < <(_docker_space)
 	[[ $first -eq 1 ]] || printf '\n  '
 	printf ']\n}\n'
+}
+
+# A table of up to ten rows, then "and N more": a list cut short says so.
+_docker_table() {
+	local rows="$1" widths="$2" shown=0 total line
+	total=$(printf '%s\n' "$rows" | grep -c . || true)
+	while IFS= read -r line; do
+		[[ -n "$line" ]] || continue
+		if [[ $shown -lt 10 ]]; then
+			# shellcheck disable=SC2086
+			print_table_row "${line//$'\t'/|}" $widths
+		fi
+		((shown++)) || true
+	done <<< "$rows"
+	if [[ $total -gt 10 ]]; then
+		# shellcheck disable=SC2086
+		print_table_row "${GRAY}and $((total - 10)) more (rcc docker --json lists them all)${NC}" $widths
+	fi
 }
 
 main() {
@@ -119,90 +135,61 @@ main() {
 
 	print_section_header "Docker Status"
 
-	if ! command -v docker >/dev/null 2>&1; then
-		print_table_row "${RED}Docker is not installed or not running${NC}" 40
-		print_table_row "${GRAY}Install Docker Desktop${NC}" 40
+	if ! _docker_installed; then
+		print_table_row "${YELLOW}Docker is not installed${NC}" 40
+		print_table_row "${GRAY}Install Docker Desktop, or OrbStack, or Colima${NC}" 40
+		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
+		return 0
+	fi
+	if ! _docker_running; then
+		print_table_row "${YELLOW}Docker is installed, but the daemon is not running${NC}" 60
+		print_table_row "${GRAY}Start Docker Desktop (or the engine you use) and run again${NC}" 60
 		echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
 		return 0
 	fi
 
+	local rows
 	echo "${GRAY}[1/4] Docker Images...${NC}"
-	print_table_header "Repository|Tag|Size" 25 15 10
-
-	local images
-	images=$(docker images 2>/dev/null | tail -n +2 | head -10 || echo "")
-	if [[ -n "$images" ]]; then
-		echo "$images" | while read -r line; do
-			[[ -z "$line" ]] && continue
-			local repo tag size
-			repo=$(echo "$line" | awk '{print $1}')
-			tag=$(echo "$line" | awk '{print $2}')
-			size=$(echo "$line" | awk '{print $NF}')
-			[[ -n "$repo" ]] && print_table_row "$repo|$tag|$size" 25 15 10
-		done
+	print_table_header "Repository|Tag|Size" 30 15 10
+	rows=$(_docker_images)
+	if [[ -n "$rows" ]]; then
+		_docker_table "$rows" "30 15 10"
 	else
-		print_table_row "${GRAY}No images found${NC}|-|-" 25 15 10
+		print_table_row "${GRAY}No images${NC}|-|-" 30 15 10
 	fi
 	echo "${GREEN}✓${NC}"
 
 	echo ""
 	echo "${GRAY}[2/4] Docker Containers...${NC}"
-	print_table_header "Container ID|Image|Status" 14 20 15
-
-	local containers
-	containers=$(docker ps -a 2>/dev/null | tail -n +2 | head -10 || echo "")
-	if [[ -n "$containers" ]]; then
-		echo "$containers" | while read -r line; do
-			[[ -z "$line" ]] && continue
-			local cid image status
-			cid=$(echo "$line" | awk '{print $1}' | cut -c1-14)
-			image=$(echo "$line" | awk '{print $2}')
-			status=$(echo "$line" | awk '{print $5}')
-			[[ -n "$cid" ]] && print_table_row "$cid|$image|$status" 14 20 15
-		done
+	print_table_header "Container ID|Image|Status" 14 24 24
+	rows=$(_docker_containers)
+	if [[ -n "$rows" ]]; then
+		_docker_table "$rows" "14 24 24"
 	else
-		print_table_row "${GRAY}No containers found${NC}|-|-" 14 20 15
+		print_table_row "${GRAY}No containers${NC}|-|-" 14 24 24
 	fi
 	echo "${GREEN}✓${NC}"
 
 	echo ""
 	echo "${GRAY}[3/4] Docker Volumes...${NC}"
-	print_table_header "Volume Name|Driver" 30 15
-
-	local volumes
-	volumes=$(docker volume ls 2>/dev/null | tail -n +2 || echo "")
-	if [[ -n "$volumes" ]]; then
-		local vol_count
-		vol_count=$(echo "$volumes" | wc -l | xargs || echo "0")
-		print_table_row "Total volumes|$vol_count" 30 15
-		echo "$volumes" | while read -r line; do
-			[[ -z "$line" ]] && continue
-			local vol_name driver
-			vol_name=$(echo "$line" | awk '{print $2}')
-			driver=$(echo "$line" | awk '{print $1}')
-			[[ -n "$vol_name" && "$vol_name" != "NAME" ]] && print_table_row "$vol_name|$driver" 30 15
-		done
+	print_table_header "Volume Name|Driver" 40 10
+	rows=$(_docker_volumes)
+	if [[ -n "$rows" ]]; then
+		print_table_row "${GRAY}Total: $(printf '%s\n' "$rows" | grep -c .) volumes${NC}|" 40 10
+		_docker_table "$rows" "40 10"
 	else
-		print_table_row "${GRAY}No volumes found${NC}|-" 30 15
+		print_table_row "${GRAY}No volumes${NC}|-" 40 10
 	fi
 	echo "${GREEN}✓${NC}"
 
 	echo ""
 	echo "${GRAY}[4/4] Space Usage...${NC}"
-	print_table_header "Type|Size" 25 20
-
-	local sys_df
-	sys_df=$(docker system df 2>/dev/null || echo "")
-	if [[ -n "$sys_df" ]]; then
-		echo "$sys_df" | head -10 | while read -r line; do
-			[[ -z "$line" ]] && continue
-			local type size
-			type=$(echo "$line" | awk '{print $1}')
-			size=$(echo "$line" | awk '{print $2}')
-			[[ -n "$type" ]] && print_table_row "$type|$size" 25 20
-		done
+	print_table_header "Type|Items|Active|Size|Reclaimable" 16 6 6 10 14
+	rows=$(_docker_space)
+	if [[ -n "$rows" ]]; then
+		_docker_table "$rows" "16 6 6 10 14"
 	else
-		print_table_row "${GRAY}Could not get info${NC}|-" 25 20
+		print_table_row "${GRAY}Could not get info${NC}|-|-|-|-" 16 6 6 10 14
 	fi
 	echo "${GREEN}✓${NC}"
 

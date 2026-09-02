@@ -92,6 +92,16 @@ _overlap_rules() {
 	printf '%s|system\n' "${root}/usr/libexec"
 	printf '%s|system\n' "${root}/bin"
 	printf '%s|system\n' "${root}/sbin"
+	# Fifty of /usr/bin's entries are symlinks into /System/Library —
+	# qlmanage, fontrestore, the acfs tools — and were read as orphans because
+	# the rule matched the link's target, not the link. Same for the developer
+	# tools: what xcode-select installs is Apple's, whichever bundle holds it.
+	printf '%s|system\n' "${root}/System/Library"
+	printf '%s|xcode\n' "${root}/Library/Developer/CommandLineTools"
+	printf '%s|xcode\n' "${root}/Applications/Xcode.app"
+	# MacTeX ships tlmgr, which is the manager for everything under it.
+	printf '%s|tlmgr\n' "${root}/Library/TeX"
+	printf '%s|tlmgr\n' "${root}/usr/local/texlive"
 }
 
 # Version managers shadow binaries per project on purpose. They are matched

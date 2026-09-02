@@ -94,3 +94,77 @@ _network_ports() {
 	assert_output_contains "SOCKS5"
 	[[ "$output" != *"V2Ray"* ]]
 }
+
+# --- measured, not read: the findings of 2026-09-02 ---------------------------
+
+@test "network: addresses come from every interface ifconfig lists, not a fixed nine" {
+	run bash "$SCRIPT_DIR/bin/network.sh" --json
+	assert_success
+	printf '%s' "$output" | python3 -c '
+import json, subprocess, sys
+d = json.load(sys.stdin)
+listed = {i["name"] for i in d["interfaces"]}
+# Every interface with a non-link-local address, as ifconfig sees it.
+truth = set()
+for iface in subprocess.run(["ifconfig", "-l"], capture_output=True, text=True).stdout.split():
+    out = subprocess.run(["ifconfig", iface], capture_output=True, text=True).stdout
+    for line in out.splitlines():
+        f = line.split()
+        if len(f) > 1 and f[0] in ("inet", "inet6") and not f[1].startswith("fe80") and not f[1].startswith("169.254"):
+            truth.add(iface)
+assert listed == truth, (listed, truth)
+for i in d["interfaces"]:
+    assert i["kind"] != "LinkLocal", i
+    assert i["kind"] != "Other" or ":" not in i["address"], i
+'
+}
+
+@test "network: an iPhone hotspot address is private space, not WireGuard" {
+	# The function alone, on the ranges that used to be misread.
+	run bash -c 'source "$1"; categorize_interface 172.20.10.3; categorize_interface 172.31.255.1; categorize_interface 172.32.0.1; categorize_interface 2a02:b027::1; categorize_interface fd7a:115c:a1e0::1; categorize_interface 100.100.1.1; categorize_interface 10.0.0.5' _ <(sed -n '/^categorize_interface()/,/^}/p' "$SCRIPT_DIR/bin/network.sh")
+	assert_success
+	[[ "${lines[0]}" == "Private" ]]
+	[[ "${lines[1]}" == "Private" ]]
+	[[ "${lines[2]}" == "Public" ]]
+	[[ "${lines[3]}" == "Public" ]]
+	[[ "${lines[4]}" == "Tailscale" ]]
+	[[ "${lines[5]}" == "CGNAT" ]]
+	[[ "${lines[6]}" == "Private" ]]
+}
+
+@test "network: a firewall tool that cannot run is 'unknown', never 'disabled'" {
+	command -v sandbox-exec >/dev/null 2>&1 || skip "sandbox-exec not available"
+	run sandbox-exec -p '(version 1)(allow default)(deny process-exec (literal "/usr/libexec/ApplicationFirewall/socketfilterfw"))' bash "$SCRIPT_DIR/bin/network.sh" --json
+	assert_success
+	[[ "$output" == *'"application": "unknown"'* ]]
+}
+
+@test "network: system proxies from System Settings are read, not only the environment" {
+	local shim="$HOME/shim"
+	mkdir -p "$shim"
+	cat > "$shim/scutil" <<'SH'
+#!/bin/bash
+case "$1" in
+	--proxy) printf '<dictionary> {\n  HTTPEnable : 1\n  HTTPProxy : 127.0.0.1\n  HTTPPort : 12334\n  HTTPSEnable : 0\n  SOCKSEnable : 0\n  ProxyAutoConfigEnable : 0\n}\n' ;;
+	--dns) printf 'resolver #1\n  nameserver[0] : 1.1.1.1\n' ;;
+	--nc) printf 'Available network connection services in the current set (*=enabled):\n' ;;
+	*) exit 1 ;;
+esac
+SH
+	chmod +x "$shim/scutil"
+	PATH="$shim:$PATH" run bash "$SCRIPT_DIR/bin/network.sh" --json
+	assert_success
+	printf '%s' "$output" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+assert {"name": "system HTTP", "value": "127.0.0.1:12334"} in d["proxies"], d["proxies"]
+assert d["dns"] == ["1.1.1.1"], d["dns"]
+'
+}
+
+@test "network: without /usr/sbin it is 'not checked', not an empty machine" {
+	run env -i PATH=/usr/bin:/bin HOME="$HOME" bash "$SCRIPT_DIR/bin/network.sh" --json
+	[[ "$status" -eq 3 ]]
+	[[ "$output" == *"Not checked"* ]]
+	[[ "$output" != *'"interfaces"'* ]]
+}

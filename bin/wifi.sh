@@ -8,8 +8,6 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 # shellcheck source=lib/core/common.sh
 source "$SCRIPT_DIR/../lib/core/common.sh"
 
-AIRPORT="/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport"
-
 show_wifi_help() {
 	echo "Usage: rcc wifi [options]"
 	echo ""
@@ -28,18 +26,35 @@ show_wifi_help() {
 	echo "  rcc wifi --passwords     # reveal Keychain passwords without prompting"
 }
 
-# Detect the Wi-Fi interface (en0 as a sane fallback).
+# The first Wi-Fi hardware port. Empty when the Mac has none: that is an
+# answer, and a guessed "en0" was not.
 _wifi_interface() {
-	local iface
-	iface="$(networksetup -listallhardwareports 2>/dev/null |
-		awk '/Wi-Fi|AirPort/{found=1} found && /Device:/{print $2; exit}' || true)"
-	[[ -z "$iface" ]] && iface="en0"
-	printf '%s' "$iface"
+	networksetup -listallhardwareports 2>/dev/null |
+		awk '/Wi-Fi|AirPort/{found=1} found && /Device:/{print $2; exit}' || true
 }
 
-_active_ssid() {
-	networksetup -getairportnetwork "$1" 2>/dev/null |
-		sed -n 's/^Current Wi-Fi Network: //p' || true
+# The link as the interface itself reports it: "<ssid>" US "<connected>"
+# (unit separator, not a tab: a tab is IFS whitespace, and an empty name
+# would let `read` slide the flag into the name's place).
+#
+# `networksetup -getairportnetwork` says "not associated" when macOS withholds
+# the network name from command-line tools (it does, without Location Services
+# access, since macOS 14). That is not the same as not connected: the link is
+# up and DHCP is bound, only the name is hidden. So the link state comes from
+# ipconfig, and the name from whichever of the two will say it.
+_active_link() {
+	local iface="$1" ssid summary up=false
+	ssid="$(networksetup -getairportnetwork "$iface" 2>/dev/null |
+		sed -n 's/^Current Wi-Fi Network: //p' || true)"
+	summary="$(ipconfig getsummary "$iface" 2>/dev/null || true)"
+	if [[ -z "$ssid" ]]; then
+		ssid="$(printf '%s\n' "$summary" | sed -n 's/^[[:space:]]*SSID : //p' | head -1)"
+		[[ "$ssid" == "<redacted>" ]] && ssid=""
+	fi
+	if [[ -n "$ssid" ]] || printf '%s\n' "$summary" | grep -q 'LinkStatusActive : TRUE'; then
+		up=true
+	fi
+	printf '%s\x1f%s\n' "$ssid" "$up"
 }
 
 # Saved (preferred) networks, one per line.
@@ -52,27 +67,18 @@ _password_for() {
 	security find-generic-password -D "AirPort network password" -a "$1" -w 2>/dev/null || true
 }
 
-_json_escape() {
-	local s="$1"
-	s="${s//\\/\\\\}"
-	s="${s//\"/\\\"}"
-	printf '%s' "$s"
-}
+HIDDEN_SSID_NOTE="macOS withholds the network name from command-line tools without Location Services access"
 
 # --- sections ----------------------------------------------------------------
 section_active() {
-	local iface="$1" ssid
+	local iface="$1" ssid up
 	print_section_header "Active Connection"
-	ssid="$(_active_ssid "$iface")"
+	IFS=$'\x1f' read -r ssid up < <(_active_link "$iface")
 	if [[ -n "$ssid" ]]; then
 		print_table_row "SSID: $ssid"
-		if [[ -x "$AIRPORT" ]]; then
-			"$AIRPORT" -I 2>/dev/null |
-				grep -E "^[[:space:]]*(SSID|RSSI|channel|lastTxRate)" |
-				sed 's/^[[:space:]]*//' | while IFS= read -r line; do
-				print_table_row "$line"
-			done || true
-		fi
+	elif [[ "$up" == true ]]; then
+		print_table_row "Connected, name withheld"
+		print_table_row "${GRAY}${HIDDEN_SSID_NOTE}${NC}"
 	else
 		print_table_row "${GRAY}Not connected${NC}"
 	fi
@@ -120,18 +126,21 @@ section_passwords() {
 }
 
 output_json() {
-	local iface="$1" reveal="$2" ssid nets line pw first=1
-	ssid="$(_json_escape "$(_active_ssid "$iface")")"
+	local iface="$1" reveal="$2" ssid up nets line pw first=1 hidden=false
+	IFS=$'\x1f' read -r ssid up < <(_active_link "$iface")
+	[[ "$up" == true && -z "$ssid" ]] && hidden=true
 	nets="$(_known_networks "$iface")"
 	printf '{\n'
-	printf '  "interface": "%s",\n' "$(_json_escape "$iface")"
-	printf '  "active_ssid": "%s",\n' "$ssid"
+	printf '  "interface": %s,\n' "$(rcc_json_string "$iface")"
+	printf '  "active_ssid": %s,\n' "$(rcc_json_string "$ssid")"
+	printf '  "connected": %s,\n' "$up"
+	printf '  "ssid_hidden": %s,\n' "$hidden"
 	printf '  "known_networks": ['
 	if [[ -n "$nets" ]]; then
 		while IFS= read -r line; do
 			[[ -z "$line" ]] && continue
 			if [[ $first -eq 1 ]]; then first=0; else printf ','; fi
-			printf '\n    "%s"' "$(_json_escape "$line")"
+			printf '\n    %s' "$(rcc_json_string "$line")"
 		done <<< "$nets"
 		printf '\n  '
 	fi
@@ -143,7 +152,7 @@ output_json() {
 			[[ -z "$line" ]] && continue
 			pw="$(_password_for "$line")"
 			if [[ $first -eq 1 ]]; then first=0; else printf ','; fi
-			printf '\n    "%s": "%s"' "$(_json_escape "$line")" "$(_json_escape "$pw")"
+			printf '\n    %s: %s' "$(rcc_json_string "$line")" "$(rcc_json_string "$pw")"
 		done <<< "$nets"
 		printf '\n  '
 	fi
@@ -164,6 +173,10 @@ main() {
 		esac
 	done
 
+	# Both live in /usr/sbin. Without them this used to print "en0", "Not
+	# connected" and "No saved networks" with exit 0, on a Mac with 167 saved.
+	rcc_require_tools networksetup ipconfig
+
 	local iface
 	iface="$(_wifi_interface)"
 
@@ -173,6 +186,10 @@ main() {
 	fi
 
 	echo ""
+	if [[ -z "$iface" ]]; then
+		echo "${GRAY}No Wi-Fi interface on this Mac.${NC}"
+		return 0
+	fi
 	echo "${GRAY}Interface: $iface${NC}"
 
 	# No explicit section flag -> show everything.

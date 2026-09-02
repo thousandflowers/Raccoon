@@ -127,6 +127,9 @@ _ports_awk() {
 
 _ports_rows() {
 	local mode="$1" data psmap
+	# lsof lives in /usr/sbin. Off PATH it used to mean "No ports found", `[]`
+	# and exit 0 — the same answer as a Mac with nothing listening.
+	rcc_require_tools lsof ps
 	data=$(lsof -iTCP -iUDP -nP 2>/dev/null || true)
 
 	if [[ -z "$data" ]]; then
@@ -150,6 +153,15 @@ _ports_rows() {
 
 display_ports_json() {
 	_ports_rows json
+}
+
+# lsof shows a non-root caller only its own sockets and does not say so. On
+# this Mac that hid sshd on 22, kdc on 88 and two more, which are the rows a
+# port check exists to find. The list is what it is; the reader must know
+# whose it is.
+_ports_scope_note() {
+	[[ $EUID -eq 0 ]] && return 0
+	print_info "Sockets held by other users (root's sshd, for one) are not listed: lsof shows only yours without administrator rights. \`sudo rcc ports\` lists them all."
 }
 
 main() {
@@ -194,6 +206,7 @@ main() {
 	done <<< "$rows"
 
 	echo ""
+	_ports_scope_note
 	print_success "Completed"
 }
 

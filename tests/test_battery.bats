@@ -116,3 +116,52 @@ _stub_no_battery() {
 	assert_output_contains '"fully_charged": true'
 	assert_output_contains '"cycle_count": 42'
 }
+
+# --- measured, not read: the findings of 2026-09-02 ---------------------------
+
+# system_profiler present but answering nothing about the battery, while pmset
+# still reports a charge: the text used to grade that as "0 cycles, 0% (poor)".
+_stub_silent_profiler() {
+	STUB="${BATS_TEST_TMPDIR}/silent"
+	mkdir -p "$STUB"
+	printf '#!/bin/bash\nexit 0\n' > "$STUB/system_profiler"
+	printf '#!/bin/bash\necho "Now drawing from '"'"'AC Power'"'"'"\necho " -InternalBattery-0 (id=1)\t83%%; AC attached; not charging present: true"\n' > "$STUB/pmset"
+	chmod +x "$STUB/system_profiler" "$STUB/pmset"
+}
+
+@test "battery: a figure system_profiler did not report is 'not reported', never 0" {
+	_stub_silent_profiler
+	NO_COLOR=1 PATH="$STUB:$PATH" run bash "$SCRIPT_DIR/bin/battery.sh"
+	assert_success
+	assert_output_contains "not reported"
+	[[ "$output" != *"| 0 "* ]]
+	[[ "$output" != *"0%"* ]]
+	[[ "$output" != *"poor"* ]]
+}
+
+@test "battery: says where the power comes from, apart from whether it is charging" {
+	_stub_silent_profiler
+	PATH="$STUB:$PATH" run bash "$SCRIPT_DIR/bin/battery.sh" --json
+	assert_success
+	printf '%s' "$output" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+assert d["power_source"] == "ac", d
+assert d["charging"] is False, d
+'
+	NO_COLOR=1 PATH="$STUB:$PATH" run bash "$SCRIPT_DIR/bin/battery.sh"
+	assert_output_contains "AC adapter"
+}
+
+@test "battery: without pmset it is 'not checked'" {
+	# Everything the script needs except pmset, so PATH can name only this dir.
+	local tools="$HOME/tools" t
+	mkdir -p "$tools"
+	for t in bash system_profiler sed awk grep cut tail head tr readlink dirname basename cat id env printf date; do
+		ln -sf "$(command -v "$t")" "$tools/$t"
+	done
+	run env -i PATH="$tools" HOME="$HOME" bash "$SCRIPT_DIR/bin/battery.sh" --json
+	[[ "$status" -eq 3 ]]
+	[[ "$output" == *"Not checked"*"pmset"* ]]
+	[[ "$output" != *'"present"'* ]]
+}
