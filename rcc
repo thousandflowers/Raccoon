@@ -18,7 +18,7 @@ case "${1:-""}" in
 				# install without Go): fall back to the Bash menu and point
 				# the user at how to get the richer interactive TUI.
 				if [[ ! -x "$UI_BINARY" && -t 1 ]]; then
-					printf 'TUI not installed — using the text menu. Get it: brew install thousandflowers/raccoon/rcc  (or build it: cd ui && ./build.sh)\n' >&2
+					printf 'TUI not installed — using the text menu. Get it: brew install thousandflowers/tap/rcc  (or build it: cd ui && ./build.sh)\n' >&2
 				fi
 				show_brand_banner
 				interactive_main_menu

@@ -8,7 +8,7 @@ No build step, no npm, no extension store — Raycast runs the shell scripts dir
 
 ## Install
 
-1. `brew install thousandflowers/raccoon/rcc`
+1. `brew install thousandflowers/tap/rcc`
 2. Raycast → **Settings → Extensions → Script Commands → Add Directories**
 3. Pick `raccoon/raycast/commands`
 

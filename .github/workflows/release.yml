@@ -5,7 +5,10 @@ on:
     tags: ["v*"]
 
 env:
-  TAP_REPO: thousandflowers/homebrew-raccoon
+  # One tap for every CLI. rcc had its own, and a tap nobody bumps quietly
+  # serves an old version - canary sat on v0.7.0 for months that way.
+  # homebrew-raccoon redirects here via tap_migrations.json.
+  TAP_REPO: thousandflowers/homebrew-tap
   FORMULA_PATH: Formula/rcc.rb
   # `softwareupdate -l` needs over seven minutes on a fresh runner and
   # answers a question about a machine that will not exist in ten. It was
@@ -117,6 +120,15 @@ jobs:
         run: |
           if [ -z "${GH_TOKEN}" ]; then
             echo "ERROR: tap token is empty (secret RACCOONTAPPUSH not set?)"
+            exit 1
+          fi
+
+          # The tap is public: a token with no write access clones it happily
+          # and only fails at push, with the tag already published. Ask first.
+          push=$(gh api "repos/${TAP_REPO}" --jq '.permissions.push')
+          if [ "$push" != "true" ]; then
+            echo "ERROR: RACCOONTAPPUSH cannot push to ${TAP_REPO} (permissions.push=$push)" >&2
+            echo "Grant the fine-grained PAT Contents:write on ${TAP_REPO}." >&2
             exit 1
           fi
 

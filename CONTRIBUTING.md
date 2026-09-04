@@ -23,7 +23,7 @@ Build it only if your change touches the TUI.
 ## Releases
 
 Tagged releases publish the `rcc` binary and bump the Homebrew tap
-(`thousandflowers/homebrew-raccoon`). Maintainer-only; no manual steps for contributors.
+(`thousandflowers/homebrew-tap`, shared with the other CLIs). Maintainer-only; no manual steps for contributors.
 
 ## Questions
 

@@ -139,7 +139,7 @@ if command -v go >/dev/null 2>&1; then
 	fi
 else
 	echo "Go not found — skipping the optional TUI. The CLI and text menu work anyway;"
-	echo "  for the richer TUI, install Go and re-run, or: brew install thousandflowers/raccoon/rcc"
+	echo "  for the richer TUI, install Go and re-run, or: brew install thousandflowers/tap/rcc"
 fi
 
 _rcc_done "Raccoon ${VERSION} is installed"

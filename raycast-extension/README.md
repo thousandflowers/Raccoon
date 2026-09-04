@@ -57,7 +57,7 @@ should leave a record of what it removed.
 This extension drives the `rcc` command-line tool. Install it once:
 
 ```sh
-brew install thousandflowers/raccoon/rcc
+brew install thousandflowers/tap/rcc
 ```
 
 The extension finds `rcc` in the usual Homebrew locations. If yours lives
