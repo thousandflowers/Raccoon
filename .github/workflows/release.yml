@@ -3,6 +3,9 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Answer "can this token still push to the tap?" on demand, instead of
+  # finding out from a release that has already published its tag.
+  workflow_dispatch:
 
 env:
   # One tap for every CLI. rcc had its own, and a tap nobody bumps quietly
@@ -18,6 +21,7 @@ env:
 
 jobs:
   ci:
+    if: github.event_name == 'push'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -36,6 +40,7 @@ jobs:
         run: bats tests/
 
   release:
+    if: github.event_name == 'push'
     needs: ci
     runs-on: macos-latest
     permissions:
@@ -154,3 +159,24 @@ jobs:
              -c user.email="actions@github.com" \
              commit -m "rcc ${TAG}"
           git push
+
+  tap-token-check:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Can the tap token push to the tap?
+        env:
+          GH_TOKEN: ${{ secrets.RACCOONTAPPUSH }}
+          TAP_REPO: thousandflowers/homebrew-tap
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "RACCOONTAPPUSH is not set" >&2
+            exit 1
+          fi
+          push=$(gh api "repos/${TAP_REPO}" --jq '.permissions.push')
+          echo "permissions.push on ${TAP_REPO} = ${push}"
+          if [ "$push" != "true" ]; then
+            echo "The token cannot push there. Grant it Contents:write on ${TAP_REPO}." >&2
+            exit 1
+          fi
+          echo "OK - releases can bump ${TAP_REPO}."
