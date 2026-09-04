@@ -45,7 +45,7 @@ So I merged it with the script I already ran on my sisters' Macs - disk space, o
 Via Homebrew (recommended):
 
 ```bash
-brew install thousandflowers/raccoon/rcc
+brew install thousandflowers/tap/rcc
 ```
 
 Or grab the single self-contained file - no git, no clone (CLI only; the
@@ -413,7 +413,7 @@ Raccoon fits when you want to audit - and hand a client a readable report on - a
 
 Fair question for a tool that audits security and runs `sudo`. The honest answer:
 
-- **Read it first.** The installer is one file - [`install.sh`](install.sh). It clones the repo to `~/.raccoon` and symlinks `rcc`; nothing else. Prefer Homebrew (`brew install thousandflowers/raccoon/rcc`) if you'd rather not pipe to a shell.
+- **Read it first.** The installer is one file - [`install.sh`](install.sh). It clones the repo to `~/.raccoon` and symlinks `rcc`; nothing else. Prefer Homebrew (`brew install thousandflowers/tap/rcc`) if you'd rather not pipe to a shell.
 - **No telemetry.** Raccoon makes no analytics or "phone-home" calls. Ever.
 - **Network calls are only the obvious ones:** `apps` fetches the Homebrew cask catalog and Sparkle appcasts to find updates; `audit --share` (opt-in only) uploads a report to GitHub; `fleet` connects over SSH to *your* hosts and uses Bonjour/ping on *your* LAN for `scan`; `upgrade` talks to the package managers you already use. Nothing leaves your machine unless you run one of those.
 - **`sudo` only when it's doing the work** - applying `audit --fix` changes or installing a cask - never just to look around.
@@ -483,7 +483,7 @@ One rule runs through all of them: **opening a screen does not act.** `apps` ope
 **It is not in the Raycast Store yet.** To run it from source:
 
 ```bash
-brew install thousandflowers/raccoon/rcc   # the extension needs the CLI
+brew install thousandflowers/tap/rcc   # the extension needs the CLI
 cd raycast-extension
 npm install
 npm run dev

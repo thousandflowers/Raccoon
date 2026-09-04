@@ -27,7 +27,7 @@ export const RUNTIME_PATH = [
 	"/sbin",
 ].join(":");
 
-export const INSTALL_COMMAND = "brew install thousandflowers/raccoon/rcc";
+export const INSTALL_COMMAND = "brew install thousandflowers/tap/rcc";
 
 export class RccNotFoundError extends Error {
 	constructor() {

@@ -3,9 +3,15 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Answer "can this token still push to the tap?" on demand, instead of
+  # finding out from a release that has already published its tag.
+  workflow_dispatch:
 
 env:
-  TAP_REPO: thousandflowers/homebrew-raccoon
+  # One tap for every CLI. rcc had its own, and a tap nobody bumps quietly
+  # serves an old version - canary sat on v0.7.0 for months that way.
+  # homebrew-raccoon redirects here via tap_migrations.json.
+  TAP_REPO: thousandflowers/homebrew-tap
   FORMULA_PATH: Formula/rcc.rb
   # `softwareupdate -l` needs over seven minutes on a fresh runner and
   # answers a question about a machine that will not exist in ten. It was
@@ -15,6 +21,7 @@ env:
 
 jobs:
   ci:
+    if: github.event_name == 'push'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -33,6 +40,7 @@ jobs:
         run: bats tests/
 
   release:
+    if: github.event_name == 'push'
     needs: ci
     runs-on: macos-latest
     permissions:
@@ -120,6 +128,15 @@ jobs:
             exit 1
           fi
 
+          # The tap is public: a token with no write access clones it happily
+          # and only fails at push, with the tag already published. Ask first.
+          push=$(gh api "repos/${TAP_REPO}" --jq '.permissions.push')
+          if [ "$push" != "true" ]; then
+            echo "ERROR: RACCOONTAPPUSH cannot push to ${TAP_REPO} (permissions.push=$push)" >&2
+            echo "Grant the fine-grained PAT Contents:write on ${TAP_REPO}." >&2
+            exit 1
+          fi
+
           TAG="${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
           SHA256="${{ steps.sha.outputs.sha256 }}"
@@ -142,3 +159,24 @@ jobs:
              -c user.email="actions@github.com" \
              commit -m "rcc ${TAG}"
           git push
+
+  tap-token-check:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Can the tap token push to the tap?
+        env:
+          GH_TOKEN: ${{ secrets.RACCOONTAPPUSH }}
+          TAP_REPO: thousandflowers/homebrew-tap
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "RACCOONTAPPUSH is not set" >&2
+            exit 1
+          fi
+          push=$(gh api "repos/${TAP_REPO}" --jq '.permissions.push')
+          echo "permissions.push on ${TAP_REPO} = ${push}"
+          if [ "$push" != "true" ]; then
+            echo "The token cannot push there. Grant it Contents:write on ${TAP_REPO}." >&2
+            exit 1
+          fi
+          echo "OK - releases can bump ${TAP_REPO}."
