@@ -93,6 +93,39 @@ jobs:
             > /tmp/release-notes.md
           echo "Release notes: $(wc -l < /tmp/release-notes.md) lines from CHANGELOG.md"
 
+      - name: The tap must be writable, and hold the formula, before publishing
+        env:
+          GH_TOKEN: ${{ secrets.RACCOONTAPPUSH }}
+        run: |
+          # Everything the last step needs, checked while the only cost is a
+          # deleted tag. It used to be checked at the end, after the release was
+          # public: a tap that had moved, or a token that had lost its scope,
+          # produced a published release with a formula still on the old
+          # version and nothing saying so.
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "ERROR: tap token is empty (secret RACCOONTAPPUSH not set?)" >&2
+            exit 1
+          fi
+
+          # The tap is public: a token with no write access clones it happily
+          # and only fails at push. Ask GitHub instead of finding out then.
+          push=$(gh api "repos/${TAP_REPO}" --jq '.permissions.push')
+          if [ "$push" != "true" ]; then
+            echo "ERROR: RACCOONTAPPUSH cannot push to ${TAP_REPO} (permissions.push=$push)" >&2
+            echo "Grant the fine-grained PAT Contents:write on ${TAP_REPO}." >&2
+            exit 1
+          fi
+
+          # rcc moved from thousandflowers/homebrew-raccoon to the shared tap.
+          # A tag cut from a commit older than that move runs THAT commit's
+          # workflow, which points at the old tap where the formula no longer
+          # exists — so name the miss here rather than after publishing.
+          if ! gh api "repos/${TAP_REPO}/contents/${FORMULA_PATH}" --jq '.name' >/dev/null 2>&1; then
+            echo "ERROR: ${FORMULA_PATH} is not in ${TAP_REPO}" >&2
+            echo "Tag from an up-to-date main: rcc is in thousandflowers/homebrew-tap now." >&2
+            exit 1
+          fi
+
       - name: Build standalone single-file rcc
         run: |
           ./tools/build-standalone.sh dist/rcc
@@ -123,42 +156,51 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RACCOONTAPPUSH }}
         run: |
-          if [ -z "${GH_TOKEN}" ]; then
-            echo "ERROR: tap token is empty (secret RACCOONTAPPUSH not set?)"
-            exit 1
-          fi
-
-          # The tap is public: a token with no write access clones it happily
-          # and only fails at push, with the tag already published. Ask first.
-          push=$(gh api "repos/${TAP_REPO}" --jq '.permissions.push')
-          if [ "$push" != "true" ]; then
-            echo "ERROR: RACCOONTAPPUSH cannot push to ${TAP_REPO} (permissions.push=$push)" >&2
-            echo "Grant the fine-grained PAT Contents:write on ${TAP_REPO}." >&2
-            exit 1
-          fi
-
           TAG="${{ steps.version.outputs.tag }}"
-          VERSION="${{ steps.version.outputs.version }}"
           SHA256="${{ steps.sha.outputs.sha256 }}"
 
           git clone "https://x-access-token:${GH_TOKEN}@github.com/${{ env.TAP_REPO }}.git" tap-repo
           cd tap-repo
-
           FORMULA="${{ env.FORMULA_PATH }}"
-          if [[ ! -f "$FORMULA" ]]; then
-            echo "ERROR: $FORMULA not found in tap repo!"
-            exit 1
-          fi
 
-          sed -i '' 's/version "[^"]*"/version "'"$VERSION"'"/' "$FORMULA"
+          # rcc.rb carries no `version` field: brew reads the version out of the
+          # tag in the url. There used to be a sed for it here, matching nothing
+          # on every release — a rewrite that silently does nothing looks
+          # exactly like one that worked.
           sed -i '' 's|/archive/refs/tags/v[^"]*\.tar\.gz|/archive/refs/tags/'"$TAG"'\.tar\.gz|' "$FORMULA"
           sed -i '' 's/sha256 "[^"]*"/sha256 "'"$SHA256"'"/' "$FORMULA"
+
+          # The seds are pattern matches against a file this repo does not own.
+          # If the formula is ever reshaped they stop matching, and the tap
+          # would be committed unchanged and called a successful release.
+          grep -q "/archive/refs/tags/${TAG}\.tar\.gz" "$FORMULA" || {
+            echo "ERROR: $FORMULA still does not point at $TAG after rewriting" >&2
+            exit 1
+          }
+          grep -q "sha256 \"${SHA256}\"" "$FORMULA" || {
+            echo "ERROR: $FORMULA did not take the new sha256" >&2
+            exit 1
+          }
 
           git add "$FORMULA"
           git -c user.name="Raccoon Release Bot" \
              -c user.email="actions@github.com" \
              commit -m "rcc ${TAG}"
-          git push
+
+          # The tap is shared with canary, skillreaper and qr-multi-imgs now, so
+          # another project releasing in the same minute can take the push slot.
+          # Rebase and try again instead of failing a release that is already
+          # public over a race that resolves itself.
+          n=0
+          until git push; do
+            n=$((n + 1))
+            if [ "$n" -ge 3 ]; then
+              echo "ERROR: could not push the formula after $n attempts" >&2
+              exit 1
+            fi
+            echo "push rejected — someone else bumped the shared tap; rebasing (attempt $n)"
+            git pull --rebase origin main
+          done
 
   tap-token-check:
     if: github.event_name == 'workflow_dispatch'
