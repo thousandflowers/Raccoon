@@ -50,12 +50,20 @@ fi
 # mouth stay put and only the eyes move, which is the rule the TUI follows too.
 RCC_EYES=("o.o" "-.-" "o.o" "^.^")
 
+# True while the cursor sits on the top line of a drawn face, waiting to be
+# redrawn over. _rcc_step sets it, _rcc_say clears it.
+RCC_PARKED=false
+
 # One frame of the raccoon, with a caption to its right.
+# \033[K after each line: the frame is redrawn in place over the previous one,
+# and without erasing to the end of the line a shorter caption left the tail of
+# the longer one behind. "Linked rcc to /Users/x/.local/bin" followed by
+# "Linked the man page" read as "Linked the man pageocal/bin".
 _rcc_frame() {
 	local eyes="$1" caption="$2"
-	printf '   %sn___n%s\n' "$BOLD" "$NC"
-	printf '  %s[ %s ]%s  %s\n' "$BOLD" "$eyes" "$NC" "$caption"
-	printf '   %s> ^ <%s\n' "$BOLD" "$NC"
+	printf '   %sn___n%s\033[K\n' "$BOLD" "$NC"
+	printf '  %s[ %s ]%s  %s\033[K\n' "$BOLD" "$eyes" "$NC" "$caption"
+	printf '   %s> ^ <%s\033[K\n' "$BOLD" "$NC"
 }
 
 # Draw the face once, then redraw it in place while a step runs. Without a tty
@@ -66,6 +74,10 @@ _rcc_step() {
 		printf '  %s\n' "$caption"
 		return 0
 	fi
+	# A message since the last frame moved the cursor off the face, so start a
+	# new one below it rather than redrawing three lines that are no longer
+	# where the cursor thinks they are.
+	[[ "$RCC_PARKED" == "true" ]] || printf '\n'
 	local i
 	for i in 0 1 2 3; do
 		_rcc_frame "${RCC_EYES[$i]}" "$caption"
@@ -75,11 +87,29 @@ _rcc_step() {
 	done
 	_rcc_frame "o.o" "$caption"
 	printf '\033[3A'
+	RCC_PARKED=true
+}
+
+# Between steps the cursor is parked on the top line of the face, so anything
+# printed the ordinary way lands on the raccoon and shreds it. That is what
+# broke the animation on a real install: git and go write to the terminal from
+# inside the very step whose face is on screen. Messages go through here
+# instead - it steps past the face and leaves the cursor below it.
+_rcc_say() {
+	if [[ "$ANIMATE" == "true" && "$RCC_PARKED" == "true" ]]; then
+		printf '\033[3B'
+	fi
+	printf '%s\n' "$1"
+	RCC_PARKED=false
 }
 
 # Leave the last frame on screen instead of scrolling past it.
 _rcc_done() {
+	if [[ "$ANIMATE" == "true" && "$RCC_PARKED" != "true" ]]; then
+		printf '\n'
+	fi
 	_rcc_frame "^.^" "${GREEN}$1${NC}"
+	RCC_PARKED=false
 }
 
 if [[ -t 1 ]] && [[ -z "${NO_COLOR:-}" ]]; then
@@ -97,9 +127,11 @@ clone_repo() {
 	if git clone --depth 1 --filter=blob:none --no-checkout "$REPO_URL" "${INSTALL_DIR}" 2>/dev/null; then
 		cd "${INSTALL_DIR}"
 		git sparse-checkout set --no-cone '/*' '!/docs/' '!/tests/' 2>/dev/null || true
-		git checkout
+		# --quiet, and stderr away: the cursor is parked on the raccoon while
+		# this runs, so git's progress lines land on its face.
+		git checkout --quiet 2>/dev/null
 	else
-		git clone --depth 1 "$REPO_URL" "${INSTALL_DIR}"
+		git clone --quiet --depth 1 "$REPO_URL" "${INSTALL_DIR}" 2>/dev/null
 	fi
 }
 
@@ -108,7 +140,10 @@ if [[ ! -d "${INSTALL_DIR}" ]]; then
 	clone_repo
 else
 	_rcc_step "Updating your installation"
-	cd "${INSTALL_DIR}" && git fetch --depth 1 origin main && git reset --hard origin/main
+	# The hard reset prints "HEAD is now at ..." on stdout, straight onto the
+	# parked face.
+	cd "${INSTALL_DIR}" && git fetch --quiet --depth 1 origin main &&
+		git reset --quiet --hard origin/main
 fi
 
 VERSION=$(get_version)
@@ -132,14 +167,18 @@ chmod +x "${BIN_DIR}/rcc"
 # and the Bash text menu work without it.
 if command -v go >/dev/null 2>&1; then
 	_rcc_step "Building the interactive TUI"
-	if ( cd "${INSTALL_DIR}/ui" && go build -o "${INSTALL_DIR}/bin/rcc-ui" . ); then
-		echo "✓ TUI built"
+	# go build writes to stderr, and stderr here is the terminal the face is
+	# drawn on. Hold the output in a variable and show it only if the build
+	# fails, where it is worth the reader's attention.
+	if _rcc_build_out=$( ( cd "${INSTALL_DIR}/ui" && go build -o "${INSTALL_DIR}/bin/rcc-ui" . ) 2>&1 ); then
+		_rcc_step "Built the interactive TUI"
 	else
-		echo "⚠ TUI build failed — the text menu still works ('rcc' opens it)"
+		_rcc_say "⚠ TUI build failed — the text menu still works ('rcc' opens it)"
+		printf '%s\n' "$_rcc_build_out" | sed 's/^/    /' | head -10
 	fi
 else
-	echo "Go not found — skipping the optional TUI. The CLI and text menu work anyway;"
-	echo "  for the richer TUI, install Go and re-run, or: brew install thousandflowers/tap/rcc"
+	_rcc_say "Go not found — skipping the optional TUI. The CLI and text menu work anyway;"
+	_rcc_say "  for the richer TUI, install Go and re-run, or: brew install thousandflowers/tap/rcc"
 fi
 
 _rcc_done "Raccoon ${VERSION} is installed"

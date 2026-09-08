@@ -178,7 +178,7 @@ _json_report() {
 		[[ -n "$kc" ]] && keychains+=("$kc")
 	done < <(_certs_keychains)
 	details=$(_certs_scan ${keychains[@]+"${keychains[@]}"})
-	summary=$(printf '%s\n' "$details" | grep "SUMMARY:" | sed 's/^SUMMARY://')
+	summary=$(printf '%s\n' "$details" | grep "SUMMARY:" | sed 's/^SUMMARY://' || true)
 
 	printf '{\n'
 	printf '  "counts": {"total": %s, "valid": %s, "expiring": %s, "expired": %s, "self_signed": %s},\n' \
@@ -236,9 +236,13 @@ main() {
 	local summary
 	# Strip the "SUMMARY:" prefix so cut -f1 is `total`, not "SUMMARY:total"
 	# (the prefix used to merge with field 1, shifting every column by one).
-	summary=$(echo "$details" | grep "SUMMARY:" | sed 's/^SUMMARY://')
+	summary=$(echo "$details" | grep "SUMMARY:" | sed 's/^SUMMARY://' || true)
 	local cert_lines
-	cert_lines=$(echo "$details" | grep -v "SUMMARY:")
+	# A keychain holding no certificates leaves $details as the SUMMARY line and
+	# nothing else, so grep -v matches nothing and exits 1. Under `set -e -o
+	# pipefail` that killed the command before it printed a single row: the empty
+	# case is not an error, it is the answer.
+	cert_lines=$(echo "$details" | grep -v "SUMMARY:" || true)
 	
 	local total valid expiring expired selfsigned
 	total=0

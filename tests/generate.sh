@@ -3,7 +3,12 @@
 # Each tool gets tests for: --help, -h, bad flag, and execution.
 # Audit gets combinatorial flag tests.
 
-OUT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Respects OUT_DIR so the output can be inspected without writing over the
+# tests. It writes in place by default, and the files it overwrites carry
+# hand-written tests on top of the generated skeleton - test_ports.bats is 265
+# lines against the 40 this produces. Running it to see what it would emit cost
+# 1194 lines of those once; OUT_DIR=/tmp/x is the way to look.
+OUT_DIR="${OUT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 # ─── Helper: generate tests for a simple sub-tool ───
 gen_subtool_tests() {
@@ -80,9 +85,14 @@ gen_audit_tests() {
 
     local flags=(--deep --fix --dry-run --force --quiet --json --csv --html --history --diff --watch --alert --notify)
     for flag in "${flags[@]}"; do
-        echo "@test \"audit: flag $flag exits 0 or 1\" {" >&3
+        echo "@test \"audit: flag $flag exits 0, 1 or 2\" {" >&3
         echo "    run bash \"\$SCRIPT_DIR/bin/audit.sh\" $flag 2>&1 || true" >&3
-        echo "    [[ \$status -eq 0 || \$status -eq 1 ]]" >&3
+        # assert_audit_exit, not a hand-written 0-or-1: the audit exits 2 for
+        # "warnings only", which the README documents beside 0 and 1 and which
+        # is what a machine with nothing broken returns. The helper has existed
+        # in test_helper.bash all along and was applied by hand in two places;
+        # the generator kept emitting the narrow form and putting it back.
+        echo "    assert_audit_exit" >&3
         echo '}' >&3
         echo '' >&3
     done
@@ -94,33 +104,37 @@ gen_audit_tests() {
             local label="${f1#--}+${f2#--}"
             echo "@test \"audit: combo ${label}\" {" >&3
             echo "    run bash \"\$SCRIPT_DIR/bin/audit.sh\" $f1 $f2 2>&1 || true" >&3
-            echo "    [[ \$status -eq 0 || \$status -eq 1 ]]" >&3
+            echo "    assert_audit_exit" >&3
             echo '}' >&3
             echo '' >&3
         done
     done
 
+    # These four already read assert_audit_exit in the committed file: someone
+    # fixed them by hand and the generator kept putting assert_success and the
+    # narrow 0-or-1 back on the next run. Emitting the helper is what makes a
+    # regeneration a no-op instead of a regression.
     echo "@test \"audit: --help exits 0\" {" >&3
     echo "    run bash \"\$SCRIPT_DIR/bin/audit.sh\" --help" >&3
-    echo "    assert_success" >&3
+    echo "    assert_audit_exit" >&3
     echo '}' >&3
     echo '' >&3
 
     echo "@test \"audit: -h exits 0\" {" >&3
     echo "    run bash \"\$SCRIPT_DIR/bin/audit.sh\" -h" >&3
-    echo "    assert_success" >&3
+    echo "    assert_audit_exit" >&3
     echo '}' >&3
     echo '' >&3
 
     echo "@test \"audit: --nonexistent silently ignored\" {" >&3
     echo "    run bash \"\$SCRIPT_DIR/bin/audit.sh\" --nonexistent" >&3
-    echo "    [[ \$status -eq 0 || \$status -eq 1 ]]" >&3
+    echo "    assert_audit_exit" >&3
     echo '}' >&3
     echo '' >&3
 
     echo "@test \"audit: multi-bad-flag silently ignored\" {" >&3
     echo "    run bash \"\$SCRIPT_DIR/bin/audit.sh\" --bogus --also-bogus" >&3
-    echo "    [[ \$status -eq 0 || \$status -eq 1 ]]" >&3
+    echo "    assert_audit_exit" >&3
     echo '}' >&3
     echo '' >&3
 
@@ -188,7 +202,8 @@ gen_rcc_tests() {
     for aa in "${audit_cmds[@]}"; do
         echo "@test \"rcc: audit $aa no crash\" {" >&3
         echo "    run bash \"\$SCRIPT_DIR/rcc\" audit $aa 2>&1 || true" >&3
-        echo "    [[ \$status -eq 0 || \$status -eq 1 ]]" >&3
+        # Same reason as the audit flag loop above.
+        echo "    assert_audit_exit" >&3
         echo '}' >&3
         echo '' >&3
     done

@@ -29,29 +29,43 @@ run_core_checks() {
 	
 	local gk_status
 	gk_status="$(spctl --status 2>/dev/null)" || true
+	# Same three-way shape as SIP above, and for the same reason: a check that
+	# could not read the answer has not found a problem. Collapsing "unknown"
+	# into the bad branch is what made `rcc audit` report failures on a Mac
+	# where nothing was wrong - it reported the absence of an answer.
 	if echo "$gk_status" | grep -qi "enabled"; then
 		core_results+=("pass:Gatekeeper: Enabled")
-	else
+	elif echo "$gk_status" | grep -qi "disabled"; then
 		core_results+=("fail:Gatekeeper: Disabled")
 		fix_issue "Gatekeeper" "_sudo spctl --master-enable"
+	else
+		core_results+=("warn:Gatekeeper: Unknown")
 	fi
 	
 	local fw_status
 	fw_status="$(_sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>/dev/null)" || true
+	# socketfilterfw needs administrator rights to answer. Without them it
+	# printed nothing, and "nothing" was read as "Disabled": a machine with the
+	# firewall on reported a hard failure, and offered to fix it. It is only a
+	# failure when macOS says the word.
 	if echo "$fw_status" | grep -qi "enabled"; then
 		core_results+=("pass:Firewall: Enabled")
-	else
+	elif echo "$fw_status" | grep -qi "disabled"; then
 		core_results+=("fail:Firewall: Disabled")
 		fix_issue "Firewall" "_sudo /usr/libexec/ApplicationFirewall/socketfilterfw --enable"
+	else
+		core_results+=("warn:Firewall: Unknown")
 	fi
 	
 	local stealth_status
 	stealth_status="$(_sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getstealthmode 2>/dev/null)" || true
 	if echo "$stealth_status" | grep -qi "enabled"; then
 		core_results+=("pass:Stealth Mode: Enabled")
-	else
+	elif echo "$stealth_status" | grep -qi "disabled"; then
 		core_results+=("warn:Stealth Mode: Disabled")
 		fix_issue "Stealth Mode" "_sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on"
+	else
+		core_results+=("warn:Stealth Mode: Unknown")
 	fi
 	
 	# softwareupdate -l output varies across macOS versions; the stable
@@ -93,7 +107,15 @@ run_network_checks() {
 	local -a network_results=()
 	
 	update_global_progress_info "audit: Open Ports..."
-	port_count="$(_sudo lsof -i -P -n 2>/dev/null | grep -c LISTEN)" || true
+	# grep -c counts lsof's rows, and one port answers on several: IPv4 and
+	# IPv6, one row per process holding it. That made "29 listening" out of the
+	# sixteen ports `rcc ports` lists, and tripped the threshold of ten on a
+	# machine that was under it. Count the ports, through the same helper the
+	# other two commands read addresses with.
+	port_count="$(_sudo lsof -i -P -n 2>/dev/null | grep LISTEN | awk '{print $9}' |
+		while IFS= read -r endpoint; do
+			[[ -n "$endpoint" ]] && rcc_local_port "$endpoint"
+		done | sort -u | grep -c . )" || true
 	[[ -z "$port_count" ]] && port_count="0"
 	port_count="${port_count// }"
 	if [[ "$port_count" -lt 10 ]]; then
@@ -208,8 +230,13 @@ run_auth_checks() {
 
 	local sudoers_check
 	sudoers_check="$(_sudo visudo -c 2>&1)" || true
+	# visudo -c needs root. Denied, it says so; that is not a broken sudoers
+	# file, and reporting it as one put a red Fail on a machine whose sudoers
+	# parses cleanly the moment you ask with rights.
 	if echo "$sudoers_check" | grep -qi "parsed"; then
 		auth_results+=("pass:Sudoers: OK")
+	elif [[ -z "$sudoers_check" ]] || echo "$sudoers_check" | grep -qiE "permission denied|must be run|not permitted|a terminal is required|no tty"; then
+		auth_results+=("warn:Sudoers: Unknown")
 	else
 		auth_results+=("fail:Sudoers: Error")
 	fi

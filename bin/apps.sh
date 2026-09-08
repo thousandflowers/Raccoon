@@ -142,7 +142,7 @@ update_casks() {
 	if [[ "${RCC_NO_PROMPT:-}" != "1" ]] && has_tty; then
 		brew_stdin=/dev/tty
 	fi
-	brew upgrade --cask --greedy <"$brew_stdin" | progress_pipe _parse_cask || true
+	brew upgrade --cask --greedy <"$brew_stdin" | progress_pipe _parse_cask || _apps_note_failure casks
 	increment_global_progress
 }
 
@@ -180,7 +180,7 @@ update_mas() {
 
 	increment_global_progress
 	update_global_progress_info "mas: upgrading..."
-	mas upgrade 2>&1 | progress_pipe _parse_mas || true
+	mas upgrade 2>&1 | progress_pipe _parse_mas || _apps_note_failure mas
 	increment_global_progress
 }
 
@@ -301,7 +301,7 @@ update_homebrew_catalog() {
 	local brew_casks=""
 	command -v brew >/dev/null 2>&1 && brew_casks="$(brew list --cask 2>/dev/null || true)"
 
-	local updated=0 launched=0 skipped=0 not_found=0
+	local updated=0 launched=0 skipped=0 not_found=0 failed_installs=0
 	local app_dir app_path app_name match token remote_ver auto local_ver
 
 	# shellcheck disable=SC2046  # intentional word-split of the dir list
@@ -363,14 +363,20 @@ update_homebrew_catalog() {
 				update_global_progress_info "catalog: updating $app_name via brew cask..."
 				local brew_stdin=/dev/null
 				{ true >/dev/tty; } 2>/dev/null && brew_stdin=/dev/tty
-				brew install --cask "$token" --force <"$brew_stdin" 2>&1 | progress_pipe _parse_cask || true
-				echo "$app_name" >>"${PROCESSED_APPS_FILE:-/dev/null}"
-				((updated++)) || true
+				# An install that failed used to be counted as updated, so
+				# "catalog: 3 updated" could be three apps that were not.
+				if brew install --cask "$token" --force <"$brew_stdin" 2>&1 | progress_pipe _parse_cask; then
+					echo "$app_name" >>"${PROCESSED_APPS_FILE:-/dev/null}"
+					((updated++)) || true
+				else
+					_apps_note_failure "catalog:$app_name"
+					((failed_installs++)) || true
+				fi
 			fi
 		done
 	done
 
-	append_progress_output "catalog: $updated updated, $launched launched, $skipped up to date/skipped, $not_found not in catalog"
+	append_progress_output "catalog: $updated updated, $launched launched, $skipped up to date/skipped, $not_found not in catalog$([[ $failed_installs -gt 0 ]] && printf ', %s failed' "$failed_installs")"
 	increment_global_progress
 }
 
@@ -512,8 +518,25 @@ update_sparkle_apps() {
 # Main
 # ============================================================
 
+# Every action in this file ended in `|| true`, so brew, mas and the catalog
+# could each fail outright and the command still printed "Completed" and exited
+# 0 - the reader was told the apps were updated when nothing had been. This is
+# the ledger upgrade.sh already keeps, ported across; the comment there says
+# the same thing about the same bug.
+#
+# A file rather than an array: the catalog layer runs its installs in
+# subshells, where an array assignment dies with the subshell. Appends this
+# short are atomic, so concurrent writers cannot interleave.
+RCC_APPS_FAILURE_LOG=""
+
+_apps_note_failure() {
+	[[ -n "$RCC_APPS_FAILURE_LOG" ]] && echo "$1" >>"$RCC_APPS_FAILURE_LOG"
+	return 0
+}
+
 _rcc_apps_cleanup() {
 	stop_sudo_keepalive 2>/dev/null || true
+	[[ -n "$RCC_APPS_FAILURE_LOG" ]] && rm -f "$RCC_APPS_FAILURE_LOG"
 	# CASK_CATALOG_FILE is the persistent ~/.raccoon cache now — deleting it here
 	# would defeat the TTL and refetch 16MB on every run.
 	[[ -n "${CASK_LOOKUP_FILE:-}" ]] && rm -f "$CASK_LOOKUP_FILE"
@@ -529,6 +552,7 @@ main() {
 	fi
 
 	trap _rcc_apps_cleanup EXIT
+	RCC_APPS_FAILURE_LOG="$(mktemp /tmp/raccoon-apps-fail-XXXXXX)"
 
 	# Cache sudo up front (Touch ID when available) so casks/pkgs that need root
 	# complete without a prompt mid-progress (issue #23).
@@ -597,6 +621,21 @@ main() {
 
 	finish_global_progress
 	echo ""
+
+	# Say what failed. Without this a cron run or a piped caller could not tell
+	# an update from a no-op, which is the whole complaint against this command.
+	local failed=""
+	if [[ -s "$RCC_APPS_FAILURE_LOG" ]]; then
+		failed="$(sort -u "$RCC_APPS_FAILURE_LOG" | tr '\n' ' ')"
+	fi
+	rm -f "$RCC_APPS_FAILURE_LOG"
+	RCC_APPS_FAILURE_LOG=""
+
+	if [[ -n "$failed" ]]; then
+		print_error "Failed: ${failed% }"
+		echo "  Re-run that layer directly to see why."
+		return 1
+	fi
 
 	print_success "Completed"
 }

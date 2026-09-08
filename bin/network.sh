@@ -285,7 +285,11 @@ main() {
 	section_done "$found"
 	echo "${GREEN}✓${NC}"
 
-	print_section_header "[2/10] Listening Ports"
+	# Not every listening port: categorize_port drops anything outside the
+	# proxy/VPN vocabulary two lines below, so this listed 3 of the 16 ports
+	# open on the machine it ran on, under a heading that claimed to be all of
+	# them. The heading now says which ones.
+	print_section_header "[2/10] Proxy and VPN Ports"
 	print_table_header "Port|Service|Description" 8 15 30
 	found=0
 	local ports endpoints port
@@ -442,7 +446,12 @@ main() {
 	print_section_header "[10/10] Summary"
 	echo "  ${GRAY}Checks with a finding:${NC} $sections_found of $sections_run"
 	local software
-	software=$(printf '%s' "$detected" | tr ',' '\n' | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+	# grep exits 1 when it matches nothing, and under `set -e -o pipefail` that
+	# killed main() two lines from the end: on any machine with no proxy or VPN
+	# process, $detected is empty, so the whole command printed its ten sections
+	# and then died without "Proxy/VPN software" and without "Completed",
+	# leaving rcc network the only command that exits 1 when nothing is wrong.
+	software=$(printf '%s' "$detected" | tr ',' '\n' | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//' || true)
 	echo "  ${GRAY}Proxy/VPN software:${NC} ${software:-none}"
 	echo "${GREEN}${ICON_SUCCESS} Completed${NC}"
 }

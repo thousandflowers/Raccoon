@@ -25,13 +25,24 @@ _rcc_strip_ansi() {
 }
 
 # Return visible character count (ANSI-stripped length)
-# All Raccoon labels are ASCII, so ${#var} is correct even in C locale
+#
+# The note here used to read "all Raccoon labels are ASCII, so ${#var} is
+# correct even in C locale". They are not: startup, ports and disk put ○ and ✓
+# inside cells, and every script exports LC_ALL=C, where ${#var} counts bytes.
+# Each of those glyphs is three bytes, so a row carrying one was measured two
+# too wide, padded two too few, and its right border came in early - which is
+# why the boxes in `rcc startup` did not line up with their own separators.
+#
+# Every continuation byte of a UTF-8 sequence matches 0b10xxxxxx and no lead
+# byte does, so bytes minus continuations is the character count, and it stays
+# true without leaving the C locale.
 _rcc_visible_width() {
     local str="$1"
     [[ -z "$str" ]] && { echo 0; return; }
-    local clean
+    local clean cont
     clean=$(_rcc_strip_ansi "$str")
-    echo ${#clean}
+    cont=$(printf '%s' "$clean" | tr -dc '\200-\277' | wc -c)
+    echo $(( ${#clean} - cont ))
 }
 
 # Right-pad a string (with ANSI codes) to a target visible width
@@ -189,7 +200,11 @@ ensure_sudo() {
     # Explain why, and DO NOT swallow the "Password:" prompt: it goes to stderr,
     # and hiding it (the old `sudo -v 2>/dev/null`) made rcc look like it hung
     # waiting on nothing (issue #23). Keep the prompt visible.
-    printf '%s\n' "${GRAY}rcc needs sudo for upgrades that touch system paths (casks, global npm).${NC}" >&2
+    # This helper is shared by every command, so the notice cannot name one of
+    # them: it used to say "for upgrades ... (casks, global npm)" in the middle
+    # of `rcc audit`, which reads as the wrong command asking for rights, and in
+    # a client-facing report that is worse than unhelpful.
+    printf '%s\n' "${GRAY}rcc needs administrator rights to read or change system settings.${NC}" >&2
     # Touch ID answers through a GUI dialog that needs no terminal at all;
     # without it sudo reads the password from /dev/tty on its own, so a
     # reachable /dev/tty is the gate. Redirecting stdin from /dev/tty here would
@@ -464,6 +479,49 @@ print_table_row() {
         local text="${val_arr[$i]}"
         local vlen
         vlen=$(_rcc_visible_width "$text")
+        # A value wider than its column used to push the right border out, so
+        # the box stopped being a box: a long home path in `trash`, a long
+        # service description in `network`. Cut it to the column instead. A
+        # path keeps its tail, which is the end that identifies it - the same
+        # reasoning as _overlap_ellipsize, and ASCII "..." for the same reason,
+        # widths are counted in bytes. A cell carrying colour is left alone:
+        # cutting one by index would cut an escape sequence in half.
+        # How a cell is cut depends on what it is made of. Bash slices bytes
+        # under LC_ALL=C, so that is only safe for plain ASCII; a cell carrying
+        # a glyph (startup's ○ and ✓) or colour goes the slow way through perl.
+        # Colour is the awkward one: an escape sequence occupies no columns, so
+        # it must be carried across the cut rather than counted or discarded -
+        # cutting one in half turns the rest of the line into garbage, which is
+        # why these cells used to be left long instead. Only a cell that is
+        # over-wide and non-ASCII reaches perl, which is rare enough not to
+        # matter.
+        if [[ $vlen -gt $w && $w -ge 4 ]]; then
+            local keep=$((w - 3))
+            if [[ "$text" == *$'\033'* ]]; then
+                text=$(printf '%s' "$text" | perl -CSD -ne '
+                    chomp;
+                    my $keep = '"$keep"'; my ($out, $n) = ("", 0);
+                    while (/\G(\e\[[0-9;]*[a-zA-Z]|.)/gs) {
+                        my $tok = $1;
+                        if ($tok =~ /^\e/) { $out .= $tok; next; }
+                        last if $n >= $keep;
+                        $out .= $tok; $n++;
+                    }
+                    print $out, "...", "\e[0m";
+                ')
+            elif [[ "$text" == *[$'\x80'-$'\xff']* ]]; then
+                if [[ "$text" == */* ]]; then
+                    text=$(printf '%s' "$text" | perl -CSD -ne 'chomp; print "...", substr($_, -'"$keep"')')
+                else
+                    text=$(printf '%s' "$text" | perl -CSD -ne 'chomp; print substr($_, 0, '"$keep"'), "..."')
+                fi
+            elif [[ "$text" == */* ]]; then
+                text="...${text: -$keep}"
+            else
+                text="${text:0:$keep}..."
+            fi
+            vlen=$w
+        fi
         local pad=$((w - vlen))
         [[ $pad -lt 0 ]] && pad=0
         printf " %s%*s %s" "$text" "$pad" "" "$sep"
@@ -554,16 +612,25 @@ init_global_progress() {
         printf '\033[2J\033[H'
         printf '\033[?25l'
         _rcc_redraw_global_progress
-    else
+    elif [[ "${RCC_PROGRESS_PROTOCOL:-}" == "1" ]]; then
+        # Not "anything that is not a terminal": only a caller that asked for
+        # the protocol. This branch is why a redirect still opened with one
+        # __RCC_PROGRESS__ line after the other two sites were gated.
         echo "__RCC_PROGRESS__:0:${total}:Initializing..."
     fi
 }
 
+# __RCC_PROGRESS__ is a protocol, not output: the Raycast extension parses it to
+# drive a progress bar. It used to be emitted whenever stdout was not a terminal,
+# which is not the same question - a redirect, a pipe, `tee`, a cron job and a CI
+# log are all "not a terminal" too, so `rcc upgrade > log.txt` filled the file
+# with `__RCC_PROGRESS__:4:30:pip: dry run`. A caller that wants the protocol now
+# says so: RCC_PROGRESS_PROTOCOL=1, which the extension sets when it spawns rcc.
 update_global_progress_info() {
     local info="$1"
     RCC_PROGRESS_INFO="$info"
     _rcc_maybe_redraw_global_progress
-    if [[ "$RCC_PROGRESS_ACTIVE" == "true" && ! -t 1 ]]; then
+    if [[ "$RCC_PROGRESS_ACTIVE" == "true" && "${RCC_PROGRESS_PROTOCOL:-}" == "1" ]]; then
         echo "__RCC_PROGRESS__:${RCC_PROGRESS_CURRENT}:${RCC_PROGRESS_TOTAL}:${info}"
     fi
 }
@@ -571,7 +638,7 @@ update_global_progress_info() {
 increment_global_progress() {
     RCC_PROGRESS_CURRENT=$((RCC_PROGRESS_CURRENT + 1))
     _rcc_maybe_redraw_global_progress
-    if [[ "$RCC_PROGRESS_ACTIVE" == "true" && ! -t 1 ]]; then
+    if [[ "$RCC_PROGRESS_ACTIVE" == "true" && "${RCC_PROGRESS_PROTOCOL:-}" == "1" ]]; then
         echo "__RCC_PROGRESS__:${RCC_PROGRESS_CURRENT}:${RCC_PROGRESS_TOTAL}:${RCC_PROGRESS_INFO}"
     fi
 }

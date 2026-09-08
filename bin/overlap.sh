@@ -81,7 +81,17 @@ _overlap_rules() {
 	printf '%s|macports\n' "${root}/opt/local"
 	printf '%s|nix\n' "${root}/nix/store"
 	printf '%s|nix\n' "$HOME/.nix-profile"
-	printf '%s|pipx\n' "$HOME/.local/bin"
+	# pipx keeps its venvs here and symlinks ~/.local/bin at them, so this is
+	# where a pipx binary actually resolves. The rule used to name ~/.local/bin
+	# itself, which got it backwards both ways: a plain file someone dropped
+	# there read as "pipx", while a real pipx binary - resolving into
+	# .local/pipx/venvs - matched nothing and read as "orphan".
+	printf '%s|pipx\n' "$HOME/.local/pipx"
+	printf '%s|uv\n' "$HOME/.local/share/uv/tools"
+	# `pip install --user` puts scripts here. Seventy-five of them on this Mac,
+	# and pip updates every one: they are managed, and lumping them in with the
+	# hand-installed binaries would bury the ones that really have no manager.
+	printf '%s|pip\n' "$HOME/Library/Python"
 
 	# Last, so a manager prefix that nests inside one of these still wins.
 	# Apple's own binaries live under SIP: no manager installed them, none can
@@ -185,6 +195,9 @@ _overlap_resolve() {
 
 # Attribute a resolved path to a manager. Result lands in $OVERLAP_MANAGER.
 OVERLAP_MANAGER=""
+# Same root the rules are built with, so the fixture filesystem the portable
+# tests assemble is classified as itself rather than as this machine.
+OVERLAP_ROOT_PREFIX="${RCC_OVERLAP_ROOT:-}"
 _overlap_classify() {
 	local entry="$1"
 	local resolved="$2"
@@ -214,6 +227,19 @@ _overlap_classify() {
 			;;
 		esac
 	done <<< "$OVERLAP_RULES"
+
+	# Nothing claimed it. `curl | sh` leaves no manifest, so an installer's
+	# binaries cannot be enumerated - but they can be recognised by where they
+	# ended up: under the user's own home, or in /usr/local/bin, with no manager
+	# owning the path. That is worth separating from "orphan", because it is the
+	# set no package manager will ever update. No list of tool names here on
+	# purpose: bun, uv, rustup and whatever ships next all land the same way.
+	case "$resolved" in
+	"$HOME"/* | "${OVERLAP_ROOT_PREFIX}/usr/local/bin/"*)
+		OVERLAP_MANAGER="manual"
+		return 0
+		;;
+	esac
 
 	OVERLAP_MANAGER="orphan"
 }

@@ -53,6 +53,7 @@ RCC_ENTRIES=(
     "audit json:help:audit --json"
     "audit history:help:audit --history"
     "audit watch:help:audit --watch"
+    "audit export:help:audit --export md (also html, csv, rtf, json)"
     "upgrade:both:Update packages"
     "apps:both:Update GUI apps (App Store + casks)"
     "backup:both:Time Machine"

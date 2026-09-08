@@ -45,6 +45,9 @@ case "${1:-""}" in
 				"profile") exec "${SCRIPT_DIR}/bin/audit.sh" --profile "${@:3}" ;;
 				"profile-list") exec "${SCRIPT_DIR}/bin/audit.sh" --profile-list "${@:3}" ;;
 				"share") exec "${SCRIPT_DIR}/bin/audit.sh" --share "${@:3}" ;;
+				# Markdown is the default because it is the one a person reads
+				# and a client accepts; the other four are one word away.
+				"export") exec "${SCRIPT_DIR}/bin/audit.sh" --deep --export "${3:-md}" "${@:4}" ;;
 				*)       exec "${SCRIPT_DIR}/bin/audit.sh" "${@:2}" ;;
 			esac
 			;;

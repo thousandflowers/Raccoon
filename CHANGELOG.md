@@ -3,6 +3,98 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [1.0.1] - 2026-09-08
+
+Fourteen bugs, and five of them were the same mistake: an absent value read as
+a bad one. `${charge:-}` returning the value instead of the default; `grep`
+exiting 1 on no match and killing the script under `set -e`; a firewall
+reported "Disabled" because it could not be read; `grep "Name:"` missing
+tmutil's padded `Name          :`; `|| true` swallowing a failure that
+happened. Everything below was found by running the command and asking macOS
+the same question another way.
+
+### Fixed
+
+- **`rcc audit` reported failures on a machine with nothing wrong.** Without
+  administrator rights `socketfilterfw` and `visudo -c` print nothing, and
+  "nothing" was read as "Disabled" and "Error" — a hard Fail, with an offer to
+  fix it. Firewall, Sudoers, Stealth Mode and Gatekeeper now degrade to
+  "Unknown", the three-way shape SIP already used. Measured: 2 false failures
+  before, 0 after, with the privileged run unchanged.
+- **`rcc network` exited 1 and lost its last two lines.** `grep -v '^$'` on
+  empty input exits 1, which killed `main()` two lines from the end on any
+  machine with no proxy or VPN process. It printed all ten sections and then
+  died without "Proxy/VPN software" and without "Completed".
+- **`rcc certs` died before printing anything** on a keychain holding no
+  certificates: `grep -v "SUMMARY:"` matched nothing and exited 1.
+- **`rcc backup` said "Not configured" to a Mac with a destination.** tmutil
+  pads its field names, so a grep for `Name:` matched no line on any machine,
+  and the XML fallback could not save it — `perl -wne` reads one line at a
+  time and the pattern spanned two. The local snapshots were counted for
+  `--json` and never shown in the report, so a Mac holding twelve backups read
+  "No backup found". Newest and oldest are now rows.
+- **`rcc apps` printed "Completed" whatever failed.** Every layer ended in
+  `|| true`: brew, mas and each catalog install could fail outright and the
+  command still exited 0. A failed install was counted as "updated". It now
+  keeps the failure ledger `upgrade` already had, names what failed and exits
+  1.
+- **`rcc upgrade --dry-run` skipped five of the twelve tools it tracks.**
+  `bun`, `uv`, `go`, `claude` and `npm` reported nothing at all — their dry-run
+  branches fed the progress bar, never the report. `nvm` announced
+  `v24.20.0 -> v24.20.0`, which is not an upgrade.
+- **`rcc battery` printed the charge twice** — "67%67". `${charge:-...}`
+  returns the value when the variable is set, not the default.
+- **`rcc audit` counted lsof's rows, not ports:** "29 listening" where the
+  machine had sixteen. One port answers on IPv4 and IPv6 and once per process
+  holding it.
+- **`--json --report FILE` wrote nothing.** The machine-format branch returns
+  before the writer, so `rcc audit --json --report out.json` printed to stdout
+  and silently created no file. Same for `--quiet`.
+- **`--csv` exported three summary rows and not one check**, under a
+  four-column header its three-field rows did not fit. It is the format a
+  technician opens in a spreadsheet: it now carries every check, with the same
+  fields as `--json` and RFC 4180 quoting.
+- **Tables broke on long or non-ASCII values.** Widths were counted in bytes
+  under `LC_ALL=C`, so every row carrying `○` or `✓` was padded three short
+  per glyph and closed its border early; a value wider than its column pushed
+  the border out entirely. Cells are now measured in characters and cut to fit
+  — paths keep their tail, colour is carried across the cut rather than
+  severed.
+- **`__RCC_PROGRESS__` leaked into every redirect.** The protocol the Raycast
+  extension parses was emitted whenever stdout was not a terminal, so
+  `rcc upgrade > log.txt` filled the file with it. A caller that wants it now
+  asks: `RCC_PROGRESS_PROTOCOL=1`.
+- **The `curl | bash` installer shredded its own animation.** git and go wrote
+  to the terminal from inside the step whose raccoon was on screen, and the
+  frames never erased to end of line, so a short caption left the tail of a
+  long one behind: `Linked the man pageocal/bin`.
+- **`rcc overlap` called `pipx` everything in `~/.local/bin`** and called the
+  real pipx binaries orphans — the rule matched the symlink's directory
+  instead of where pipx actually resolves.
+
+### Added
+
+- **`rcc audit --export md|rtf|html|csv|json`**, and `rcc audit export`. rcc
+  picks the filename, writes it and prints where it went, so a caller does not
+  have to invent a path. `RCC_EXPORT_DIR` sends every machine's report to one
+  folder; the name carries the host, so reports gathered from several Macs do
+  not collide.
+- **Export from the Raycast extension** (⌘⇧E) and **from the terminal UI**
+  (`^K` on a finished audit), both through the same flag.
+- **`rcc overlap` names what no manager can update.** A `curl | sh` install
+  leaves no manifest, so its binaries cannot be enumerated — but they can be
+  recognised by where they land, and they are now `manual` rather than
+  `orphan`. `pip --user` and `uv` tools are attributed too. `rcc upgrade` says
+  the set exists and points at the list.
+
+### Changed
+
+- `rcc network`'s second section is called "Proxy and VPN Ports": it filters
+  through the proxy/VPN vocabulary and showed three of the sixteen ports open
+  on the machine it ran on, under a heading that claimed to be all of them.
+- `tests/generate.sh` respects `OUT_DIR`. It writes in place by default, over
+  files that carry hand-written tests on top of the generated skeleton.
+
 ## [1.0.0] - 2026-09-02
 
 1.0 because `--json` is now a contract: the Raycast extension in the store

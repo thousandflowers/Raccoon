@@ -92,7 +92,7 @@ _menu_commands() {
 @test "help: two columns, one command per line, nothing else indented" {
 	run bash "$SCRIPT_DIR/rcc" --help
 	assert_success
-	[[ "$(printf '%s\n' "$output" | grep -c '^  rcc ')" -eq 28 ]]
+	[[ "$(printf '%s\n' "$output" | grep -c '^  rcc ')" -eq 29 ]]
 }
 
 # --- fleet's default --------------------------------------------------------
