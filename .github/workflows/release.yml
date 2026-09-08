@@ -108,13 +108,28 @@ jobs:
           fi
 
           # The tap is public: a token with no write access clones it happily
-          # and only fails at push. Ask GitHub instead of finding out then.
-          push=$(gh api "repos/${TAP_REPO}" --jq '.permissions.push')
-          if [ "$push" != "true" ]; then
-            echo "ERROR: RACCOONTAPPUSH cannot push to ${TAP_REPO} (permissions.push=$push)" >&2
+          # and only fails at push.
+          #
+          # Asking the API was the obvious thing and it is the wrong question.
+          # `repos/X --jq .permissions.push` answers for the *account* the token
+          # authenticates as, not for the token's own scope: a fine-grained PAT
+          # that does not list this repository still reports true. v1.0.1 was
+          # published on the strength of that true, and then the push got 403.
+          #
+          # Only git knows. A dry-run push performs the whole authentication and
+          # permission handshake against receive-pack and writes nothing, so it
+          # fails here - where the cost is a deleted tag - instead of after the
+          # release is public.
+          probe="$(mktemp -d)"
+          git clone --quiet --depth 1 \
+            "https://x-access-token:${GH_TOKEN}@github.com/${TAP_REPO}.git" "$probe/tap"
+          if ! git -C "$probe/tap" push --dry-run origin HEAD:main 2>"$probe/err"; then
+            echo "ERROR: RACCOONTAPPUSH cannot push to ${TAP_REPO}" >&2
+            sed 's/^/  /' "$probe/err" >&2
             echo "Grant the fine-grained PAT Contents:write on ${TAP_REPO}." >&2
             exit 1
           fi
+          echo "The tap token can push to ${TAP_REPO}."
 
           # rcc moved from thousandflowers/homebrew-raccoon to the shared tap.
           # A tag cut from a commit older than that move runs THAT commit's
@@ -202,8 +217,10 @@ jobs:
             git pull --rebase origin main
           done
 
+  # Runs on a tag too, not only when someone thinks to ask. Gated on
+  # workflow_dispatch it was blind in the one situation it exists for, and a
+  # release went out with a token that could not bump the tap.
   tap-token-check:
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Can the tap token push to the tap?
