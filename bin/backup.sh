@@ -28,19 +28,36 @@ for arg in "$@"; do
 	esac
 done
 
+# One field out of `tmutil destinationinfo`, by name.
+#
+# Both readers of this were broken, and between them they made every Mac with
+# a destination report "Not configured":
+#
+#   - tmutil pads its field names ("Name          : Backup di x"), so the
+#     grep for "Name:" matched nothing at all - not one line, on any machine.
+#   - the XML fallback could not save it: `perl -wne` reads one line at a
+#     time, and <key>Name</key> and its <string> are on separate lines, so a
+#     pattern spanning both could never match however many /s it carried.
+#
+# The padded form answers first because it needs no second call; the XML is
+# kept because tmutil drops fields from the plain output during a backup, and
+# it is slurped now so the pattern can span lines.
+_tm_field() {
+	local key="$1" value
+	value=$(tmutil destinationinfo 2>/dev/null |
+		awk -F' *: *' -v k="$key" '$1 == k { print $2; exit }' || printf '')
+	if [[ -z "$value" ]]; then
+		value=$(tmutil destinationinfo -X 2>/dev/null |
+			perl -0777 -wne 'print $1 if /<key>'"$key"'<\/key>\s*<string>(.*?)<\/string>/s' \
+			2>/dev/null || printf '')
+	fi
+	printf '%s' "$value"
+}
+
 check_tm_destination() {
 	local dest kind
-	dest=$(tmutil destinationinfo 2>/dev/null | grep "Name:" | head -1 |
-		cut -d: -f2- | xargs 2>/dev/null || echo "")
-	kind=$(tmutil destinationinfo 2>/dev/null | grep "Kind:" | head -1 | cut -d: -f2- | xargs || echo "")
-
-	# ponytail: plain-text parse fails during backups (field absent).
-	# fallback: XML parse via Perl one-liner.
-	if [[ -z "$dest" ]]; then
-		local xml_dest
-		xml_dest=$(tmutil destinationinfo -X 2>/dev/null | perl -wne 'print $1 if /<key>Name<\/key>\s*<string>(.*?)<\/string>/s' 2>/dev/null || echo "")
-		[[ -n "$xml_dest" ]] && dest="$xml_dest"
-	fi
+	dest=$(_tm_field Name)
+	kind=$(_tm_field Kind)
 
 	print_table_header "Setting|Value" 20 30
 
@@ -71,7 +88,19 @@ check_last_backup() {
 	print_table_header "Last Backup|When" 20 30
 
 	if [[ -z "$last_backup" ]]; then
-		print_table_row "Backup|${YELLOW}No backup found${NC}" 20 30
+		# "No backup found" was said to a Mac holding a dozen of them. tmutil
+		# latestbackup answers for the destination, and it fails whenever the
+		# destination is not mounted - which is the normal state of a laptop.
+		# The snapshots on the internal disk are backups too, and they are
+		# listed by check_local_snapshots below, so this row says only what it
+		# actually knows: the destination has nothing to show right now.
+		local snaps
+		snaps=$(_backup_snapshot_count)
+		if [[ "${snaps:-0}" -gt 0 ]]; then
+			print_table_row "Backup|${GRAY}destination not mounted${NC}" 20 30
+		else
+			print_table_row "Backup|${YELLOW}No backup found${NC}" 20 30
+		fi
 		return 0
 	fi
 
@@ -145,13 +174,47 @@ _backup_snapshot_count() {
 		| grep -c 'com.apple.TimeMachine' || true
 }
 
+# The snapshot names, newest last. diskutil prints "|   Name:  com.apple..."
+# so the name is the last field of the lines that carry one.
+_backup_snapshot_names() {
+	_backup_can_read_snapshots || return 0
+	diskutil apfs listSnapshots /System/Volumes/Data 2>/dev/null |
+		awk '/com\.apple\.TimeMachine/ { print $NF }' || true
+}
+
+# The count alone does not say how far back the copies go, which is the whole
+# question a backup report is asked. Newest and oldest bound it in two rows.
+check_local_snapshots() {
+	local count
+	count=$(_backup_snapshot_count)
+
+	print_table_header "Local snapshots|When" 20 30
+
+	if [[ "${count:-0}" -eq 0 ]]; then
+		print_table_row "Snapshots|${GRAY}none${NC}" 20 30
+		return 0
+	fi
+
+	print_table_row "Snapshots|${GREEN}${count} on this disk${NC}" 20 30
+
+	local names newest oldest
+	names=$(_backup_snapshot_names)
+	[[ -n "$names" ]] || return 0
+	newest=$(printf '%s\n' "$names" | tail -1)
+	oldest=$(printf '%s\n' "$names" | head -1)
+	print_table_row "Newest|$(_snapshot_when "$newest")" 20 30
+	[[ "$newest" == "$oldest" ]] || print_table_row "Oldest|$(_snapshot_when "$oldest")" 20 30
+}
+
+# com.apple.TimeMachine.2026-09-07-180811.local -> 2026-09-07 18:08
+_snapshot_when() {
+	printf '%s' "$1" | sed -E 's/.*\.([0-9]{4}-[0-9]{2}-[0-9]{2})-([0-9]{2})([0-9]{2})[0-9]{2}.*/\1 \2:\3/'
+}
+
 _json_report() {
 	local dest kind phase latest date_ hours first path
-	dest=$(tmutil destinationinfo 2>/dev/null | grep "Name:" | head -1 | cut -d: -f2- | xargs || printf '')
-	if [[ -z "$dest" ]]; then
-		dest=$(tmutil destinationinfo -X 2>/dev/null | perl -wne 'print $1 if /<key>Name<\/key>\s*<string>(.*?)<\/string>/s' 2>/dev/null || printf '')
-	fi
-	kind=$(tmutil destinationinfo 2>/dev/null | grep "Kind:" | head -1 | cut -d: -f2- | xargs || printf '')
+	dest=$(_tm_field Name)
+	kind=$(_tm_field Kind)
 	phase=$(tmutil currentphase 2>/dev/null || printf 'unknown')
 	latest=$(tmutil latestbackup 2>/dev/null || printf '')
 	date_=$(basename "${latest:-}" 2>/dev/null | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || printf '')
@@ -192,6 +255,7 @@ main() {
 	check_tm_destination
 	check_tm_phase
 	check_last_backup
+	check_local_snapshots
 	check_tm_exclusions
 
 	echo ""

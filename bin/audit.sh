@@ -204,6 +204,7 @@ FIX_FORCE=false
 QUIET_MODE=false
 REPORT_FILE=""
 OUTPUT_FORMAT="text"
+EXPORT_FORMAT=""
 SHOW_HISTORY=false
 SHOW_DIFF=false
 SCHEDULE_ACTION=""
@@ -253,6 +254,18 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--quiet | -q)
 		QUIET_MODE=true
+		shift
+		;;
+	# --export names a format and lets rcc choose the file. Both front ends -
+	# the Raycast extension and the Go TUI - can offer "export this report"
+	# without either of them having to invent a filename, and the path is
+	# printed so whatever called it knows where the document went.
+	--export)
+		EXPORT_FORMAT="$2"
+		shift 2
+		;;
+	--export=*)
+		EXPORT_FORMAT="${1#--export=}"
 		shift
 		;;
 	--report)
@@ -427,6 +440,29 @@ done
 # An explicit --md/--rtf/--json/--csv/--html flag wins. If none was given but a
 # --report file carries a known extension, infer the format from it so
 # `--report client.md` just works.
+# Resolve --export into the pair of settings the rest of the script already
+# understands: a format and a file. The directory is $RCC_EXPORT_DIR when set,
+# so a technician can send every machine's report to one synced folder, and the
+# Desktop otherwise because that is where a file can be found without looking.
+# The name carries the host, so reports gathered from several Macs do not
+# collide in that folder.
+if [[ -n "$EXPORT_FORMAT" ]]; then
+	case "$EXPORT_FORMAT" in
+	md | html | csv | rtf | json) ;;
+	*)
+		echo "rcc audit --export: unknown format '$EXPORT_FORMAT' (md, html, csv, rtf, json)" >&2
+		exit "${RCC_EX_USAGE:-64}"
+		;;
+	esac
+	OUTPUT_FORMAT="$EXPORT_FORMAT"
+	if [[ -z "$REPORT_FILE" ]]; then
+		_export_dir="${RCC_EXPORT_DIR:-$HOME/Desktop}"
+		mkdir -p "$_export_dir" 2>/dev/null || _export_dir="$HOME"
+		_export_host="$(scutil --get LocalHostName 2>/dev/null || hostname -s 2>/dev/null || echo mac)"
+		REPORT_FILE="${_export_dir}/rcc-audit-${_export_host}-$(date +%Y%m%d-%H%M%S).${EXPORT_FORMAT}"
+	fi
+fi
+
 if [[ "$OUTPUT_FORMAT" == "text" && -n "$REPORT_FILE" ]]; then
 	case "$REPORT_FILE" in
 		*.md | *.markdown) OUTPUT_FORMAT="md" ;;
@@ -1098,11 +1134,48 @@ ${rows}		</tbody>
 EOFHTML
 }
 
+# Quote a field the way RFC 4180 asks: wrap it when it holds a comma, a quote
+# or a newline, and double any quote inside.
+_csv_field() {
+	local v="$1"
+	case "$v" in
+	*[,\"$'\n'$'\r']*)
+		v="${v//\"/\"\"}"
+		printf '"%s"' "$v"
+		;;
+	*) printf '%s' "$v" ;;
+	esac
+}
+
+# CSV used to be four column headers over three summary rows of three fields
+# each - not one check exported, and not even valid against its own header. It
+# is the format a technician opens in a spreadsheet, so it is the one that has
+# to carry the data. Same fields as --json, read from the same array and split
+# the same way as _results_json above.
 print_output_csv() {
-	echo "Status,Category,Check,Result"
-	echo "pass,Summary,$PASS_count passed"
-	echo "warn,Summary,$WARN_count warnings"
-	echo "fail,Summary,$FAIL_count failures"
+	echo "Status,Category,Check,Value,CIS,Command,Fix Available"
+	[[ ${#AUDIT_RESULTS[@]} -eq 0 ]] && return 0
+	local entry st cat_ tail_ rest nm val fix
+	for entry in "${AUDIT_RESULTS[@]}"; do
+		st="${entry%%$'\t'*}"
+		tail_="${entry#*$'\t'}"
+		cat_="${tail_%%$'\t'*}"
+		rest="${tail_#*$'\t'}"
+		if [[ "$rest" == *": "* ]]; then
+			nm="${rest%%: *}"
+			val="${rest#*: }"
+		else
+			nm="$rest"
+			val=""
+		fi
+		_fix_available "$nm" && fix=yes || fix=no
+		printf '%s,%s,%s,%s,%s,%s,%s\n' \
+			"$(_csv_field "$st")" "$(_csv_field "$cat_")" \
+			"$(_csv_field "$nm")" "$(_csv_field "$val")" \
+			"$(_csv_field "$(_check_cis "$nm")")" \
+			"$(_csv_field "$(_check_command "$nm")")" \
+			"$fix"
+	done
 }
 
 print_output_json() {
@@ -1602,11 +1675,24 @@ main() {
 	if [[ "$QUIET_MODE" == "true" || "$OUTPUT_FORMAT" == "json" ]]; then
 		_run_checks_quiet
 		_redact_audit_results   # scrub secrets before any machine format is emitted
-		case "$OUTPUT_FORMAT" in
-			json) print_output_json ;;
-			csv) print_output_csv ;;
-			*) echo "pass:${PASS_count} warn:${WARN_count} fail:${FAIL_count}" ;;
-		esac
+		# This branch returns before the writer further down, so --report was
+		# ignored on exactly the formats most likely to be saved to a file:
+		# `rcc audit --json --report out.json` printed to stdout and wrote
+		# nothing at all, silently.
+		if [[ -n "$REPORT_FILE" ]]; then
+			case "$OUTPUT_FORMAT" in
+				json) print_output_json > "$REPORT_FILE" ;;
+				csv) print_output_csv > "$REPORT_FILE" ;;
+				*) echo "pass:${PASS_count} warn:${WARN_count} fail:${FAIL_count}" > "$REPORT_FILE" ;;
+			esac
+			echo "  Report saved to: $REPORT_FILE"
+		else
+			case "$OUTPUT_FORMAT" in
+				json) print_output_json ;;
+				csv) print_output_csv ;;
+				*) echo "pass:${PASS_count} warn:${WARN_count} fail:${FAIL_count}" ;;
+			esac
+		fi
 		return "$(_audit_exit_code)"
 	fi
 

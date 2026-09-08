@@ -318,7 +318,12 @@ main() {
 			if [[ "$from" == "$file" ]]; then
 				print_table_row "✓ $name" 60
 			elif [[ -n "$from" ]]; then
-				print_table_row "○ $name ${GRAY}(launchd loads ${from} instead)${NC}" 60
+				# The directory is the whole point - a user agent shadowed by a
+				# system one - and the filename repeats $name. The full path put
+				# the cell 25 characters past its column and pushed the box open;
+				# print_table_row cannot cut it back because the cell carries
+				# colour, and cutting that by index would cut an escape in half.
+				print_table_row "○ $name ${GRAY}(loaded from $(dirname "$from") instead)${NC}" 60
 			else
 				print_table_row "○ $name ${GRAY}(not loaded)${NC}" 60
 			fi

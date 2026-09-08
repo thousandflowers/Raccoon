@@ -68,7 +68,17 @@ _build_fixture() {
     # go install / cargo / pipx
     _mkexec "$HOME/go/bin/gopls"
     _mkexec "$HOME/.cargo/bin/rg"
-    _mkexec "$HOME/.local/bin/black"
+    # pipx as pipx actually installs: the venv under ~/.local/pipx, and a
+    # symlink from its bin dir at it. The fixture used to be a plain file in
+    # ~/.local/bin, which modelled the directory rather than the manager - and
+    # a rule built on that read every hand-installed binary there as pipx while
+    # missing the real ones, which resolve into ~/.local/pipx/venvs.
+    _mkexec "$HOME/.local/pipx/venvs/black/bin/black"
+    mkdir -p "$HOME/.local/bin"
+    ln -s "$HOME/.local/pipx/venvs/black/bin/black" "$HOME/.local/bin/black"
+    # and a binary a curl installer dropped in the same directory: no manager
+    # owns it, and no manager will ever update it
+    _mkexec "$HOME/.local/bin/handrolled"
 
     # mise shim — shadowing on purpose, must NOT read as an overlap
     _mkexec "$HOME/.local/share/mise/shims/python"
@@ -150,10 +160,16 @@ _record() {
     [[ "$(_record rg | grep cargo)" == *"\"manager\": \"cargo\""* ]]
 }
 
-@test "overlap: local bin attributes to pipx" {
+@test "overlap: a pipx venv attributes to pipx" {
     run bash "$SCRIPT_DIR/bin/overlap.sh" --json
     assert_success
     [[ "$(_record black)" == *"\"manager\": \"pipx\""* ]]
+}
+
+@test "overlap: a binary dropped in local bin is manual, not pipx" {
+    run bash "$SCRIPT_DIR/bin/overlap.sh" --json
+    assert_success
+    [[ "$(_record handrolled)" == *"\"manager\": \"manual\""* ]]
 }
 
 @test "overlap: npm relative symlink into node_modules attributes to npm" {

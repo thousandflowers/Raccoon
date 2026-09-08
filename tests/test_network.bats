@@ -63,7 +63,7 @@ _stub_network() {
 
 _network_ports() {
 	NO_COLOR=1 PATH="$STUB:$PATH" bash "$SCRIPT_DIR/bin/network.sh" 2>/dev/null |
-		sed -n '/Listening Ports/,/\[3\/10\]/p'
+		sed -n '/Proxy and VPN Ports/,/\[3\/10\]/p'
 }
 
 @test "network: a listening IPv4 port is reported" {

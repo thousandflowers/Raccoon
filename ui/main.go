@@ -2471,7 +2471,32 @@ const (
 	stateSearch
 	stateRunning
 	stateOutput
+	stateExport
 )
+
+// exportFormat is one row of the export picker. The list is the same five
+// formats `rcc audit --export` accepts, in the order a technician reaches for
+// them: the document you hand over, the one that opens in Word, the page, the
+// spreadsheet, the machine's copy.
+type exportFormat struct {
+	id    string
+	label string
+	desc  string
+}
+
+var exportFormats = []exportFormat{
+	{"md", "Markdown", "Client-ready document"},
+	{"rtf", "RTF", "Opens in TextEdit or Word"},
+	{"html", "HTML", "Report as a web page"},
+	{"csv", "CSV", "One row per check, for a spreadsheet"},
+	{"json", "JSON", "Machine-readable"},
+}
+
+// exportDone carries where the report landed, or why it did not.
+type exportDone struct {
+	path string
+	err  error
+}
 
 type model struct {
 	items    []item
@@ -2488,6 +2513,15 @@ type model struct {
 	// working on whatever length filtered() returns, and nothing has to remember
 	// how to come back.
 	fleetExpanded bool
+
+	// The export picker, opened from a finished audit. It is a screen rather
+	// than a menu row because the menu's model is one row per script, defended
+	// by three tests, and because exporting what you are looking at is the
+	// thing a person actually wants.
+	exportSel    int
+	exportBusy   bool
+	exportResult string
+	exportErr    string
 
 	// Streaming
 	cmd           *exec.Cmd // stored from message for kill signal
@@ -2846,6 +2880,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(startScript(m.binPath, m.currentScript, m.pendingArgs), tick())
 
+	case exportDone:
+		m.exportBusy = false
+		if msg.err != nil {
+			m.exportErr = msg.err.Error()
+		} else {
+			m.exportResult = msg.path
+		}
+		return m, nil
+
 	case scriptDone:
 		// Ignore a scriptDone that arrives after the user already killed the
 		// script (state is back to stateMenu): the in-flight reader goroutine
@@ -2888,6 +2931,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case stateOutput:
 			return m.handleOutputKey(msg)
+		case stateExport:
+			return m.handleExportKey(msg)
 		}
 	}
 
@@ -2900,6 +2945,8 @@ func (m model) View() string {
 		return m.runningView()
 	case stateOutput:
 		return m.outputView()
+	case stateExport:
+		return m.exportView()
 	default:
 		return m.menuView()
 	}
@@ -3449,7 +3496,11 @@ func (m model) outputView() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(styleFooter.Render("  ↑↓ Scroll · Enter Return · q Quit"))
+	if m.currentScript == "audit.sh" {
+		b.WriteString(styleFooter.Render("  ↑↓ Scroll · Enter Return · ^K Export · q Quit"))
+	} else {
+		b.WriteString(styleFooter.Render("  ↑↓ Scroll · Enter Return · q Quit"))
+	}
 	b.WriteString("\n")
 
 	return b.String()
@@ -3572,6 +3623,16 @@ func (m *model) handleOutputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.outputScroll < len(m.outputLines)-1 {
 			m.outputScroll++
 		}
+	case "ctrl+k", "e":
+		// Only after an audit: the other commands have nothing to export.
+		if m.currentScript == "audit.sh" {
+			m.state = stateExport
+			m.exportSel = 0
+			m.exportBusy = false
+			m.exportResult = ""
+			m.exportErr = ""
+		}
+		return m, nil
 	case "enter", " ":
 		m.state = stateMenu
 		m.outputLines = nil
@@ -3581,6 +3642,93 @@ func (m *model) handleOutputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+func (m *model) handleExportKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.exportBusy {
+		return m, nil
+	}
+	switch msg.String() {
+	case "esc", "q":
+		m.state = stateOutput
+		return m, nil
+	case "up", "k":
+		if m.exportSel > 0 {
+			m.exportSel--
+		}
+	case "down", "j":
+		if m.exportSel < len(exportFormats)-1 {
+			m.exportSel++
+		}
+	case "enter", " ":
+		m.exportBusy = true
+		m.exportErr = ""
+		m.exportResult = ""
+		return m, runExport(m.binPath, exportFormats[m.exportSel].id)
+	case "ctrl+c":
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+// runExport re-runs the audit and saves it. The audit is run again rather than
+// rendered from what is on screen: a report handed to someone else has to be
+// the state of the machine now.
+//
+// The exit code is deliberately not treated as failure. `rcc audit` exits 1
+// when a check failed and 2 when it only warned, and 2 is the answer on most
+// machines - reading either as an error would make the export unusable exactly
+// where it works. What decides success is whether the script said where it
+// saved the file.
+func runExport(binPath, format string) tea.Cmd {
+	return func() tea.Msg {
+		cmd := exec.Command("bash", filepath.Join(binPath, "audit.sh"), "--export", format)
+		cmd.Stdin = nil
+		out, _ := cmd.CombinedOutput()
+		for _, line := range strings.Split(string(out), "\n") {
+			if idx := strings.Index(line, "Report saved to:"); idx >= 0 {
+				path := strings.TrimSpace(line[idx+len("Report saved to:"):])
+				if path != "" {
+					return exportDone{path: path}
+				}
+			}
+		}
+		return exportDone{err: fmt.Errorf("the audit ran but did not say where it saved the report")}
+	}
+}
+
+// exportView draws the format picker: five rows and whatever the last attempt
+// produced. It is deliberately plain - the reader is two keystrokes from a file
+// and does not need a second report on the way there.
+func (m model) exportView() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(styleTitle.Render("  Save the audit as a document"))
+	b.WriteString("\n\n")
+
+	for i, f := range exportFormats {
+		row := fmt.Sprintf("%-10s %s", f.label, f.desc)
+		if i == m.exportSel {
+			b.WriteString("  " + styleSelected.Render(row))
+		} else {
+			b.WriteString("  " + styleItem.Render(row))
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	switch {
+	case m.exportBusy:
+		b.WriteString(styleDesc.Render("  Running the audit..."))
+	case m.exportErr != "":
+		b.WriteString(styleError.Render("  " + m.exportErr))
+	case m.exportResult != "":
+		b.WriteString(styleOutput.Render("  Saved to " + m.exportResult))
+	}
+	b.WriteString("\n\n")
+	b.WriteString(styleFooter.Render("  ↑↓ Choose · Enter Save · Esc Back"))
+	b.WriteString("\n")
+	return b.String()
 }
 
 // ─── Main ──────────────────────────────────────────────────

@@ -331,7 +331,19 @@ upgrade_npm() {
 
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "npm: dry run"
-		$npm_sudo npm outdated -g 2>&1 | progress_pipe || true
+		# `npm outdated -g` prints nothing when nothing is outdated, and the
+		# tool then vanished from the report entirely - the reader could not
+		# tell "checked, fine" from "never looked".
+		local npm_outdated
+		npm_outdated=$($npm_sudo npm outdated -g 2>&1 || true)
+		if [[ -n "$npm_outdated" ]]; then
+			append_progress_output "npm: outdated packages found"
+			while IFS= read -r line; do
+				[[ -n "$line" ]] && append_progress_output "$line"
+			done <<<"$npm_outdated"
+		else
+			append_progress_output "npm: up to date"
+		fi
 		increment_global_progress
 		increment_global_progress
 		return 0
@@ -368,7 +380,12 @@ upgrade_nvm() {
 		local current latest
 		current=$(nvm version current 2>/dev/null || echo "system")
 		latest=$(nvm version-remote --lts 2>/dev/null || echo "unknown")
-		append_progress_output "nvm: $current -> $latest"
+		# "v24.20.0 -> v24.20.0" is not an upgrade, it is the answer "no".
+		if [[ "$current" == "$latest" ]]; then
+			append_progress_output "nvm: up to date ($current)"
+		else
+			append_progress_output "nvm: $current -> $latest"
+		fi
 		increment_global_progress
 		increment_global_progress
 		increment_global_progress
@@ -504,6 +521,7 @@ upgrade_bun() {
 	fi
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "bun: dry run"
+		append_progress_output "bun: would run bun upgrade"
 		increment_global_progress
 		increment_global_progress
 		return 0
@@ -524,6 +542,7 @@ upgrade_uv() {
 	fi
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "uv: dry run"
+		append_progress_output "uv: would run uv self update and uv tool upgrade"
 		increment_global_progress
 		increment_global_progress
 		return 0
@@ -546,6 +565,7 @@ upgrade_go() {
 	fi
 	update_global_progress_info "go: $(go version 2>/dev/null | awk '{print $3}')"
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
+		append_progress_output "go: would update gopls and goimports"
 		increment_global_progress
 		increment_global_progress
 		return 0
@@ -592,6 +612,7 @@ upgrade_claude() {
 	fi
 	if [[ "$RCC_DRY_RUN" == "true" ]]; then
 		update_global_progress_info "claude: dry run"
+		append_progress_output "claude: would run claude update"
 		increment_global_progress
 		increment_global_progress
 		return 0
@@ -680,7 +701,13 @@ _run_upgrades_parallel() {
 
 	dir="$(mktemp -d /tmp/raccoon-upg-XXXXXX)"
 
+	# Both, and not by accident. update_global_progress_info feeds the progress
+	# bar, which is transient and, off a terminal, used to reach the reader only
+	# as a __RCC_PROGRESS__ line - so once that protocol was gated behind
+	# RCC_PROGRESS_PROTOCOL the one statement telling you the run went parallel
+	# vanished from every log. Which mode a run used belongs in the report.
 	update_global_progress_info "running $# upgrades in parallel..."
+	append_progress_output "running $# upgrades in parallel..."
 	for job in "$@"; do
 		("$job" >"$dir/$job.log" 2>&1) &
 	done
@@ -779,6 +806,13 @@ main() {
 		echo "  Re-run with the tool directly to see why."
 		return 1
 	fi
+
+	# What this command cannot reach. A `curl | sh` install leaves no manifest,
+	# so there is nothing here to enumerate and nothing safe to run: invoking a
+	# self-update guessed from an unknown binary means executing something rcc
+	# never installed. It is still worth saying they exist, and where the list
+	# is - `rcc overlap` already resolves every PATH entry and now names them.
+	append_progress_output "manual: binaries installed by hand or by a curl installer are not updated here - 'rcc overlap' lists them"
 
 	print_success "Completed"
 }

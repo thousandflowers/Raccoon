@@ -149,13 +149,24 @@ display_battery_status() {
 		capacity_cell="${GRAY}not reported${NC}"
 	fi
 
+	# ${charge:+${charge}%}${charge:-...} printed the value twice: :- returns the
+	# value when the variable is set, so a charge of 67 rendered "67%67". The
+	# suffix is why the row could not use the plain :- the other rows use, so it
+	# is built the way the capacity cell above it is.
+	local charge_cell
+	if [[ -n "$charge" ]]; then
+		charge_cell="${charge}%"
+	else
+		charge_cell="${GRAY}not reported${NC}"
+	fi
+
 	print_section_header "Battery Status"
 
 	print_table_header "Metric|Value" 15 24
 	print_table_row "Cycle Count|${cycle_count:-${GRAY}not reported${NC}}" 15 24
 	print_table_row "Max Capacity|${capacity_cell}" 15 24
 	print_table_row "Condition|${condition:-${GRAY}not reported${NC}}" 15 24
-	print_table_row "Charge Level|${charge:+${charge}%}${charge:-${GRAY}not reported${NC}}" 15 24
+	print_table_row "Charge Level|${charge_cell}" 15 24
 	print_table_row "Power Source|$(_power_source_label)" 15 24
 	print_table_row "Charging|${charging:-${GRAY}not reported${NC}}" 15 24
 	print_table_row "Fully Charged|${full:-${GRAY}not reported${NC}}" 15 24

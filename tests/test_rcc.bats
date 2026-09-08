@@ -122,32 +122,32 @@ teardown() { teardown_raccoon_env; }
 
 @test "rcc: audit fix no crash" {
     run bash "$SCRIPT_DIR/rcc" audit fix 2>&1 || true
-    [[ $status -eq 0 || $status -eq 1 ]]
+    assert_audit_exit
 }
 
 @test "rcc: audit deep no crash" {
     run bash "$SCRIPT_DIR/rcc" audit deep 2>&1 || true
-    [[ $status -eq 0 || $status -eq 1 ]]
+    assert_audit_exit
 }
 
 @test "rcc: audit quiet no crash" {
     run bash "$SCRIPT_DIR/rcc" audit quiet 2>&1 || true
-    [[ $status -eq 0 || $status -eq 1 ]]
+    assert_audit_exit
 }
 
 @test "rcc: audit json no crash" {
     run bash "$SCRIPT_DIR/rcc" audit json 2>&1 || true
-    [[ $status -eq 0 || $status -eq 1 ]]
+    assert_audit_exit
 }
 
 @test "rcc: audit history no crash" {
     run bash "$SCRIPT_DIR/rcc" audit history 2>&1 || true
-    [[ $status -eq 0 || $status -eq 1 ]]
+    assert_audit_exit
 }
 
 @test "rcc: audit watch no crash" {
     run bash "$SCRIPT_DIR/rcc" audit watch 2>&1 || true
-    [[ $status -eq 0 || $status -eq 1 ]]
+    assert_audit_exit
 }
 
 @test "rcc: completion bash prints functions" {
