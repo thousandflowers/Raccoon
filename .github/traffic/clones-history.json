@@ -762,5 +762,17 @@
   "homebrew-raccoon|2026-09-15": {
     "count": 1,
     "uniques": 1
+  },
+  "Raccoon|2026-09-15": {
+    "count": 2,
+    "uniques": 2
+  },
+  "Raccoon|2026-09-16": {
+    "count": 3,
+    "uniques": 3
+  },
+  "homebrew-raccoon|2026-09-16": {
+    "count": 1,
+    "uniques": 1
   }
 }
