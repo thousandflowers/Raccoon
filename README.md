@@ -532,6 +532,12 @@ shellcheck rcc bin/*.sh lib/core/*.sh    # lint
 
 ---
 
+## Also by me
+
+- [Stockfish Continue to Play](https://github.com/thousandflowers/stockfish-continue-to-play) - Chess.com extension: when a game ends, keep playing the final position against Stockfish on the same board.
+
+---
+
 ## License
 
 MIT - see [LICENSE](LICENSE).
