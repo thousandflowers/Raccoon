@@ -514,8 +514,19 @@ The extension ships no copy of Raccoon: it runs the `rcc` you installed, so the 
 ## Shell completion
 
 ```bash
-rcc completion bash >> ~/.bashrc      # or: rcc completion zsh >> ~/.zshrc
+# bash
+rcc completion bash >> ~/.bashrc
+
+# zsh: a completion function has to be autoloaded, not sourced
+mkdir -p ~/.zfunc
+rcc completion zsh > ~/.zfunc/_rcc
+# then in ~/.zshrc, before compinit (or add these two lines if you have none):
+#   fpath+=~/.zfunc
+#   autoload -Uz compinit && compinit
 ```
+
+Homebrew installs both for you: there you only need the shell setup it prints
+after `brew install`.
 
 ## Man page
 
