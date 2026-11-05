@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { rememberYes } from "./once.ts";
 
 const run = promisify(execFile);
 
@@ -28,14 +29,7 @@ export function fixCommand(rcc: string, checkNames: string[]): string {
 	// One comma-separated list rather than one run per check: an audit takes
 	// about eight seconds, and fixing what is on screen would otherwise mean
 	// running it once per row. No check name contains a comma.
-	return [
-		shellQuote(rcc),
-		"audit",
-		"--fix",
-		"--force",
-		"--fix-only",
-		shellQuote(checkNames.join(",")),
-	].join(" ");
+	return [shellQuote(rcc), "audit", "--fix", "--force", "--fix-only", shellQuote(checkNames.join(","))].join(" ");
 }
 
 /**
@@ -47,15 +41,33 @@ export function fixCommand(rcc: string, checkNames: string[]): string {
  * cannot narrow the fix must not run it at all.
  */
 export async function supportsFixOnly(rcc: string): Promise<boolean> {
+	return supportsAuditFlag(rcc, "--fix-only");
+}
+
+/**
+ * Whether this rcc's `audit` documents a flag.
+ *
+ * Asked of the binary rather than worked out from its version number, because
+ * the help is what the binary itself says it can do. A flag it does not know is
+ * not refused - it is ignored - so a caller that needs one has to check.
+ */
+export async function supportsAuditFlag(rcc: string, flag: string): Promise<boolean> {
+	// Remembered per binary and flag: asking is a process, and it was being
+	// spent on every single fix - `usableRcc()` asks before each one, so five
+	// checks fixed one at a time meant five `rcc audit --help` runs for an
+	// answer that cannot change while that binary is the one on disk.
+	return askOnce(`${rcc}\u0000${flag}`);
+}
+
+const askOnce = rememberYes(async (key: string) => {
+	const [rcc, flag] = key.split("\u0000");
 	try {
-		const { stdout } = await run(rcc, ["audit", "--help"], {
-			timeout: 15_000,
-		});
-		return stdout.includes("--fix-only");
+		const { stdout } = await run(rcc, ["audit", "--help"], { timeout: 15_000 });
+		return stdout.includes(flag);
 	} catch {
 		return false;
 	}
-}
+});
 
 /**
  * Run a command in Terminal.app.
@@ -64,12 +76,25 @@ export async function supportsFixOnly(rcc: string): Promise<boolean> {
  * administrator rights, and there is no tty behind a Raycast view for sudo to
  * prompt on: Touch ID and the password prompt only exist here.
  */
-export async function runInTerminal(command: string): Promise<void> {
-	const script = [
-		'tell application "Terminal"',
-		`  do script ${appleScriptQuote(command)}`,
-		"  activate",
-		"end tell",
-	].join("\n");
-	await run("/usr/bin/osascript", ["-e", script], { timeout: 15_000 });
+export async function runInTerminal(command: string, exec: Exec = osascript): Promise<void> {
+	await exec("/usr/bin/osascript", ["-e", terminalScript(command)]);
+}
+
+/** How the AppleScript is run. Injectable so a test can read what was handed over. */
+export type Exec = (file: string, args: string[]) => Promise<unknown>;
+
+const osascript: Exec = (file, args) => run(file, args, { timeout: 15_000 });
+
+/**
+ * The AppleScript that opens Terminal on a command.
+ *
+ * Its own function because the command is a shell line built from what rcc
+ * reported, and it is about to be pasted inside an AppleScript string: two
+ * quoting contexts, one inside the other, and the inner one is what a test can
+ * actually hold to account.
+ */
+export function terminalScript(command: string): string {
+	return ['tell application "Terminal"', `  do script ${appleScriptQuote(command)}`, "  activate", "end tell"].join(
+		"\n",
+	);
 }

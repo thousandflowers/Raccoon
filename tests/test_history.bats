@@ -38,3 +38,20 @@ teardown() { teardown_raccoon_env; }
     [[ $status -eq 0 || $status -eq 1 ]]
 }
 
+@test "history --json: recent is newest first, distinct, and only command names" {
+    mkdir -p "$BATS_TEST_TMPDIR/h"
+    cat > "$BATS_TEST_TMPDIR/h/.zsh_history" <<'EOF'
+: 1700000000:0;oldest --flag
+: 1700000001:0;ls -la
+: 1700000002:0;API_TOKEN=s3cret curl https://example.com
+: 1700000003:0;/Users/someone/private/deploy --prod
+: 1700000004:0;clear; cd /Users/someone
+: 1700000005:0;clear; cd /Users/someone/else
+EOF
+    HOME="$BATS_TEST_TMPDIR/h" run bash "$SCRIPT_DIR/bin/history.sh" --json
+    assert_success
+    recent=$(printf '%s' "$output" | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin)["recent"]))')
+    [ "$recent" = "clear deploy curl ls oldest" ]
+    [[ "$output" != *s3cret* ]]
+    [[ "$output" != *private* ]]
+}

@@ -1,8 +1,21 @@
 import { Action, Color, Icon, List } from "@raycast/api";
-import { removeSymlink, reveal, whichAll } from "./fixes";
+import { tilde } from "./paths.ts";
+import { needsRoot, removeSymlink, reveal, whichAll } from "./fixes";
 import { RccList } from "./rcc-list";
 import { RowActions } from "./resolve";
 import { parseEnv, problems, shortVersion, type EnvReport } from "./env-json";
+
+/**
+ * The confirmation, plus the one thing the command's own text does not spell
+ * out: that it may end up running as root. PATH is scanned in full, so a
+ * broken link can sit in a directory only root can write to, and then the
+ * plain `rm` is refused and the fallback asks for a password.
+ */
+function withRootNote(detail: string, links: string[]): string {
+	return needsRoot(links)
+		? `${detail}\n\nOne of these is outside your home, so this may ask for your password.`
+		: detail;
+}
 
 function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 	const missing = e.path.filter((p) => !p.exists);
@@ -15,10 +28,11 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 		e.broken_symlinks.length > 0
 			? {
 					title: `Remove ${e.broken_symlinks.length} Broken Symlinks`,
-					command: removeSymlink(
+					command: removeSymlink(e.broken_symlinks.map((b) => b.link)),
+					detail: withRootNote(
+						e.broken_symlinks.map((b) => b.name).join(", "),
 						e.broken_symlinks.map((b) => b.link),
 					),
-					detail: e.broken_symlinks.map((b) => b.name).join(", "),
 					destructive: true,
 					count: e.broken_symlinks.length,
 				}
@@ -28,10 +42,7 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 			{/* A command on the PATH that still fails: the most surprising of the
 			    three, so it goes first even when the list is empty elsewhere. */}
 			{e.broken_symlinks.length > 0 ? (
-				<List.Section
-					title="Broken symlinks"
-					subtitle={`${e.broken_symlinks.length}`}
-				>
+				<List.Section title="Broken symlinks" subtitle={`${e.broken_symlinks.length}`}>
 					{e.broken_symlinks.map((b) => (
 						<List.Item
 							key={b.link}
@@ -40,7 +51,8 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 								tintColor: Color.Red,
 							}}
 							title={b.name}
-							subtitle={`→ ${b.target}`}
+							keywords={[b.link, b.target]}
+							subtitle={`→ ${tilde(b.target)}`}
 							accessories={[
 								{
 									tag: {
@@ -54,7 +66,9 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 									one={{
 										title: "Remove This Symlink",
 										command: removeSymlink([b.link]),
-										detail: `${b.link} points at ${b.target}, which is gone.`,
+										detail: withRootNote(`${b.link} points at ${b.target}, which is gone.`, [
+											b.link,
+										]),
 										destructive: true,
 									}}
 									all={allBroken}
@@ -67,10 +81,7 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 			) : null}
 
 			{missing.length > 0 ? (
-				<List.Section
-					title="Missing from disk"
-					subtitle={`${missing.length}`}
-				>
+				<List.Section title="Missing from disk" subtitle={`${missing.length}`}>
 					{missing.map((p) => (
 						<List.Item
 							key={p.path}
@@ -78,7 +89,8 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 								source: Icon.Folder,
 								tintColor: Color.Orange,
 							}}
-							title={p.path}
+							title={tilde(p.path)}
+							keywords={[p.path]}
 							accessories={[
 								{
 									tag: {
@@ -93,10 +105,7 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 									    or in /etc/paths.d — 6 of 14 here did —
 									    and only the reader knows which, so this
 									    copies it rather than editing. */}
-									<Action.CopyToClipboard
-										title="Copy Path Entry"
-										content={p.path}
-									/>
+									<Action.CopyToClipboard title="Copy Path Entry" content={p.path} />
 								</RowActions>
 							}
 						/>
@@ -105,10 +114,7 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 			) : null}
 
 			{e.duplicates.length > 0 ? (
-				<List.Section
-					title="Listed twice"
-					subtitle={`${e.duplicates.length}`}
-				>
+				<List.Section title="Listed twice" subtitle={`${e.duplicates.length}`}>
 					{e.duplicates.map((d, i) => (
 						<List.Item
 							key={`${d}-${i}`}
@@ -138,16 +144,10 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 						key={t.name}
 						icon={{
 							source: t.found ? Icon.CheckCircle : Icon.Minus,
-							tintColor: t.found
-								? Color.Green
-								: Color.SecondaryText,
+							tintColor: t.found ? Color.Green : Color.SecondaryText,
 						}}
 						title={t.name}
-						subtitle={
-							t.version
-								? shortVersion(t.version)
-								: "not installed"
-						}
+						subtitle={t.version ? shortVersion(t.version) : "not installed"}
 						actions={
 							<RowActions
 								one={
@@ -174,7 +174,8 @@ function Rows({ e, actions }: { e: EnvReport; actions: React.ReactNode }) {
 							source: Icon.Folder,
 							tintColor: Color.SecondaryText,
 						}}
-						title={p.path}
+						title={tilde(p.path)}
+						keywords={[p.path]}
 						// Position matters: the first match on the PATH is the one that runs.
 						accessories={[{ text: `#${i + 1}` }]}
 						actions={
@@ -203,8 +204,8 @@ export default function Command() {
 				if (!e) return "Environment";
 				const n = problems(e);
 				return n === 0
-					? `Environment — ${e.path.length} PATH entries, nothing wrong`
-					: `Environment — ${n} ${n === 1 ? "problem" : "problems"}`;
+					? `Environment: ${e.path.length} PATH entries, nothing wrong`
+					: `Environment: ${n} ${n === 1 ? "problem" : "problems"}`;
 			}}
 			searchBarPlaceholder="Search PATH entries, symlinks and tools"
 			emptyIcon={Icon.Terminal}

@@ -7,7 +7,10 @@ import { expectArray, expectObject } from "./json-out.ts";
  * rendered as "undefined" three screens later.
  */
 
-export type TrashReport = { path: string; size: string; count: number };
+/** One mounted volume's own trash, which Finder empties along with the home one. */
+export type TrashVolume = { path: string; size: string; count: number };
+
+export type TrashReport = { path: string; size: string; count: number; volumes: TrashVolume[] };
 
 export function parseTrash(stdout: string): TrashReport {
 	const r = expectObject(stdout, "trash");
@@ -15,6 +18,18 @@ export function parseTrash(stdout: string): TrashReport {
 		path: typeof r.path === "string" ? r.path : "",
 		size: typeof r.size === "string" ? r.size : "0",
 		count: typeof r.count === "number" ? r.count : 0,
+		// Absent on an rcc old enough not to report them: an empty list, never
+		// a missing field, so the screen counts nothing rather than crashing.
+		volumes: Array.isArray(r.volumes)
+			? r.volumes.map((v) => {
+					const o = (v ?? {}) as Record<string, unknown>;
+					return {
+						path: typeof o.path === "string" ? o.path : "",
+						size: typeof o.size === "string" ? o.size : "0",
+						count: typeof o.count === "number" ? o.count : 0,
+					};
+				})
+			: [],
 	};
 }
 
@@ -35,17 +50,13 @@ export function parseWifi(stdout: string): WifiReport {
 		interface: typeof r.interface === "string" ? r.interface : "",
 		active_ssid: typeof r.active_ssid === "string" ? r.active_ssid : "",
 		connected:
-			typeof r.connected === "boolean"
-				? r.connected
-				: typeof r.active_ssid === "string" && r.active_ssid !== "",
+			typeof r.connected === "boolean" ? r.connected : typeof r.active_ssid === "string" && r.active_ssid !== "",
 		ssid_hidden: r.ssid_hidden === true,
 		known_networks: Array.isArray(r.known_networks)
 			? r.known_networks.filter((n): n is string => typeof n === "string")
 			: [],
 		passwords:
-			typeof r.passwords === "object" && r.passwords !== null
-				? (r.passwords as Record<string, string>)
-				: {},
+			typeof r.passwords === "object" && r.passwords !== null ? (r.passwords as Record<string, string>) : {},
 	};
 }
 
@@ -60,9 +71,7 @@ export function parseOverlap(stdout: string): PathEntry[] {
 	return expectArray(stdout, "overlap").map((value, index) => {
 		const e = value as Record<string, unknown>;
 		if (typeof e?.name !== "string" || typeof e?.manager !== "string") {
-			throw new Error(
-				`Entry ${index + 1} is not shaped like a PATH entry.`,
-			);
+			throw new Error(`Entry ${index + 1} is not shaped like a PATH entry.`);
 		}
 		return {
 			name: e.name,

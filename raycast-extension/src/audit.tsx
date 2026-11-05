@@ -14,25 +14,17 @@ import {
 	Toast,
 	useNavigation,
 } from "@raycast/api";
-import { showFailureToast, useExec, usePromise } from "@raycast/utils";
+import { showFailureToast, usePromise } from "@raycast/utils";
+import { useAudit } from "./use-audit";
 import { useMemo, useState } from "react";
 import { AUDIT_CONF, readSkipList, skipCheck } from "./audit-conf";
-import {
-	AUDIT_EXPORT_FORMATS,
-	type AuditExportFormat,
-	exportAudit,
-} from "./audit-export";
-import {
-	type AuditCheck,
-	type AuditStatus,
-	countByStatus,
-	fixableCount,
-	readAuditRun,
-} from "./audit-json";
+import { AUDIT_EXPORT_FORMATS, type AuditExportFormat, exportAudit } from "./audit-export";
+import { type AuditCheck, type AuditStatus, countByStatus, fixableCount } from "./audit-json";
+import { auditTitle } from "./audit-title";
 import { findCommand } from "./commands";
 import { MissingRcc, REPO_URL } from "./missing-rcc";
 import { RccDetail } from "./rcc-detail";
-import { RccNotFoundError, resolveRcc, RUNTIME_PATH } from "./rcc";
+import { RccNotFoundError, resolveRcc } from "./rcc";
 import { fixCommand, runInTerminal, supportsFixOnly } from "./terminal";
 
 /**
@@ -66,42 +58,19 @@ const LABEL: Record<AuditStatus, string> = {
 	fail: "Fail",
 };
 
-function CheckDetail({
-	check,
-	skipped,
-}: {
-	check: AuditCheck;
-	skipped: boolean;
-}) {
+function CheckDetail({ check, skipped }: { check: AuditCheck; skipped: boolean }) {
 	return (
 		<List.Item.Detail
 			metadata={
 				<List.Item.Detail.Metadata>
 					<List.Item.Detail.Metadata.TagList title="Status">
-						<List.Item.Detail.Metadata.TagList.Item
-							text={LABEL[check.status]}
-							color={TINT[check.status]}
-						/>
+						<List.Item.Detail.Metadata.TagList.Item text={LABEL[check.status]} color={TINT[check.status]} />
 					</List.Item.Detail.Metadata.TagList>
-					<List.Item.Detail.Metadata.Label
-						title="Category"
-						text={check.category}
-					/>
-					<List.Item.Detail.Metadata.Label
-						title="Value"
-						text={check.value}
-					/>
-					{check.cis ? (
-						<List.Item.Detail.Metadata.Label
-							title="CIS"
-							text={check.cis}
-						/>
-					) : null}
+					<List.Item.Detail.Metadata.Label title="Category" text={check.category} />
+					<List.Item.Detail.Metadata.Label title="Value" text={check.value} />
+					{check.cis ? <List.Item.Detail.Metadata.Label title="CIS" text={check.cis} /> : null}
 					<List.Item.Detail.Metadata.Separator />
-					<List.Item.Detail.Metadata.Label
-						title="Verify with"
-						text={check.command}
-					/>
+					<List.Item.Detail.Metadata.Label title="Verify with" text={check.command} />
 					<List.Item.Detail.Metadata.Label
 						title="Fix available"
 						text={
@@ -115,15 +84,8 @@ function CheckDetail({
 						}
 						icon={{
 							source:
-								check.fix_available === false
-									? Icon.Minus
-									: skipped
-										? Icon.MinusCircle
-										: Icon.Hammer,
-							tintColor:
-								check.fix_available && !skipped
-									? Color.Orange
-									: Color.SecondaryText,
+								check.fix_available === false ? Icon.Minus : skipped ? Icon.MinusCircle : Icon.Hammer,
+							tintColor: check.fix_available && !skipped ? Color.Orange : Color.SecondaryText,
 						}}
 					/>
 				</List.Item.Detail.Metadata>
@@ -155,22 +117,14 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 	// from where it is written rather than waited for in the report: the JSON
 	// cannot say which checks are skipped, because fix_available is recorded
 	// before the opt-out is consulted.
-	const { data: skipList, revalidate: revalidateSkipList } =
-		usePromise(readSkipList);
+	const { data: skipList, revalidate: revalidateSkipList } = usePromise(readSkipList);
 	const skipped = useMemo(() => new Set(skipList ?? []), [skipList]);
 
-	const { isLoading, data, error, revalidate } = useExec(
-		rccPath ?? "rcc",
-		deep ? ["audit", "--deep", "--json"] : ["audit", "--json"],
-		{
-			execute: rccPath !== null,
-			timeout: AUDIT_TIMEOUT_MS,
-			env: { ...process.env, NO_COLOR: "1", PATH: RUNTIME_PATH },
-			// The exit code is classified here, not by useExec: audit spends 1 on
-			// "a check failed" and 2 on "warnings only", and both are reports.
-			parseOutput: readAuditRun,
-		},
-	);
+	const { isLoading, data, error, revalidate, pending, pendingError, whole } = useAudit({
+		rcc: rccPath,
+		deep,
+		timeout: AUDIT_TIMEOUT_MS,
+	});
 
 	// Filtering is taken over from Raycast so that "everything shown" has a
 	// meaning the code can read. Same fields the placeholder promises.
@@ -180,10 +134,7 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 		const all = data?.results ?? [];
 		if (query === "") return all;
 		return all.filter((check) =>
-			[check.name, check.category, check.value, check.status]
-				.join(" ")
-				.toLowerCase()
-				.includes(query),
+			[check.name, check.category, check.value, check.status].join(" ").toLowerCase().includes(query),
 		);
 	}, [data, searchText]);
 
@@ -192,23 +143,25 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 	const fixableVisible = useMemo(
 		() =>
 			visible.filter(
-				(check) =>
-					check.status !== "pass" &&
-					check.fix_available !== false &&
-					!skipped.has(check.name),
+				(check) => check.status !== "pass" && check.fix_available !== false && !skipped.has(check.name),
 			),
 		[visible, skipped],
 	);
 
 	if (resolveError instanceof RccNotFoundError) return <MissingRcc />;
 
-	if (error) {
+	// Anything else that went wrong finding rcc is shown, not swallowed: an
+	// empty screen here reads as a clean result, which on a report about this
+	// machine is the worst thing it could say.
+	const failure = error ?? (resolveError instanceof Error ? resolveError : undefined);
+
+	if (failure) {
 		return (
 			<List>
 				<List.EmptyView
 					icon={{ source: Icon.XMarkCircle, tintColor: Color.Red }}
 					title="The audit could not be read"
-					description={error.message}
+					description={failure.message}
 					actions={
 						<ActionPanel>
 							<Action
@@ -220,23 +173,11 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 							<Action
 								title="Show Raw Output"
 								icon={Icon.Text}
-								onAction={() =>
-									push(
-										<RccDetail
-											command={findCommand("audit")}
-										/>,
-									)
-								}
+								shortcut={{ modifiers: ["cmd"], key: "t" }}
+								onAction={() => push(<RccDetail command={findCommand("audit")} />)}
 							/>
-							<Action
-								title="Set Rcc Path"
-								icon={Icon.Gear}
-								onAction={openExtensionPreferences}
-							/>
-							<Action.OpenInBrowser
-								title="Open Raccoon on GitHub"
-								url={REPO_URL}
-							/>
+							<Action title="Set Raccoon CLI Path" icon={Icon.Gear} onAction={openExtensionPreferences} />
+							<Action.OpenInBrowser title="Open Raccoon on GitHub" url={REPO_URL} />
 						</ActionPanel>
 					}
 				/>
@@ -291,8 +232,7 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 			await showToast({
 				style: Toast.Style.Failure,
 				title: "rcc not found",
-				message:
-					"Set the Raccoon CLI path in the extension preferences.",
+				message: "Set the Raccoon CLI path in the extension preferences.",
 			});
 			return undefined;
 		}
@@ -312,7 +252,27 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 		const rcc = await usableRcc();
 		if (!rcc) return;
 
-		await runInTerminal(fixCommand(rcc, [check.name]));
+		// Asked for even though it is one check: Enter is the cheapest key on
+		// the row, and what it changes is a security setting on this Mac. The
+		// screen promises that opening it acts on nothing; the same promise has
+		// to hold for the keystroke that lands on a row by accident.
+		const confirmed = await confirmAlert({
+			title: `Fix ${check.name}?`,
+			message: `Raccoon will change this security setting on this Mac. Found: ${check.value}`,
+			icon: { source: Icon.Hammer, tintColor: Color.Red },
+			primaryAction: {
+				title: `Fix ${check.name}`,
+				style: Alert.ActionStyle.Destructive,
+			},
+		});
+		if (!confirmed) return;
+
+		try {
+			await runInTerminal(fixCommand(rcc, [check.name]));
+		} catch (error) {
+			await showFailureToast(error, { title: "Could not hand the fix to Terminal" });
+			return;
+		}
 		await showToast({
 			style: Toast.Style.Success,
 			title: `Fixing ${check.name}`,
@@ -329,8 +289,7 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 			await showToast({
 				style: Toast.Style.Failure,
 				title: "Nothing to fix here",
-				message:
-					"None of the checks on screen has a fix available right now.",
+				message: "None of the checks on screen has a fix available right now.",
 			});
 			return;
 		}
@@ -349,7 +308,12 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 		});
 		if (!confirmed) return;
 
-		await runInTerminal(fixCommand(rcc, names));
+		try {
+			await runInTerminal(fixCommand(rcc, names));
+		} catch (error) {
+			await showFailureToast(error, { title: "Could not hand the fix to Terminal" });
+			return;
+		}
 		await showToast({
 			style: Toast.Style.Success,
 			title: `Fixing ${names.length} checks`,
@@ -408,7 +372,7 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 
 	const screenActions = (
 		<>
-			{fixable > 0 && (
+			{fixable > 0 && whole && (
 				<Action
 					title={`Fix ${fixable} ${fixable === 1 ? "Issue" : "Issues"} Automatically`}
 					icon={{ source: Icon.Hammer, tintColor: Color.Red }}
@@ -446,7 +410,7 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 				{AUDIT_EXPORT_FORMATS.map((format) => (
 					<Action
 						key={format.id}
-						title={`${format.title} — ${format.subtitle}`}
+						title={format.title}
 						icon={Icon.Document}
 						onAction={() => exportReport(format.id)}
 					/>
@@ -455,15 +419,10 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 			<Action
 				title="Show Raw Output"
 				icon={Icon.Text}
-				onAction={() =>
-					push(<RccDetail command={findCommand("audit")} />)
-				}
+				shortcut={{ modifiers: ["cmd"], key: "t" }}
+				onAction={() => push(<RccDetail command={findCommand("audit")} />)}
 			/>
-			<Action
-				title="Set Rcc Path"
-				icon={Icon.Gear}
-				onAction={openExtensionPreferences}
-			/>
+			<Action title="Set Raccoon CLI Path" icon={Icon.Gear} onAction={openExtensionPreferences} />
 		</>
 	);
 
@@ -473,11 +432,7 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 			// Not gated on isLoading: data survives a revalidate, so gating on it
 			// collapsed the panel being read for the seven seconds of a reload.
 			isShowingDetail={(data?.results.length ?? 0) > 0}
-			navigationTitle={
-				counts
-					? `Security Audit — ${counts.pass} pass, ${counts.warn} warn, ${counts.fail} fail`
-					: "Security Audit"
-			}
+			navigationTitle={auditTitle({ counts, whole, pending, failed: pendingError !== undefined })}
 			filtering={false}
 			searchText={searchText}
 			onSearchTextChange={setSearchText}
@@ -495,8 +450,54 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 						: undefined
 				}
 			/>
+			{pending ? (
+				<List.Item
+					icon={{ source: Icon.Clock, tintColor: Color.SecondaryText }}
+					// Short, because the list pane is narrow whenever the detail
+					// pane is open: the first version of this row read
+					// "Still ch… Softwa… Running".
+					title={`${pending[0].toUpperCase()}${pending.slice(1)} checks`}
+					accessories={[{ tag: { value: "Running", color: Color.SecondaryText } }]}
+					detail={
+						<List.Item.Detail
+							markdown={[
+								`## The ${pending} checks are still running`,
+								"",
+								"One of them asks Apple's servers whether this Mac has updates. How long that takes is theirs rather than the audit's: usually seconds, occasionally minutes.",
+								"",
+								"Everything else is already below. These join the top of the list when they land.",
+							].join("\n")}
+						/>
+					}
+					actions={<ActionPanel>{screenActions}</ActionPanel>}
+				/>
+			) : null}
+			{pendingError ? (
+				<List.Item
+					icon={{ source: Icon.Warning, tintColor: Color.Orange }}
+					title="One group of checks could not be read"
+					subtitle={pendingError.message}
+					actions={<ActionPanel>{screenActions}</ActionPanel>}
+				/>
+			) : null}
 			{visible.map((check, index) => {
 				const isSkipped = skipped.has(check.name);
+				const canFixRow = check.status !== "pass" && check.fix_available !== false && !isSkipped;
+				// Raycast binds Enter to the FIRST action in the panel, whatever
+				// shortcut it carries - the rule resolve.tsx was written around. On a
+				// row with nothing of its own to fix (every passing check, which on a
+				// healthy Mac is most of them) this used to put "Fix All Shown" in the
+				// Enter slot, so looking at a clean check offered to change every
+				// failing one. It goes first only when the row's own fix is there to
+				// hold that slot; otherwise it sits below, still on Cmd+Enter.
+				const fixAll = (
+					<Action
+						title={`Fix All ${fixableVisible.length} Shown`}
+						icon={{ source: Icon.Hammer, tintColor: Color.Orange }}
+						shortcut={{ modifiers: ["cmd"], key: "return" }}
+						onAction={fixAllVisible}
+					/>
+				);
 				return (
 					<List.Item
 						key={`${check.category}/${check.name}/${index}`}
@@ -509,11 +510,7 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 							tintColor: TINT[check.status],
 						}}
 						title={check.name}
-						keywords={[
-							check.category,
-							check.value,
-							...(isSkipped ? ["skipped"] : []),
-						]}
+						keywords={[check.category, check.value, ...(isSkipped ? ["skipped"] : [])]}
 						accessories={[
 							...(isSkipped
 								? [
@@ -532,15 +529,11 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 								},
 							},
 						]}
-						detail={
-							<CheckDetail check={check} skipped={isSkipped} />
-						}
+						detail={<CheckDetail check={check} skipped={isSkipped} />}
 						actions={
 							<ActionPanel>
 								<ActionPanel.Section title={check.name}>
-									{check.status !== "pass" &&
-									check.fix_available !== false &&
-									!isSkipped ? (
+									{canFixRow ? (
 										<Action
 											title={`Fix ${check.name}`}
 											icon={{
@@ -550,18 +543,7 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 											onAction={() => fixOne(check)}
 										/>
 									) : null}
-									<Action
-										title={`Fix All ${fixableVisible.length} Shown`}
-										icon={{
-											source: Icon.Hammer,
-											tintColor: Color.Orange,
-										}}
-										shortcut={{
-											modifiers: ["cmd"],
-											key: "return",
-										}}
-										onAction={fixAllVisible}
-									/>
+									{canFixRow ? fixAll : null}
 									<Action.CopyToClipboard
 										title="Copy Verification Command"
 										content={check.command}
@@ -570,17 +552,11 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 											key: "c",
 										}}
 									/>
+									{canFixRow ? null : fixAll}
 									{check.cis ? (
-										<Action.CopyToClipboard
-											title="Copy CIS Reference"
-											content={check.cis}
-											shortcut={
-												Keyboard.Shortcut.Common.Copy
-											}
-										/>
+										<Action.CopyToClipboard title="Copy CIS Reference" content={check.cis} />
 									) : null}
-									{check.fix_available !== false &&
-									!isSkipped ? (
+									{check.fix_available !== false && !isSkipped ? (
 										<Action
 											title="Never Offer to Fix This"
 											icon={Icon.MinusCircle}
@@ -588,9 +564,7 @@ export default function Command({ deep = false }: { deep?: boolean } = {}) {
 										/>
 									) : null}
 								</ActionPanel.Section>
-								<ActionPanel.Section>
-									{screenActions}
-								</ActionPanel.Section>
+								<ActionPanel.Section>{screenActions}</ActionPanel.Section>
 							</ActionPanel>
 						}
 					/>

@@ -15,9 +15,9 @@
  */
 
 const UPGRADE =
-	"An rcc older than 0.17.0 prints its report before the JSON, and its ports " +
-	"output is not valid JSON at all. Upgrade with `brew upgrade rcc`, or point " +
-	"the Raccoon CLI preference at a newer binary.";
+	"An rcc older than 0.18.0 does not answer --json on every screen that asks " +
+	"for it, and older ones print their report before the JSON. Upgrade with " +
+	"`brew upgrade rcc`, or point the Raccoon CLI preference at a newer binary.";
 
 /** The first stretch of output, enough to see what went wrong, short enough to read. */
 function excerpt(text: string): string {
@@ -90,7 +90,7 @@ export function extractJson(stdout: string, command: string): unknown {
 				looksLikeProse(text)
 					? UPGRADE
 					: "This is a defect in rcc, not a version you can upgrade past. " +
-						"The output it printed is below — please report it.",
+						"The output it printed is below. Please report it.",
 				"",
 				excerpt(text),
 			].join("\n"),
@@ -98,19 +98,10 @@ export function extractJson(stdout: string, command: string): unknown {
 	}
 }
 
-export function expectObject(
-	stdout: string,
-	command: string,
-): Record<string, unknown> {
+export function expectObject(stdout: string, command: string): Record<string, unknown> {
 	const parsed = extractJson(stdout, command);
-	if (
-		typeof parsed !== "object" ||
-		parsed === null ||
-		Array.isArray(parsed)
-	) {
-		throw new Error(
-			`rcc ${command} printed JSON, but not a report object.`,
-		);
+	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+		throw new Error(`rcc ${command} printed JSON, but not a report object.`);
 	}
 	return parsed as Record<string, unknown>;
 }
@@ -137,9 +128,9 @@ export const JSON_TIMEOUT_MS = 60_000;
 type ExecResult = {
 	stdout: string;
 	stderr: string;
-	error?: Error;
 	exitCode: number | null;
 	signal: NodeJS.Signals | null;
+	timedOut?: boolean;
 };
 
 /**
@@ -156,19 +147,16 @@ type ExecResult = {
  * way and its document is complete. Only a signal or a spawn error means the
  * output stopped early.
  */
-export function readJson<T>(
-	command: string,
-	parse: (stdout: string) => T,
-): (result: ExecResult) => T {
-	return ({ stdout, signal, error }) => {
-		if (signal || error) {
-			const why = signal ? ` (${signal})` : "";
+export function readJson<T>(command: string, parse: (stdout: string) => T): (result: ExecResult) => T {
+	return ({ stdout, signal, timedOut }) => {
+		// A run can end three ways short of finishing: killed, out of time, or
+		// both. Only the signal used to be looked at, because the old runner
+		// reported nothing else; this one says when the deadline was what
+		// ended it, and a truncated document must never reach the parser.
+		if (signal || timedOut) {
+			const why = signal ? ` (${signal})` : timedOut ? " (out of time)" : "";
 			throw new Error(
-				[
-					`rcc ${command} was cut off after ${JSON_TIMEOUT_MS / 1000}s${why} ` +
-						"and its report is incomplete.",
-					error?.message ?? "",
-				]
+				[`rcc ${command} was cut off after ${JSON_TIMEOUT_MS / 1000}s${why} ` + "and its report is incomplete."]
 					.join("\n")
 					.trim(),
 			);

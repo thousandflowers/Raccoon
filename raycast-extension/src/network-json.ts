@@ -43,18 +43,13 @@ export function parseNetwork(stdout: string): NetworkReport {
 					};
 				})
 			: [],
-		dns: Array.isArray(r.dns)
-			? r.dns.filter((d): d is string => typeof d === "string")
-			: [],
+		dns: Array.isArray(r.dns) ? r.dns.filter((d): d is string => typeof d === "string") : [],
 		vpns: Array.isArray(r.vpns)
 			? r.vpns.map((v) => {
 					const x = (v ?? {}) as Record<string, unknown>;
 					return {
 						name: str(x.name),
-						state:
-							x.state === "connected"
-								? "connected"
-								: "configured",
+						state: x.state === "connected" ? "connected" : "configured",
 					};
 				})
 			: [],
@@ -73,15 +68,16 @@ export function parseNetwork(stdout: string): NetworkReport {
  * The address someone means when they ask what theirs is: routable, not
  * loopback and not link-local.
  */
+/** A VPN that is only configured changes nothing about the traffic right now. */
+export function splitVpns(vpns: Vpn[]): { connected: Vpn[]; idle: Vpn[] } {
+	return {
+		connected: vpns.filter((v) => v.state === "connected"),
+		idle: vpns.filter((v) => v.state !== "connected"),
+	};
+}
+
 export function primaryAddress(n: NetworkReport): Interface | null {
-	return (
-		n.interfaces.find(
-			(i) =>
-				i.family === "inet" &&
-				i.kind !== "Loopback" &&
-				i.kind !== "LinkLocal",
-		) ?? null
-	);
+	return n.interfaces.find((i) => i.family === "inet" && i.kind !== "Loopback" && i.kind !== "LinkLocal") ?? null;
 }
 
 /** Loopback is real but never the answer to "what is my address". */

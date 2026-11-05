@@ -51,7 +51,7 @@ export function sortKeys(keys: SshKey[]): SshKey[] {
 export function reason(key: SshKey): string {
 	switch (keyLevel(key)) {
 		case "unprotected":
-			return "no passphrase — usable by anything that reads the file";
+			return "no passphrase: usable by anything that reads the file";
 		case "loose-perms":
 			return `mode ${key.perms}, ssh requires 600`;
 		case "orphan":
@@ -70,8 +70,7 @@ export function parseSsh(stdout: string): SshReport {
 	const raw = expectObject(stdout, "ssh");
 	return {
 		ssh_dir_present: raw.ssh_dir_present === true,
-		ssh_dir_perms:
-			typeof raw.ssh_dir_perms === "string" ? raw.ssh_dir_perms : "000",
+		ssh_dir_perms: typeof raw.ssh_dir_perms === "string" ? raw.ssh_dir_perms : "000",
 		keys: Array.isArray(raw.keys)
 			? raw.keys.map((entry) => {
 					const k = (entry ?? {}) as Record<string, unknown>;
@@ -86,4 +85,22 @@ export function parseSsh(stdout: string): SshReport {
 				})
 			: [],
 	};
+}
+
+/**
+ * The verdict for the whole screen.
+ *
+ * Three things can be wrong and only one of them is a key: there may be no
+ * ~/.ssh at all, and the directory's own mode matters as much as any key's -
+ * 700 is what keeps another account out of all of them. The screen already
+ * paints a mode that is not 700 red; the title used to say "all in good order"
+ * next to it, and a verdict that contradicts the row under it is worse than no
+ * verdict.
+ */
+export function sshTitle(report: SshReport): string {
+	if (!report.ssh_dir_present) return "SSH keys: no ~/.ssh";
+	const problems = problemCount(report);
+	if (problems > 0) return `SSH keys: ${problems} ${problems === 1 ? "needs" : "need"} attention`;
+	if (report.ssh_dir_perms !== "700") return `SSH keys: ~/.ssh is ${report.ssh_dir_perms}, not 700`;
+	return "SSH keys: all in good order";
 }

@@ -2,7 +2,7 @@ import { Action, ActionPanel, Color, Icon, Keyboard, List } from "@raycast/api";
 import { openApp, openSettings, reveal, SETTINGS } from "./fixes";
 import { RccList } from "./rcc-list";
 import { RowActions } from "./resolve";
-import { fillLevel, parseDisk, smartLevel, type DiskReport } from "./disk-json";
+import { worstVolume, fillLevel, parseDisk, smartLevel, type DiskReport } from "./disk-json";
 
 const FILL_TINT = {
 	ok: Color.Green,
@@ -78,9 +78,7 @@ function Rows({ d, actions }: { d: DiskReport; actions: React.ReactNode }) {
 								tintColor: SMART_TINT[level],
 							}}
 							title={disk.id}
-							subtitle={[disk.type, disk.size]
-								.filter(Boolean)
-								.join(" · ")}
+							subtitle={[disk.type, disk.size].filter(Boolean).join(" · ")}
 							accessories={[
 								...(disk.mount ? [{ text: disk.mount }] : []),
 								{
@@ -115,20 +113,14 @@ function Rows({ d, actions }: { d: DiskReport; actions: React.ReactNode }) {
 				<List.Section title="Local snapshots">
 					<List.Item
 						icon={{
-							source: d.snapshots.available
-								? Icon.Clock
-								: Icon.QuestionMark,
+							source: d.snapshots.available ? Icon.Clock : Icon.QuestionMark,
 							tintColor: !d.snapshots.available
 								? Color.SecondaryText
 								: d.snapshots.count > 10
 									? Color.Orange
 									: Color.SecondaryText,
 						}}
-						title={
-							d.snapshots.available
-								? `${d.snapshots.count} snapshots`
-								: "Not checked"
-						}
+						title={d.snapshots.available ? `${d.snapshots.count} snapshots` : "Not checked"}
 						subtitle={
 							d.snapshots.available
 								? "They hold blocks from files you have already deleted"
@@ -147,10 +139,7 @@ function Rows({ d, actions }: { d: DiskReport; actions: React.ReactNode }) {
 										{
 											tag: {
 												value: `${d.snapshots.reclaimable} reclaimable`,
-												color:
-													d.snapshots.reclaimable > 0
-														? Color.Orange
-														: Color.SecondaryText,
+												color: d.snapshots.reclaimable > 0 ? Color.Orange : Color.SecondaryText,
 											},
 										},
 									]
@@ -193,10 +182,7 @@ function Rows({ d, actions }: { d: DiskReport; actions: React.ReactNode }) {
 			) : null}
 
 			{d.network_mounts.length > 0 ? (
-				<List.Section
-					title="Network mounts"
-					subtitle={`${d.network_mounts.length}`}
-				>
+				<List.Section title="Network mounts" subtitle={`${d.network_mounts.length}`}>
 					{d.network_mounts.map((n) => (
 						<List.Item
 							key={n.mount}
@@ -230,11 +216,8 @@ export default function Command() {
 			command="disk"
 			parse={parseDisk}
 			navigationTitle={(d) => {
-				if (!d || d.volumes.length === 0) return "Disk";
-				const worst = d.volumes.reduce((a, b) =>
-					fillLevel(a.percent) === "full" ? a : b,
-				);
-				return `Disk — ${worst.name} at ${worst.percent}, ${worst.free} free`;
+				const worst = d ? worstVolume(d.volumes) : undefined;
+				return worst ? `Disk: ${worst.name} at ${worst.percent}, ${worst.free} free` : "Disk";
 			}}
 			searchBarPlaceholder="Search volumes, disks and mounts"
 			emptyIcon={Icon.HardDrive}

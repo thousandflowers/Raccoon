@@ -1,18 +1,9 @@
 import { Action, Color, Icon, Keyboard, List } from "@raycast/api";
-import { homedir } from "node:os";
+import { tilde } from "./paths.ts";
 import { RccList } from "./rcc-list";
 import { gitPush, gitPushAll, repoStatus } from "./fixes";
 import { RowActions } from "./resolve";
-import {
-	parseGit,
-	repoLevel,
-	shortPath,
-	sortRepos,
-	summarise,
-	type GitReport,
-	type GitRepo,
-	type RepoLevel,
-} from "./git-json";
+import { parseGit, repoLevel, sortRepos, summarise, type GitReport, type GitRepo, type RepoLevel } from "./git-json";
 
 const TINT: Record<RepoLevel, Color> = {
 	unpushed: Color.Red,
@@ -50,7 +41,7 @@ function repoFix(repo: GitRepo) {
 		return {
 			title: `Push ${repo.unpushed} ${repo.unpushed === 1 ? "Commit" : "Commits"}`,
 			command: gitPush(repo.path),
-			detail: `${repo.name} — the working tree is clean, so pushing is the whole of it.`,
+			detail: `${repo.name}: the working tree is clean, so pushing is the whole of it.`,
 		};
 	}
 	return {
@@ -64,23 +55,18 @@ function repoFix(repo: GitRepo) {
 }
 
 function Rows({ g, actions }: { g: GitReport; actions: React.ReactNode }) {
-	const home = homedir();
 	const sorted = sortRepos(g.repos);
 	const clean = g.repos_total - g.repos_with_issues;
 	// The bulk form only takes the repositories where pushing is the whole
 	// answer. A repository with uncommitted work is left out on purpose: the
 	// keystroke has to mean the same thing for every row it touches.
-	const pushable = sorted.filter(
-		(r) => r.unpushed > 0 && r.uncommitted === 0,
-	);
+	const pushable = sorted.filter((r) => r.unpushed > 0 && r.uncommitted === 0);
 	const pushAll =
 		pushable.length > 0
 			? {
 					title: `Push ${pushable.length} Clean ${pushable.length === 1 ? "Repository" : "Repositories"}`,
 					command: gitPushAll(pushable.map((r) => r.path)),
-					detail: pushable
-						.map((r) => `${r.name} (${r.unpushed})`)
-						.join(", "),
+					detail: pushable.map((r) => `${r.name} (${r.unpushed})`).join(", "),
 					count: pushable.length,
 				}
 			: undefined;
@@ -90,14 +76,8 @@ function Rows({ g, actions }: { g: GitReport; actions: React.ReactNode }) {
 			<List.Section title="Scanned">
 				<List.Item
 					icon={{
-						source:
-							g.repos_with_issues === 0
-								? Icon.CheckCircle
-								: Icon.Folder,
-						tintColor:
-							g.repos_with_issues === 0
-								? Color.Green
-								: Color.SecondaryText,
+						source: g.repos_with_issues === 0 ? Icon.CheckCircle : Icon.Folder,
+						tintColor: g.repos_with_issues === 0 ? Color.Green : Color.SecondaryText,
 					}}
 					title={
 						g.repos_with_issues === 0
@@ -113,11 +93,7 @@ function Rows({ g, actions }: { g: GitReport; actions: React.ReactNode }) {
 				const group = sorted.filter((r) => repoLevel(r) === level);
 				if (group.length === 0) return null;
 				return (
-					<List.Section
-						key={level}
-						title={SECTION[level]}
-						subtitle={`${group.length}`}
-					>
+					<List.Section key={level} title={SECTION[level]} subtitle={`${group.length}`}>
 						{group.map((repo) => (
 							<List.Item
 								key={repo.path}
@@ -126,7 +102,7 @@ function Rows({ g, actions }: { g: GitReport; actions: React.ReactNode }) {
 									tintColor: TINT[level],
 								}}
 								title={repo.name}
-								subtitle={shortPath(repo.path, home)}
+								subtitle={tilde(repo.path)}
 								accessories={[
 									{
 										tag: {
@@ -136,18 +112,12 @@ function Rows({ g, actions }: { g: GitReport; actions: React.ReactNode }) {
 									},
 								]}
 								actions={
-									<RowActions
-										one={repoFix(repo)}
-										all={pushAll}
-										shared={actions}
-									>
+									<RowActions one={repoFix(repo)} all={pushAll} shared={actions}>
 										<Action.ShowInFinder path={repo.path} />
 										<Action.CopyToClipboard
 											title="Copy Path"
 											content={repo.path}
-											shortcut={
-												Keyboard.Shortcut.Common.Pin
-											}
+											shortcut={Keyboard.Shortcut.Common.CopyPath}
 										/>
 									</RowActions>
 								}
@@ -168,8 +138,8 @@ export default function Command() {
 			navigationTitle={(g) =>
 				g
 					? g.repos_with_issues === 0
-						? "Git — all clean"
-						: `Git — ${g.repos_with_issues} of ${g.repos_total} need attention`
+						? "Git: all clean"
+						: `Git: ${g.repos_with_issues} of ${g.repos_total} need attention`
 					: "Git"
 			}
 			searchBarPlaceholder="Search repositories"

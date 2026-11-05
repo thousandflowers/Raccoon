@@ -1,11 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-	byUrgency,
-	isRemovable,
-	parseCerts,
-	type Certificate,
-} from "./certs-json.ts";
+import { byUrgency, isRemovable, parseCerts, type Certificate, certLabel } from "./certs-json.ts";
 
 const report = (certs: unknown[]) =>
 	JSON.stringify({
@@ -39,10 +34,7 @@ test("an unknown status is read as valid rather than rendered raw", () => {
 });
 
 test("expired sorts first, then expiring, then the rest", () => {
-	const cert = (
-		name: string,
-		status: Certificate["status"],
-	): Certificate => ({
+	const cert = (name: string, status: Certificate["status"]): Certificate => ({
 		name,
 		issuer: "",
 		expires: "",
@@ -51,11 +43,7 @@ test("expired sorts first, then expiring, then the rest", () => {
 		keychain: "",
 		sha256: "",
 	});
-	const sorted = [
-		cert("b", "valid"),
-		cert("c", "expired"),
-		cert("a", "expiring"),
-	].sort(byUrgency);
+	const sorted = [cert("b", "valid"), cert("c", "expired"), cert("a", "expiring")].sort(byUrgency);
 	assert.deepEqual(
 		sorted.map((c) => c.name),
 		["c", "a", "b"],
@@ -67,8 +55,7 @@ test("output that is not JSON says so", () => {
 });
 
 test("only an expired certificate in the login keychain, with a hash, can be removed", () => {
-	const SHA =
-		"28BC2356366BA59A498573A93284E67BC751D6FB618A7C8BA7A5D57C2E99AFD1";
+	const SHA = "28BC2356366BA59A498573A93284E67BC751D6FB618A7C8BA7A5D57C2E99AFD1";
 	const base: Certificate = {
 		name: "Apple Worldwide Developer Relations Certification Authority",
 		issuer: "Apple Root CA",
@@ -91,4 +78,15 @@ test("only an expired certificate in the login keychain, with a hash, can be rem
 	assert.equal(isRemovable({ ...base, keychain: "" }), false);
 	assert.equal(isRemovable({ ...base, sha256: "" }), false);
 	assert.equal(isRemovable({ ...base, status: "expiring" }), false);
+});
+
+test("a fingerprint is shortened for the row, a real name is left alone", () => {
+	// Sixty-four hex characters is what a certificate with no common name is
+	// reported as, and it pushed the issuer and every tag off the row.
+	assert.equal(certLabel("4c7ea6879711d2713a4cce418ca8e7edbc19e86fc0d3f093b9a8aca730c753d1"), "4c7ea687…30c753d1");
+	assert.equal(
+		certLabel("Apple Worldwide Developer Relations Certification Authority"),
+		"Apple Worldwide Developer Relations Certification Authority",
+	);
+	assert.equal(certLabel("*.branch.io"), "*.branch.io");
 });

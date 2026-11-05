@@ -1,4 +1,10 @@
 import { runRcc } from "./rcc";
+import { meetsMinimum, parseRccVersion, type RccVersion } from "./rcc-version.ts";
+
+/** The release that added `rcc audit --export`. */
+export const MIN_EXPORT_VERSION: RccVersion = [1, 0, 1];
+
+export const EXPORT_NEEDS_UPGRADE = "Exporting the report needs rcc 1.0.1 or newer. Upgrade with `brew upgrade rcc`.";
 
 /**
  * The formats `rcc audit --export` accepts, in the order a technician reaches
@@ -6,15 +12,11 @@ import { runRcc } from "./rcc";
  * the spreadsheet, the machine's copy.
  */
 export const AUDIT_EXPORT_FORMATS = [
-	{ id: "md", title: "Markdown", subtitle: "Client-ready document" },
-	{ id: "rtf", title: "RTF", subtitle: "Opens in TextEdit or Word" },
-	{ id: "html", title: "HTML", subtitle: "Report as a web page" },
-	{
-		id: "csv",
-		title: "CSV",
-		subtitle: "One row per check, for a spreadsheet",
-	},
-	{ id: "json", title: "JSON", subtitle: "Machine-readable" },
+	{ id: "md", title: "Markdown" },
+	{ id: "rtf", title: "RTF" },
+	{ id: "html", title: "HTML" },
+	{ id: "csv", title: "CSV" },
+	{ id: "json", title: "JSON" },
 ] as const;
 
 export type AuditExportFormat = (typeof AUDIT_EXPORT_FORMATS)[number]["id"];
@@ -27,6 +29,8 @@ export type AuditExportFormat = (typeof AUDIT_EXPORT_FORMATS)[number]["id"];
  * rebuilt here, so the two cannot drift apart.
  */
 export async function exportAudit(format: AuditExportFormat): Promise<string> {
+	await requireExportSupport();
+
 	let stdout: string;
 	try {
 		stdout = await runRcc(["audit", "--export", format]);
@@ -48,4 +52,29 @@ export async function exportAudit(format: AuditExportFormat): Promise<string> {
 		throw new Error("rcc ran but did not say where it saved the report");
 	}
 	return saved[1].trim();
+}
+
+/**
+ * Refuse the export on an rcc that predates it, and say what to do about it.
+ *
+ * Older versions do not reject `--export`; they run an ordinary audit and print
+ * no path, so without this the action failed with "rcc ran but did not say
+ * where it saved the report" - true, and no help at all.
+ *
+ * A version that cannot be read is allowed through: the banner is not a
+ * contract, and refusing a working install on the strength of it would be the
+ * worse failure of the two.
+ */
+async function requireExportSupport(): Promise<void> {
+	let banner: string;
+	try {
+		banner = await runRcc(["--version"]);
+	} catch {
+		// An rcc that cannot say what it is still gets to try; whatever is
+		// really wrong will say so in its own words.
+		return;
+	}
+	if (!meetsMinimum(banner, MIN_EXPORT_VERSION)) {
+		throw new Error(`This rcc is ${parseRccVersion(banner)?.join(".")}. ${EXPORT_NEEDS_UPGRADE}`);
+	}
 }

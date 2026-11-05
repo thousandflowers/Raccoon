@@ -1,5 +1,6 @@
 import { Action, ActionPanel, Color, Icon, Keyboard, List } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
+import { emptyState } from "./empty-state";
 import { HISTORY_DIR, readHistory, type PastAudit } from "./audit-runs";
 import { join } from "node:path";
 
@@ -34,8 +35,17 @@ function tint(run: PastAudit): Color {
 }
 
 export default function Command() {
-	const { data, isLoading, revalidate } = usePromise(readHistory);
-	const runs = data ?? [];
+	const { data, isLoading, revalidate, error } = usePromise(readHistory);
+	const runs = data?.runs ?? [];
+	const unreadable = data?.unreadable ?? [];
+	const empty = emptyState(
+		error,
+		{
+			title: "No audit has been run on this Mac yet",
+			description: "Run Security Audit once and it will be kept here.",
+		},
+		"The audit history",
+	);
 
 	const refresh = (
 		<Action
@@ -49,19 +59,31 @@ export default function Command() {
 	return (
 		<List
 			isLoading={isLoading}
-			navigationTitle={
-				runs.length > 0
-					? `Audit History — ${runs.length} runs`
-					: "Audit History"
-			}
+			navigationTitle={runs.length > 0 ? `Audit History: ${runs.length} runs` : "Audit History"}
 			searchBarPlaceholder="Search past audits"
 		>
 			<List.EmptyView
 				icon={{ source: Icon.Clock, tintColor: Color.SecondaryText }}
-				title="No audit has been run on this Mac yet"
-				description="Run Security Audit once and it will be kept here."
+				title={empty.title}
+				description={empty.description}
 				actions={<ActionPanel>{refresh}</ActionPanel>}
 			/>
+			{/* A saved run that will not open is worth a word: it used to be one
+			    row fewer and nothing said so. */}
+			{unreadable.length > 0 ? (
+				<List.Item
+					key="unreadable"
+					icon={{ source: Icon.Warning, tintColor: Color.Orange }}
+					title={`${unreadable.length} saved ${unreadable.length === 1 ? "run" : "runs"} could not be read`}
+					subtitle={unreadable.join(", ")}
+					actions={
+						<ActionPanel>
+							<Action.ShowInFinder title="Show the Archive in Finder" path={HISTORY_DIR} />
+							{refresh}
+						</ActionPanel>
+					}
+				/>
+			) : null}
 			{runs.map((run) => (
 				<List.Item
 					key={run.file}
@@ -95,10 +117,7 @@ export default function Command() {
 					]}
 					actions={
 						<ActionPanel>
-							<Action.ShowInFinder
-								title="Show Saved Run in Finder"
-								path={join(HISTORY_DIR, run.file)}
-							/>
+							<Action.ShowInFinder title="Show Saved Run in Finder" path={join(HISTORY_DIR, run.file)} />
 							<Action.CopyToClipboard
 								title="Copy Timestamp"
 								content={run.stamp}

@@ -67,10 +67,7 @@ const BAR_WIDTH = 20;
 
 /** That step as a line a Detail can show while the command is still running. */
 export function progressBar({ current, total, info }: Progress): string {
-	const filled =
-		total > 0
-			? Math.min(BAR_WIDTH, Math.round((current / total) * BAR_WIDTH))
-			: 0;
+	const filled = total > 0 ? Math.min(BAR_WIDTH, Math.round((current / total) * BAR_WIDTH)) : 0;
 	const bar = "█".repeat(filled) + "░".repeat(BAR_WIDTH - filled);
 	return `\`${bar}\`  **${current}/${total}**${info ? ` · ${info}` : ""}`;
 }
@@ -86,8 +83,7 @@ function boxRanges(lines: string[]): Array<[number, number]> {
 		}
 		let end = index;
 		while (end < lines.length && BOXISH.test(lines[end])) end += 1;
-		if (lines.slice(index, end).some((line) => BOX_BORDER.test(line)))
-			ranges.push([index, end]);
+		if (lines.slice(index, end).some((line) => BOX_BORDER.test(line))) ranges.push([index, end]);
 		index = end;
 	}
 	return ranges;
@@ -99,9 +95,7 @@ function boxRanges(lines: string[]): Array<[number, number]> {
  * line gets a hard break so status lines do not collapse into one paragraph.
  */
 export function toMarkdown(output: string): string {
-	const lines = output
-		.split("\n")
-		.filter((line) => !DEAD_PROMPT.test(line) && !PROGRESS.test(line));
+	const lines = output.split("\n").filter((line) => !DEAD_PROMPT.test(line) && !PROGRESS.test(line));
 	const inBox = new Array<boolean>(lines.length).fill(false);
 	const opens = new Set<number>();
 	const closes = new Set<number>();
@@ -152,7 +146,35 @@ export const SUDO_HINT = [
 ].join("\n");
 
 export function withSudoHint(markdown: string): string {
-	return SUDO_UNAVAILABLE.test(markdown)
-		? `${markdown}\n${SUDO_HINT}`
-		: markdown;
+	return SUDO_UNAVAILABLE.test(markdown) ? `${markdown}\n${SUDO_HINT}` : markdown;
+}
+
+/**
+ * What the screen says when a run printed nothing at all.
+ *
+ * A run the reader stopped and a run that had nothing to say look identical
+ * from the output alone - both are empty - and calling the first one
+ * "finished" tells them the command ran to completion when they killed it.
+ */
+export function quietOutcome(args: string[], exit: { code: number | null; signal: string | null } | undefined): string {
+	const command = `\`rcc ${args.join(" ")}\``;
+	return exit?.signal
+		? `${command} was stopped before it printed anything.`
+		: `${command} finished without printing anything.`;
+}
+
+/**
+ * What the screen says about a run that was given up on for silence.
+ *
+ * Not "failed": nothing said it failed. The run was still open and had stopped
+ * saying anything, and what it had already done to the machine is still done -
+ * the same thing progress-list.tsx tells a reader who pressed Stop.
+ */
+export function idleNotice(args: string[], idleMs: number): string {
+	const minutes = Math.round(idleMs / 60_000);
+	return [
+		`\`rcc ${args.join(" ")}\` printed nothing for ${minutes} minutes, so Raccoon stopped waiting for it.`,
+		"",
+		"Whatever it had already changed stays changed.",
+	].join("\n");
 }
