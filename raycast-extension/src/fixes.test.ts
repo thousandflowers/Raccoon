@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { SshKey } from "./ssh-json.ts";
+import { appleScriptQuote } from "./terminal.ts";
 import {
+	emptyTrash,
+	sshFix,
 	bootoutAgents,
 	deleteCertificates,
 	forgetNetworks,
 	killPids,
 	removeLoginItems,
 	removeSymlink,
+	needsRoot,
 	gitPush,
 	gitPushAll,
 	repoStatus,
@@ -36,10 +41,32 @@ test("forgetting several networks runs one command per network", () => {
 });
 
 test("a dangling symlink is removed without sudo first", () => {
-	const cmd = removeSymlink(["/usr/local/bin/cagent"]);
-	// A link in the reader's own bin directory must not ask for a password.
+	const cmd = removeSymlink(["/usr/local/bin/cagent"], "/Users/me");
+	// Outside the reader's home: the plain attempt comes first, and root is
+	// only asked for if that one is refused.
 	assert.ok(cmd.startsWith("rm -f '/usr/local/bin/cagent'"));
 	assert.ok(cmd.includes("|| sudo rm -f"));
+});
+
+test("a link the reader owns is deleted without ever reaching for sudo", () => {
+	// PATH is scanned in full, so most broken links are in the reader's own
+	// ~/.local/bin - and asking for a password to delete your own dangling
+	// symlink is how a tool teaches people to type it without reading.
+	const cmd = removeSymlink(["/Users/me/.local/bin/cagent"], "/Users/me");
+	assert.equal(cmd, "rm -f '/Users/me/.local/bin/cagent'");
+	assert.ok(!cmd.includes("sudo"));
+});
+
+test("one link outside the home is enough for the whole command to need root", () => {
+	const cmd = removeSymlink(["/Users/me/.local/bin/a", "/usr/local/sbin/b"], "/Users/me");
+	assert.ok(cmd.includes("|| sudo rm -f"));
+});
+
+test("a home directory is a whole path segment, not a prefix", () => {
+	// /Users/median is not inside /Users/me, however it starts.
+	assert.ok(removeSymlink(["/Users/median/bin/a"], "/Users/me").includes("sudo"));
+	assert.ok(!needsRoot(["/Users/me/bin/a"], "/Users/me"));
+	assert.ok(needsRoot(["/usr/local/sbin/b"], "/Users/me"));
 });
 
 test("a login item name is passed as a quoted AppleScript string", () => {
@@ -52,15 +79,11 @@ test("a login item name with an apostrophe cannot break out of the shell quote",
 	const cmd = removeLoginItems(["Alex's Helper"]);
 	// The whole AppleScript is one single-quoted shell argument, and the
 	// apostrophe inside it is the '\'' dance, never a bare quote.
-	assert.equal(
-		cmd,
-		`osascript -e 'tell application "System Events" to delete login item "Alex'\\''s Helper"'`,
-	);
+	assert.equal(cmd, `osascript -e 'tell application "System Events" to delete login item "Alex'\\''s Helper"'`);
 });
 
 test("certificate deletion is scoped to the login keychain and goes by hash", () => {
-	const sha =
-		"28BC2356366BA59A498573A93284E67BC751D6FB618A7C8BA7A5D57C2E99AFD1";
+	const sha = "28BC2356366BA59A498573A93284E67BC751D6FB618A7C8BA7A5D57C2E99AFD1";
 	const cmd = deleteCertificates([sha]);
 	assert.ok(cmd.includes("login.keychain-db"));
 	assert.ok(cmd.includes(`-Z '${sha}'`));
@@ -72,10 +95,7 @@ test("certificate deletion is scoped to the login keychain and goes by hash", ()
 });
 
 test("stopping an agent addresses this login session, not the whole machine", () => {
-	assert.equal(
-		bootoutAgents(["mailbrief"]),
-		"launchctl bootout gui/$(id -u)/'mailbrief'",
-	);
+	assert.equal(bootoutAgents(["mailbrief"]), "launchctl bootout gui/$(id -u)/'mailbrief'");
 });
 
 test("every builder refuses an empty list rather than acting on everything", () => {
@@ -87,10 +107,7 @@ test("every builder refuses an empty list rather than acting on everything", () 
 });
 
 test("a repository path with a space stays one argument", () => {
-	assert.equal(
-		repoStatus("/Users/me/My Repo"),
-		"cd '/Users/me/My Repo' && git status",
-	);
+	assert.equal(repoStatus("/Users/me/My Repo"), "cd '/Users/me/My Repo' && git status");
 	assert.equal(whichAll("2to3-3.11"), "which -a '2to3-3.11'");
 });
 
@@ -105,4 +122,41 @@ test("pushing several stops at the first refusal instead of ploughing on", () =>
 	const cmd = gitPushAll(["/a", "/b"]);
 	assert.equal(cmd, "(cd '/a' && git push) && (cd '/b' && git push)");
 	assert.throws(() => gitPushAll([]));
+});
+
+// --- the SSH key builders ---------------------------------------------------
+
+const key = (over: Partial<SshKey> = {}): SshKey => ({
+	name: "id_ed25519",
+	type: "ed25519",
+	passphrase: true,
+	public_key: true,
+	perms: "600",
+	perms_ok: true,
+	...over,
+});
+
+test("a key that is already right is offered nothing", () => {
+	assert.equal(sshFix(key()), undefined);
+});
+
+test("each level of wrong gets the command that puts it right", () => {
+	assert.match(sshFix(key({ passphrase: false }))!.command, /^ssh-keygen -p -f /);
+	assert.match(sshFix(key({ perms_ok: false }))!.command, /^chmod 600 /);
+	assert.match(sshFix(key({ public_key: false }))!.command, /^ssh-keygen -y -f /);
+});
+
+test("a key name is quoted, never pasted into the command line", () => {
+	// A name is whatever is in ~/.ssh, and the CLI reports it verbatim.
+	const hostile = sshFix(key({ name: "id'; rm -rf ~; '", passphrase: false }))!.command;
+	assert.ok(!hostile.includes("rm -rf ~;'"), hostile);
+	assert.ok(hostile.includes(`'\\''`), hostile);
+});
+
+test("the trash command survives being handed to Terminal", () => {
+	// Two layers: an AppleScript string inside a single-quoted shell argument,
+	// which is then quoted again as an AppleScript string by runInTerminal.
+	const quotedForTerminal = appleScriptQuote(emptyTrash());
+	assert.ok(quotedForTerminal.startsWith('"') && quotedForTerminal.endsWith('"'));
+	assert.ok(quotedForTerminal.includes('\\"Finder\\"'), quotedForTerminal);
 });

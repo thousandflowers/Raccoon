@@ -2,7 +2,7 @@ import { Color, Icon, List } from "@raycast/api";
 import { dockerPrune, openApp } from "./fixes";
 import { RccList } from "./rcc-list";
 import { RowActions } from "./resolve";
-import { containerState, parseDocker, type DockerReport } from "./docker-json";
+import { containerState, dockerTitle, parseDocker, type DockerReport } from "./docker-json";
 
 const STATE_TINT = {
 	up: Color.Green,
@@ -45,9 +45,7 @@ function Rows({ d, actions }: { d: DockerReport; actions: React.ReactNode }) {
 				icon={{ source: Icon.Pause, tintColor: Color.Orange }}
 				title="Docker is installed but not running"
 				subtitle="Start Docker Desktop, then run this again"
-				accessories={[
-					{ tag: { value: "Stopped", color: Color.Orange } },
-				]}
+				accessories={[{ tag: { value: "Stopped", color: Color.Orange } }]}
 				actions={
 					<RowActions
 						one={{
@@ -60,9 +58,7 @@ function Rows({ d, actions }: { d: DockerReport; actions: React.ReactNode }) {
 			/>
 		);
 	}
-	const running = d.containers.filter(
-		(c) => containerState(c.status) === "up",
-	).length;
+	const running = d.containers.filter((c) => containerState(c.status) === "up").length;
 	return (
 		<>
 			<List.Section title="Containers" subtitle={`${running} running`}>
@@ -127,9 +123,7 @@ function Rows({ d, actions }: { d: DockerReport; actions: React.ReactNode }) {
 							source: Icon.Coin,
 							// Reclaimable space is the only thing here worth acting on.
 							tintColor:
-								s.reclaimable && !s.reclaimable.startsWith("0")
-									? Color.Orange
-									: Color.SecondaryText,
+								s.reclaimable && !s.reclaimable.startsWith("0") ? Color.Orange : Color.SecondaryText,
 						}}
 						title={s.type}
 						accessories={[
@@ -157,11 +151,7 @@ export default function Command() {
 		<RccList
 			command="docker"
 			parse={parseDocker}
-			navigationTitle={(d) =>
-				!d || !d.installed
-					? "Docker"
-					: `Docker — ${d.containers.length} containers, ${d.images.length} images`
-			}
+			navigationTitle={dockerTitle}
 			searchBarPlaceholder="Search containers, images and volumes"
 			emptyIcon={Icon.Box}
 			emptyTitle="Nothing from Docker"

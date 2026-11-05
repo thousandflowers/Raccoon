@@ -1,7 +1,29 @@
 # Raccoon Changelog
 
-## [Initial Version] - {PR_MERGE_DATE}
+## [Docs] - 2026-11-04
 
+- Add a link to the issue tracker in the README.
+
+## [Initial Version] - 2026-09-26
+
+- Emptying the trash empties every mounted volume's, because Finder is what
+  does it. The screen lists the other volumes and the confirmation counts them,
+  rather than quoting the home trash for a deletion that is larger than that.
+- A command that streams its work - Apps, Upgrade, a raw run, a fleet scan - is
+  given up on after fifteen minutes of printing nothing, and says that is what
+  happened. The bound is on silence rather than duration: these commands are
+  legitimately long.
+- The Homebrew install on the "CLI not found" screen can be stopped.
+- Audit History names the saved runs it could not read instead of quietly
+  listing one fewer.
+- Cmd+Shift+E on the security audit saves the report as a document - Markdown,
+  RTF, HTML, CSV or JSON - and reveals it in Finder. The audit is re-run rather
+  than rendered from what is on screen: a report handed to someone else has to
+  be the state of the machine now. Needs rcc 1.0.1.
+- The security audit fills in as its answers arrive. One of its checks asks
+  Apple's servers whether this Mac has updates, which is usually quick and
+  occasionally minutes; the other twenty-four are on screen in about two
+  seconds rather than waiting for it.
 - Opening a screen does not act. `Apps` and `Upgrade` open in `--dry-run`; doing
   it for real is a separate, confirmed action.
 - Environment and PATH Overlaps run under the login shell's PATH, not the
@@ -21,9 +43,9 @@
 - Colour means one thing everywhere: red needs doing now, orange deserves
   attention, green is in order, grey is information.
 - Enter resolves the row under the cursor and Cmd+Enter resolves everything on
-  screen. What resolving is differs per command — quit that process, close that
+  screen. What resolving is differs per command: quit that process, close that
   port, forget that network, remove that dangling symlink, push that clean
-  repository, add a passphrase to that key — and where nothing is put right by a
+  repository, add a passphrase to that key. Where nothing is put right by a
   command, it opens the one place the setting actually lives.
 - Anything that changes the machine asks first, shows the exact command it is
   about to run, and runs it in Terminal: several need administrator rights, and

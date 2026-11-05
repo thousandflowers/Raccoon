@@ -1,4 +1,5 @@
 import { Color, Icon, List } from "@raycast/api";
+import { tilde } from "./paths.ts";
 import { openApp, reveal } from "./fixes";
 import { RccList } from "./rcc-list";
 import { RowActions } from "./resolve";
@@ -30,7 +31,7 @@ function Rows({ f, actions }: { f: FontsReport; actions: React.ReactNode }) {
 							tintColor: Color.SecondaryText,
 						}}
 						title={sourceLabel(s.path)}
-						subtitle={s.path}
+						subtitle={tilde(s.path)}
 						accessories={[{ text: String(s.count) }]}
 						actions={
 							<RowActions
@@ -66,20 +67,14 @@ function Rows({ f, actions }: { f: FontsReport; actions: React.ReactNode }) {
 				<List.Item
 					icon={{
 						source: Icon.Duplicate,
-						tintColor:
-							f.fontconfig.duplicate_families > 0
-								? Color.Orange
-								: Color.SecondaryText,
+						tintColor: f.fontconfig.duplicate_families > 0 ? Color.Orange : Color.SecondaryText,
 					}}
 					title="Duplicate families"
 					accessories={[
 						{
 							tag: {
 								value: String(f.fontconfig.duplicate_families),
-								color:
-									f.fontconfig.duplicate_families > 0
-										? Color.Orange
-										: Color.SecondaryText,
+								color: f.fontconfig.duplicate_families > 0 ? Color.Orange : Color.SecondaryText,
 							},
 						},
 					]}
@@ -104,9 +99,7 @@ function Rows({ f, actions }: { f: FontsReport; actions: React.ReactNode }) {
 								tintColor: Color.SecondaryText,
 							}}
 							title="Families"
-							accessories={[
-								{ text: String(f.fontconfig.families) },
-							]}
+							accessories={[{ text: String(f.fontconfig.families) }]}
 							actions={row}
 						/>
 					</>
@@ -132,9 +125,7 @@ export default function Command() {
 			command="fonts"
 			parse={parseFonts}
 			navigationTitle={(f) =>
-				f
-					? `Fonts — ${f.installed} installed${f.corrupted > 0 ? `, ${f.corrupted} broken` : ""}`
-					: "Fonts"
+				f ? `Fonts: ${f.installed} installed${f.corrupted > 0 ? `, ${f.corrupted} broken` : ""}` : "Fonts"
 			}
 			searchBarPlaceholder="Search font sources and checks"
 			emptyIcon={Icon.Text}

@@ -11,7 +11,7 @@ commands, each with a view built for what that command actually reports.
 Every list is grouped and ordered by what you came for, and colour means the
 same thing in all of them:
 
-|        |                           |
+| Colour | What it means             |
 | ------ | ------------------------- |
 | red    | needs doing now           |
 | orange | deserves attention        |
@@ -29,7 +29,7 @@ credential in plain text, and it comes before one with loose permissions.
 **Enter** resolves the row under the cursor. **Cmd+Enter** resolves everything on
 screen. What that means differs per command, because the commands differ:
 
-|                | Enter                             | Cmd+Enter                          |
+| Command        | Enter                             | Cmd+Enter                          |
 | -------------- | --------------------------------- | ---------------------------------- |
 | Security Audit | apply that one fix                | fix everything shown               |
 | Memory         | quit that process                 | quit the listed ones               |
@@ -41,10 +41,10 @@ screen. What that means differs per command, because the commands differ:
 | Git            | push that clean repository        | push every clean one               |
 | SSH            | add a passphrase, fix permissions | fix every key that needs it        |
 | Xcode          | delete DerivedData                | that, and shut the simulators down |
-| Trash          | empty it                          | the same; there is one trash       |
+| Trash          | empty it, every volume at once    | the same; Finder empties them all  |
 
-Where nothing is put right by a command — battery, disk, network, backup, fonts,
-PATH overlaps — both keystrokes open the one place the setting actually lives.
+Where nothing is put right by a command (battery, disk, network, backup, fonts,
+PATH overlaps) both keystrokes open the one place the setting actually lives.
 
 Anything that changes the machine asks first and shows the exact command. It then
 runs in Terminal rather than silently: several of these need administrator
@@ -73,3 +73,4 @@ sixty minutes or until restart.
 ## Links
 
 - [Raccoon on GitHub](https://github.com/thousandflowers/Raccoon)
+- [Report an issue](https://github.com/thousandflowers/Raccoon/issues)

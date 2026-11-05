@@ -2,6 +2,7 @@ import {
 	Action,
 	ActionPanel,
 	Alert,
+	Color,
 	confirmAlert,
 	Detail,
 	getPreferenceValues,
@@ -10,6 +11,7 @@ import {
 } from "@raycast/api";
 import { showFailureToast, usePromise } from "@raycast/utils";
 import {
+	buildDropIn,
 	currentUsername,
 	install,
 	isInstalled,
@@ -29,6 +31,20 @@ export default function Command() {
 	const { data: installed, isLoading, revalidate } = usePromise(isInstalled);
 
 	const enable = async () => {
+		// Installing the drop-in relaxes sudo for every process this user owns,
+		// not only Raccoon's, and it is written as root. Both the first install
+		// and a re-apply come through here, so the ask lives here rather than on
+		// either button.
+		const confirmed = await confirmAlert({
+			title: installed ? "Apply the new duration?" : "Let one Touch ID cover every command?",
+			message: `Installs ${SUDOERS_PATH} as root. One authentication then covers everything you run with sudo (${SESSION_LABELS[session]}), not only Raccoon.`,
+			icon: { source: Icon.Fingerprint, tintColor: Color.Red },
+			primaryAction: {
+				title: installed ? "Apply Duration" : "Install Drop-In",
+				style: Alert.ActionStyle.Destructive,
+			},
+		});
+		if (!confirmed) return;
 		try {
 			await install(session);
 			revalidate();
@@ -75,8 +91,11 @@ export default function Command() {
 		"```",
 		`${SUDOERS_PATH}`,
 		"",
-		`Defaults:${currentUsername()} timestamp_type=global`,
-		`Defaults:${currentUsername()} timestamp_timeout=${session}`,
+		// The file itself, not a second copy of it written out here: these two
+		// lines were the drop-in's contents transcribed by hand, and a change
+		// to buildDropIn would have left this screen describing a file that no
+		// longer looked like this.
+		buildDropIn(currentUsername(), session),
 		"```",
 		"",
 		"The file is checked with `visudo -c` before it is installed, and only the final copy runs",
@@ -93,30 +112,14 @@ export default function Command() {
 			actions={
 				<ActionPanel>
 					{installed ? (
-						<Action
-							title="Ask Every Time Again"
-							icon={Icon.Trash}
-							onAction={disable}
-						/>
+						<Action title="Ask Every Time Again" icon={Icon.Trash} onAction={disable} />
 					) : (
-						<Action
-							title="Ask Only Once"
-							icon={Icon.Fingerprint}
-							onAction={enable}
-						/>
+						<Action title="Ask Only Once" icon={Icon.Fingerprint} onAction={enable} />
 					)}
 					{installed && (
-						<Action
-							title="Apply Current Duration"
-							icon={Icon.ArrowClockwise}
-							onAction={enable}
-						/>
+						<Action title="Apply Current Duration" icon={Icon.ArrowClockwise} onAction={enable} />
 					)}
-					<Action
-						title="Change Duration"
-						icon={Icon.Gear}
-						onAction={openExtensionPreferences}
-					/>
+					<Action title="Change Duration" icon={Icon.Gear} onAction={openExtensionPreferences} />
 				</ActionPanel>
 			}
 		/>

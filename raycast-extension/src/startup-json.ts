@@ -7,7 +7,7 @@ import { expectObject } from "./json-out.ts";
  * act on come first and the counts they cannot are a footer.
  */
 export type UserAgent = {
-	/** launchd's label, what `launchctl bootout` takes. Empty from an rcc older than 0.19. */
+	/** launchd's label, what `launchctl bootout` takes. Empty from an rcc older than 1.0.0. */
 	label: string;
 	/** The name a person recognises: "mailbrief" for com.eugenio.mailbrief.plist. */
 	name: string;
@@ -47,10 +47,9 @@ export type StartupReport = {
 const num = (v: unknown) => (typeof v === "number" ? v : 0);
 const numOrNull = (v: unknown) => (typeof v === "number" ? v : null);
 const str = (v: unknown) => (typeof v === "string" ? v : "");
-const strs = (v: unknown) =>
-	Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 
-/** An rcc before 0.19 listed agents by short name only; there is no label to stop them by. */
+/** An rcc before 1.0.0 listed agents by short name only; there is no label to stop them by. */
 function agent(v: unknown): UserAgent | null {
 	if (typeof v === "string") {
 		return { label: "", name: v, file: "", loaded: true, loaded_from: "" };
@@ -76,9 +75,7 @@ export function parseStartup(stdout: string): StartupReport {
 		background_items: Array.isArray(r.background_items)
 			? r.background_items.flatMap((v) => {
 					const b = (v ?? {}) as Record<string, unknown>;
-					return typeof b.label === "string"
-						? [{ label: b.label, pid: numOrNull(b.pid) }]
-						: [];
+					return typeof b.label === "string" ? [{ label: b.label, pid: numOrNull(b.pid) }] : [];
 				})
 			: [],
 		login_items: strs(r.login_items),
@@ -107,4 +104,20 @@ export function loadNow(load: string): number | null {
 	if (first === "") return null;
 	const value = Number(first);
 	return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * How many things this Mac starts, and whether that number is the whole answer.
+ *
+ * Login items are read through System Events, which can refuse - and then
+ * bin/startup.sh reports login_items_error and an empty list. The section below
+ * already says "not checked" for them; a title that added the rest up and
+ * called it the total contradicted it, and understated what starts by however
+ * many login items there are.
+ */
+export function startupTitle(s: StartupReport | undefined): string {
+	if (!s) return "Startup";
+	const counted = s.login_items.length + s.user_agents.length + s.background_items.length;
+	const total = `Startup: ${counted} things this Mac starts`;
+	return s.login_items_error ? `${total}, login items not checked` : total;
 }

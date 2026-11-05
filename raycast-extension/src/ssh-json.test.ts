@@ -6,7 +6,9 @@ import {
 	problemCount,
 	reason,
 	sortKeys,
+	sshTitle,
 	type SshKey,
+	type SshReport,
 } from "./ssh-json.ts";
 
 const key = (over: Partial<SshKey> = {}): SshKey => ({
@@ -30,9 +32,7 @@ test("parses the report rcc ssh --json prints", () => {
 });
 
 test("a Mac with no ~/.ssh parses as an empty report, not a failure", () => {
-	const parsed = parseSsh(
-		'{"ssh_dir_present":false,"ssh_dir_perms":"000","keys":[]}',
-	);
+	const parsed = parseSsh('{"ssh_dir_present":false,"ssh_dir_perms":"000","keys":[]}');
 	assert.equal(parsed.ssh_dir_present, false);
 	assert.deepEqual(parsed.keys, []);
 	assert.equal(problemCount(parsed), 0);
@@ -41,17 +41,11 @@ test("a Mac with no ~/.ssh parses as an empty report, not a failure", () => {
 test("a key with no passphrase is the worst case, whatever its permissions", () => {
 	assert.equal(keyLevel(key({ passphrase: false })), "unprotected");
 	// Mode 600 does not redeem it: the file is still a usable credential.
-	assert.equal(
-		keyLevel(key({ passphrase: false, perms: "600", perms_ok: true })),
-		"unprotected",
-	);
+	assert.equal(keyLevel(key({ passphrase: false, perms: "600", perms_ok: true })), "unprotected");
 });
 
 test("loose permissions rank above a missing .pub", () => {
-	const sorted = sortKeys([
-		key({ name: "b", public_key: false }),
-		key({ name: "a", perms: "644", perms_ok: false }),
-	]);
+	const sorted = sortKeys([key({ name: "b", public_key: false }), key({ name: "a", perms: "644", perms_ok: false })]);
 	assert.deepEqual(
 		sorted.map((k) => k.name),
 		["a", "b"],
@@ -59,10 +53,7 @@ test("loose permissions rank above a missing .pub", () => {
 });
 
 test("the reason names the mode that is wrong, not just that it is wrong", () => {
-	assert.equal(
-		reason(key({ perms: "644", perms_ok: false })),
-		"mode 644, ssh requires 600",
-	);
+	assert.equal(reason(key({ perms: "644", perms_ok: false })), "mode 644, ssh requires 600");
 });
 
 test("a healthy key is not counted as a problem", () => {
@@ -75,4 +66,37 @@ test("a healthy key is not counted as a problem", () => {
 		}),
 		0,
 	);
+});
+
+const sshReport = (over: Partial<SshReport> = {}): SshReport => ({
+	ssh_dir_present: true,
+	ssh_dir_perms: "700",
+	keys: [],
+	...over,
+});
+
+test("a ~/.ssh nobody has is not a set of keys in good order", () => {
+	assert.equal(sshTitle(sshReport({ ssh_dir_present: false })), "SSH keys: no ~/.ssh");
+});
+
+test("the directory's own mode is part of the verdict, not only the keys'", () => {
+	// The screen already paints `dir 755` red and its comment says the mode
+	// "matters as much as any key's" - while the title said all was in order.
+	assert.equal(sshTitle(sshReport({ ssh_dir_perms: "755" })), "SSH keys: ~/.ssh is 755, not 700");
+});
+
+test("keys that need attention are what the title says", () => {
+	const weak: SshKey = {
+		name: "id_rsa",
+		type: "rsa",
+		passphrase: false,
+		public_key: true,
+		perms: "644",
+		perms_ok: false,
+	};
+	assert.match(sshTitle(sshReport({ keys: [weak] })), /1 needs? attention/);
+});
+
+test("everything in order says so", () => {
+	assert.equal(sshTitle(sshReport()), "SSH keys: all in good order");
 });

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { appleScriptQuote, fixCommand, shellQuote } from "./terminal.ts";
+import { appleScriptQuote, fixCommand, runInTerminal, shellQuote } from "./terminal.ts";
 
 test("a check name with spaces survives the shell", () => {
 	assert.equal(shellQuote("Stealth Mode"), "'Stealth Mode'");
@@ -25,16 +25,10 @@ test("a hostile name reaches the program as one argument, unchanged", () => {
 		"$(whoami)",
 		"`id`",
 	]) {
-		const out = execFileSync("/bin/sh", [
-			"-c",
-			`printf %s ${shellQuote(name)}`,
-		]).toString();
+		const out = execFileSync("/bin/sh", ["-c", `printf %s ${shellQuote(name)}`]).toString();
 		assert.equal(out, name, `mangled: ${name}`);
 	}
-	assert.ok(
-		!existsSync("/tmp/rcc-should-not-exist"),
-		"the quoted name executed something",
-	);
+	assert.ok(!existsSync("/tmp/rcc-should-not-exist"), "the quoted name executed something");
 });
 
 test("a quote or a backslash cannot break out of the AppleScript literal", () => {
@@ -44,10 +38,7 @@ test("a quote or a backslash cannot break out of the AppleScript literal", () =>
 
 test("the fix command names one check and widens to nothing else", () => {
 	const cmd = fixCommand("/opt/homebrew/bin/rcc", ["Stealth Mode"]);
-	assert.equal(
-		cmd,
-		"'/opt/homebrew/bin/rcc' audit --fix --force --fix-only 'Stealth Mode'",
-	);
+	assert.equal(cmd, "'/opt/homebrew/bin/rcc' audit --fix --force --fix-only 'Stealth Mode'");
 	// --only would have taken the group, which holds six checks.
 	assert.ok(!cmd.includes("--only "), cmd);
 });
@@ -58,19 +49,27 @@ test("a path with a space is quoted too", () => {
 });
 
 test("several checks travel as one comma-separated argument", () => {
-	const cmd = fixCommand("/usr/local/bin/rcc", [
-		"Stealth Mode",
-		"Bluetooth",
-		".ssh Permissions",
-	]);
-	assert.equal(
-		cmd,
-		"'/usr/local/bin/rcc' audit --fix --force --fix-only 'Stealth Mode,Bluetooth,.ssh Permissions'",
-	);
+	const cmd = fixCommand("/usr/local/bin/rcc", ["Stealth Mode", "Bluetooth", ".ssh Permissions"]);
+	assert.equal(cmd, "'/usr/local/bin/rcc' audit --fix --force --fix-only 'Stealth Mode,Bluetooth,.ssh Permissions'");
 });
 
 test("fixing nothing is refused rather than widened to everything", () => {
 	// Without the guard the flag would carry an empty value, which rcc reads
 	// as no filter at all: every fix on the machine.
 	assert.throws(() => fixCommand("/usr/local/bin/rcc", []), /No check/);
+});
+
+test("what reaches Terminal is one AppleScript argument, quoted for it", async () => {
+	// Two quoting contexts nested: a shell line inside an AppleScript string.
+	// A name with a double quote in it used to end the inner string early.
+	const calls: { file: string; args: string[] }[] = [];
+	await runInTerminal(`rm -f '/Users/me/a "file"'`, async (file, args) => {
+		calls.push({ file, args });
+	});
+	assert.equal(calls.length, 1);
+	assert.equal(calls[0].file, "/usr/bin/osascript");
+	assert.equal(calls[0].args[0], "-e");
+	assert.match(calls[0].args[1], /^tell application "Terminal"/);
+	assert.match(calls[0].args[1], /do script "rm -f '\/Users\/me\/a \\"file\\"'"/);
+	assert.match(calls[0].args[1], /end tell$/);
 });
