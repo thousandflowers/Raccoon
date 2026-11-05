@@ -85,3 +85,10 @@ import json, sys
 assert git["found"] is True and git["version"] == "found", git
 '
 }
+
+@test "env: a cryptex PATH entry from macOS is not counted as missing" {
+    PATH="/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+        NO_COLOR=1 run bash "$SCRIPT_DIR/bin/env.sh"
+    assert_success
+    assert_output_contains "0 missing"
+}

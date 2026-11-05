@@ -17,7 +17,7 @@ on:
         default: ""
 
 env:
-  TAP_REPO: thousandflowers/homebrew-raccoon
+  TAP_REPO: thousandflowers/homebrew-tap
   FORMULA_PATH: Formula/rcc.rb
 
 jobs:

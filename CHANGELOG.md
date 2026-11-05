@@ -3,10 +3,16 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
-## [Unreleased]
+## [1.0.2] - 2026-11-05
 
 ### Fixed
 
+- **`rcc history` showed the wrong commands, and could show a secret.** It listed
+  the oldest five of the last twenty lines, not the newest. `API_TOKEN=x curl`
+  printed `API_TOKEN=x` as the command. It now lists the five newest distinct
+  command names, without assignments or directories.
+- **`rcc env` called macOS's own PATH entries missing.** The cryptex directories
+  from `/etc/paths.d/10-cryptex` are often absent, and no longer count.
 - **`rcc completion bash|zsh` failed on every Homebrew install.** The formula
   moves the completion files out of `libexec`, and the command only looked
   there. It now also looks where Homebrew puts them, and names the paths it

@@ -64,20 +64,29 @@ _history_lines_fish() {
 	printf '%s' "$((n))"
 }
 
-# The recent commands, first word only: the rest of a line is arguments, and
-# arguments are where paths and secrets live.
+# The recent commands, newest first and each one once. Only the command's own
+# name: arguments, leading VAR=value assignments and the directory it ran from
+# are where paths and secrets live.
 _history_recent() {
-	local line cmd n=0
 	[[ -f "$1" ]] || return 0
-	while IFS= read -r line || [[ -n "$line" ]]; do
-		[[ -z "$line" ]] && continue
-		cmd=$(printf '%s' "$line" | sed 's/^: [0-9]*:[0-9]*;//' | awk '{print $1}')
-		[[ -z "$cmd" ]] && continue
-		printf '%s\n' "$cmd"
-		n=$((n + 1))
-		[[ $n -ge 5 ]] && break
-	done < <(tail -n 20 "$1" 2>/dev/null)
-	return 0
+	tail -n 200 "$1" 2>/dev/null | LC_ALL=C awk '
+		{ lines[NR] = $0 }
+		END {
+			for (i = NR; i > 0 && shown < 5; i--) {
+				line = lines[i]
+				sub(/^: [0-9]+:[0-9]+;/, "", line)
+				count = split(line, words, /[ \t]+/)
+				cmd = ""
+				for (w = 1; w <= count && cmd == ""; w++) {
+					if (words[w] !~ /^[A-Za-z_][A-Za-z0-9_]*=/) cmd = words[w]
+				}
+				sub(/;+$/, "", cmd)
+				sub(/^.*\//, "", cmd)
+				if (cmd == "" || seen[cmd]++) continue
+				print cmd
+				shown++
+			}
+		}'
 }
 
 _json_report() {
@@ -130,19 +139,11 @@ main() {
 	echo "${GRAY}[2/2] Recent Commands...${NC}"
 	print_table_header "Recent Command" 35
 
-	local recent_count=0
-	if [[ -f "$_HIST_ZSH" ]]; then
-		while IFS= read -r line || [[ -n "$line" ]]; do
-			[[ -z "$line" ]] && continue
-			local cmd
-			cmd=$(echo "$line" | sed 's/^: [0-9]*:[0-9]*;//' | awk '{print $1}' | xargs || echo "")
-			[[ -n "$cmd" ]] && {
-				print_table_row "$cmd" 35
-				((recent_count++)) || true
-				[[ $recent_count -ge 5 ]] && break
-			}
-		done < <(tail -n 20 "$_HIST_ZSH" 2>/dev/null)
-	fi
+	local recent_count=0 cmd
+	while IFS= read -r cmd; do
+		print_table_row "$cmd" 35
+		((recent_count++)) || true
+	done < <(_history_recent "$_HIST_ZSH")
 
 	if [[ $recent_count -eq 0 ]]; then
 		print_table_row "${GRAY}No recent commands${NC}" 35

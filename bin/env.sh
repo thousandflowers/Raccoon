@@ -46,6 +46,9 @@ check_path_entries() {
 		((count++)) || true
 		if [[ -d "$path" ]]; then
 			print_table_row "$path|${GREEN}OK${NC}" 45 10
+		elif [[ "$path" == /var/run/com.apple.security.cryptexd/* ]]; then
+			# macOS adds these through /etc/paths.d/10-cryptex, and they are often absent.
+			print_table_row "$path|${GRAY}macOS${NC}" 45 10
 		else
 			print_table_row "$path|${RED}MISSING${NC}" 45 10
 			((missing++)) || true
