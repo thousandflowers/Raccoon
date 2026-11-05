@@ -161,6 +161,38 @@ teardown() { teardown_raccoon_env; }
     assert_success
 }
 
+# The Homebrew formula moves the completion files out of libexec into brew's own
+# directories, so the keg has none where a source checkout has them.
+brew_keg_without_completions() {
+    keg="$BATS_TEST_TMPDIR/Cellar/rcc/1.0.1"
+    mkdir -p "$keg/libexec" "$keg/etc/bash_completion.d" "$keg/share/zsh/site-functions"
+    cp -R "$SCRIPT_DIR/rcc" "$SCRIPT_DIR/lib" "$SCRIPT_DIR/bin" "$keg/libexec/"
+    cp "$SCRIPT_DIR/completions/bash/rcc" "$keg/etc/bash_completion.d/rcc"
+    cp "$SCRIPT_DIR/completions/zsh/_rcc" "$keg/share/zsh/site-functions/_rcc"
+}
+
+@test "rcc: completion bash works from a Homebrew keg" {
+    brew_keg_without_completions
+    run bash "$keg/libexec/rcc" completion bash
+    assert_success
+    assert_output_contains "complete -F"
+}
+
+@test "rcc: completion zsh works from a Homebrew keg" {
+    brew_keg_without_completions
+    run bash "$keg/libexec/rcc" completion zsh
+    assert_success
+    assert_output_contains "#compdef rcc"
+}
+
+@test "rcc: completion names the problem when no file exists" {
+    brew_keg_without_completions
+    rm "$keg/share/zsh/site-functions/_rcc"
+    run bash "$keg/libexec/rcc" completion zsh
+    assert_failure
+    assert_output_contains "completion file not found"
+}
+
 @test "rcc: completion bad arg fails" {
     run bash "$SCRIPT_DIR/rcc" completion fish
     assert_failure

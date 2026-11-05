@@ -8,6 +8,20 @@ UI_BINARY="${SCRIPT_DIR}/bin/rcc-ui"
 source "${SCRIPT_DIR}/lib/core/common.sh"
 source "${SCRIPT_DIR}/lib/core/commands.sh"
 
+# Homebrew moves the completion files out of libexec into its own directories,
+# so each shell has a second place to look.
+print_completion() {
+	local file
+	for file in "$@"; do
+		if [[ -r "$file" ]]; then
+			cat "$file"
+			return 0
+		fi
+	done
+	echo "rcc: completion file not found (looked in: $*)" >&2
+	return 1
+}
+
 main() {
 case "${1:-""}" in
 		"")
@@ -75,8 +89,8 @@ case "${1:-""}" in
 		"xcode")   exec "${SCRIPT_DIR}/bin/xcode.sh" "${@:2}" ;;
 		"completion")
 			case "${2:-bash}" in
-				bash) cat "${SCRIPT_DIR}/completions/bash/rcc" ;;
-				zsh)  cat "${SCRIPT_DIR}/completions/zsh/_rcc" ;;
+				bash) print_completion "${SCRIPT_DIR}/completions/bash/rcc" "${SCRIPT_DIR}/../etc/bash_completion.d/rcc" ;;
+				zsh)  print_completion "${SCRIPT_DIR}/completions/zsh/_rcc" "${SCRIPT_DIR}/../share/zsh/site-functions/_rcc" ;;
 				*)    echo "Usage: rcc completion bash|zsh"; exit 1 ;;
 			esac
 			;;

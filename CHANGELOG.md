@@ -3,6 +3,15 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [Unreleased]
+
+### Fixed
+
+- **`rcc completion bash|zsh` failed on every Homebrew install.** The formula
+  moves the completion files out of `libexec`, and the command only looked
+  there. It now also looks where Homebrew puts them, and names the paths it
+  tried when a file is missing.
+
 ## [1.0.1] - 2026-09-08
 
 Fourteen bugs, and five of them were the same mistake: an absent value read as
