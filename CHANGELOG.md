@@ -3,6 +3,25 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [1.0.4] - 2026-11-06
+
+### Fixed
+
+- **The TUI lost its header and status with long output.** After a long command
+  such as `rcc audit`, the raccoon and `✓ Completed` / `✗ Failed` were cut off
+  the top of the screen, on 24- and 30-row terminals among others. The output
+  view drew four rows more than the window had. The status now stays on screen at
+  any height. Below 13 rows the raccoon gives way to the output.
+- **The running and export views overflowed short terminals.** The running view
+  was also one row over with a progress bar at any height. Both now fit: the art
+  and the gaps go first, then what is not selected.
+- **Scrolling ran on past the end of the output** until one line was left on
+  screen. It now stops with the last line on the bottom row, stays in range when
+  the window is resized, and the indicator reads `N/N` at the end.
+- **Long lines were cut by bytes, not columns.** A line containing `⚠` could lose
+  its right border even though it fit, and a cut could split a character in two.
+- **A narrow terminal could cut the status off.** The title now gives way first.
+
 ## [1.0.3] - 2026-11-06
 
 ### Fixed

@@ -15,6 +15,7 @@ import (
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 // ─── Messages ──────────────────────────────────────────────
@@ -2852,6 +2853,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.outputScroll = min(m.outputScroll, m.outputMaxScroll())
 		return m, nil
 
 	case tickMsg:
@@ -2954,14 +2956,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	switch m.state {
 	case stateRunning:
-		return m.runningView()
+		return fitHeight(m.runningView(), m.height)
 	case stateOutput:
-		return m.outputView()
+		return fitHeight(m.outputView(), m.height)
 	case stateExport:
-		return m.exportView()
+		return fitHeight(m.exportView(), m.height)
 	default:
 		return m.menuView()
 	}
+}
+
+// fitHeight cuts what does not fit from the bottom. Left alone, Bubble Tea cuts
+// from the top, and the top of these views is what says what happened.
+func fitHeight(view string, height int) string {
+	rows := strings.Split(view, "\n")
+	if height <= 0 || len(rows) <= height {
+		return view
+	}
+	return strings.Join(rows[:height], "\n")
 }
 
 // ─── Menu View ─────────────────────────────────────────────
@@ -3067,6 +3079,14 @@ func (m model) menuView() string {
 func (m model) sepWidth() int {
 	return max(0, min(m.width-2, 60))
 }
+
+// Rows runningView draws around the art and the output. Full: title, two
+// separators, progress bar and its gap, the gap above the footer, footer, and the
+// row the trailing newline costs. Compact: title, bar, footer, trailing newline.
+const (
+	runningChromeFull    = 8
+	runningChromeCompact = 4
+)
 
 func (m model) runningView() string {
 	var b strings.Builder
@@ -3389,13 +3409,18 @@ func (m model) runningView() string {
 			artLines[i] = l
 		}
 	}
-	for _, l := range artLines {
-		b.WriteString("  " + styleTitle.Render(l) + "\n")
-	}
+	// A terminal too short for the art and two lines of output keeps the output:
+	// it is what the wait is about.
+	compact := m.height > 0 && m.height < runningChromeFull+len(artLines)+2
+	if !compact {
+		for _, l := range artLines {
+			b.WriteString("  " + styleTitle.Render(l) + "\n")
+		}
 
-	// Separator
-	b.WriteString(styleMuted.Render("  " + strings.Repeat("─", sepLen)))
-	b.WriteString("\n")
+		// Separator
+		b.WriteString(styleMuted.Render("  " + strings.Repeat("─", sepLen)))
+		b.WriteString("\n")
+	}
 
 	// Progress bar — compact, always on screen
 	if m.progressTotal > 0 {
@@ -3403,32 +3428,31 @@ func (m model) runningView() string {
 		b.WriteString("  " + bar)
 		if m.progressLabel != "" {
 			clean := stripANSI(m.progressLabel)
-			if len(clean) > sepLen-20 {
-				clean = clean[:max(0, sepLen-20)]
-			}
+			clean = runewidth.Truncate(clean, max(0, sepLen-20), "")
 			b.WriteString("  " + styleProgressLabel.Render(clean))
 		}
 		b.WriteString("\n")
 
-		b.WriteString("\n")
+		if !compact {
+			b.WriteString("\n")
 
-		// Separator between bar and output
-		label := "Output"
-		if m.outputTitle != "" {
-			label = m.outputTitle
+			// Separator between bar and output
+			label := "Output"
+			if m.outputTitle != "" {
+				label = m.outputTitle
+			}
+			sepLine := styleMuted.Render(strings.Repeat("─", max(0, sepLen-8-len(label))))
+			b.WriteString(styleMuted.Render("  " + sepLine + " " + label + " " + strings.Repeat("─", 4)))
+			b.WriteString("\n")
 		}
-		sepLine := styleMuted.Render(strings.Repeat("─", max(0, sepLen-8-len(label))))
-		b.WriteString(styleMuted.Render("  " + sepLine + " " + label + " " + strings.Repeat("─", 4)))
-		b.WriteString("\n")
 	}
 
 	// Live streaming output (show last N lines)
-	// 7 lines of chrome sit around the art (title, two separators, progress bar
-	// and its gap, footer). Deriving from the art itself means an animation of a
-	// different height cannot silently push the output off screen.
-	maxLines := m.height - 7 - len(artLines)
-	if maxLines < 2 {
-		maxLines = 2
+	// Deriving from the art itself means an animation of a different height
+	// cannot silently push the output off screen.
+	maxLines := max(2, m.height-runningChromeFull-len(artLines))
+	if compact {
+		maxLines = max(1, m.height-runningChromeCompact)
 	}
 
 	lines := m.outputLines
@@ -3437,17 +3461,16 @@ func (m model) runningView() string {
 		start = len(lines) - maxLines
 	}
 	for _, l := range lines[start:] {
-		clean := stripANSI(l)
-		if len(clean) > m.width-4 {
-			clean = clean[:max(0, m.width-4)]
-		}
+		clean := runewidth.Truncate(stripANSI(l), max(0, m.width-4), "")
 		if strings.TrimSpace(clean) == "" {
 			continue
 		}
 		b.WriteString(styleMuted.Render("  │ "+clean) + "\n")
 	}
 
-	b.WriteString("\n")
+	if !compact {
+		b.WriteString("\n")
+	}
 	b.WriteString(styleFooter.Render("  Running · press q to quit"))
 	b.WriteString("\n")
 
@@ -3455,6 +3478,45 @@ func (m model) runningView() string {
 }
 
 // ─── Output View (after completion) ────────────────────────
+
+// Rows outputView draws around the output. Bubble Tea drops whatever does not
+// fit from the top, which here is the outcome, so this has to be exact. Below
+// outputFullMinHeight the raccoon gives way to the output and only the status
+// row stays.
+const (
+	// Blank, three rows of raccoon, separator, gap, scroll indicator, gap,
+	// footer, and the row the trailing newline costs.
+	outputChromeFull = 10
+	// Status, scroll indicator, footer, trailing newline.
+	outputChromeCompact = 4
+	// outputChromeFull plus the three rows of output the full layout is worth.
+	outputFullMinHeight = outputChromeFull + 3
+)
+
+func (m model) outputVisibleLines() int {
+	if m.height < outputFullMinHeight {
+		return max(0, m.height-outputChromeCompact)
+	}
+	return m.height - outputChromeFull
+}
+
+// outputStatusRow gives up the title before the status: the status is the row's
+// reason to exist.
+func (m model) outputStatusRow(eyes, status string, style lipgloss.Style) string {
+	head := "  [ " + eyes + " ]"
+	rendered := style.Render(status)
+	room := m.width - 2 - runewidth.StringWidth(head) - 2 - 2 - runewidth.StringWidth(status)
+	if room < 1 {
+		return "  " + rendered + "\n"
+	}
+	title := runewidth.Truncate(m.outputTitle, room, "…")
+	return fmt.Sprintf("  %s  %s  %s\n", styleTitle.Render(head), styleTitle.Render(title), rendered)
+}
+
+// outputMaxScroll stops scrolling once the last line reaches the bottom row.
+func (m model) outputMaxScroll() int {
+	return max(0, len(m.outputLines)-m.outputVisibleLines())
+}
 
 func (m model) outputView() string {
 	var b strings.Builder
@@ -3467,47 +3529,41 @@ func (m model) outputView() string {
 	if !m.outputSuccess {
 		eyes = ">.<"
 	}
-	status := styleStatusSuccess.Render("✓ Completed")
+	statusText, statusStyle := "✓ Completed", styleStatusSuccess
 	if !m.outputSuccess {
-		status = styleStatusError.Render("✗ Failed")
+		statusText, statusStyle = "✗ Failed", styleStatusError
 	}
-	b.WriteString("\n")
-	b.WriteString("  " + styleTitle.Render("   n___n") + "\n")
-	b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
-		styleTitle.Render("  [ "+eyes+" ]"),
-		styleTitle.Render(m.outputTitle),
-		status))
-	b.WriteString("  " + styleTitle.Render("   > ^ <") + "\n")
-
-	sepLen := m.sepWidth()
-	b.WriteString(styleMuted.Render("  " + strings.Repeat("─", sepLen)))
-	b.WriteString("\n\n")
+	compact := m.height < outputFullMinHeight
+	statusRow := m.outputStatusRow(eyes, statusText, statusStyle)
+	if compact {
+		b.WriteString(statusRow)
+	} else {
+		b.WriteString("\n")
+		b.WriteString("  " + styleTitle.Render("   n___n") + "\n")
+		b.WriteString(statusRow)
+		b.WriteString("  " + styleTitle.Render("   > ^ <") + "\n")
+		b.WriteString(styleMuted.Render("  " + strings.Repeat("─", m.sepWidth())))
+		b.WriteString("\n\n")
+	}
 
 	// Visible lines based on scroll
-	maxLines := m.height - 6
-	if maxLines < 3 {
-		maxLines = 3
-	}
-	end := m.outputScroll + maxLines
-	if end > len(m.outputLines) {
-		end = len(m.outputLines)
-	}
+	maxLines := m.outputVisibleLines()
+	end := min(m.outputScroll+maxLines, len(m.outputLines))
 	for _, l := range m.outputLines[m.outputScroll:end] {
-		clean := stripANSI(l)
-		if len(clean) > m.width-4 {
-			clean = clean[:max(0, m.width-4)]
-		}
+		clean := runewidth.Truncate(stripANSI(l), max(0, m.width-2), "")
 		b.WriteString(styleOutput.Render("  "+clean) + "\n")
 	}
 
 	// Scroll indicator
 	if len(m.outputLines) > maxLines {
-		scrollInfo := fmt.Sprintf("  ↑↓ %d/%d", m.outputScroll+1, len(m.outputLines))
-		// Only show percentage if there's meaningful content
+		// The last row on screen, so the end of the output reads N/N.
+		scrollInfo := fmt.Sprintf("  ↑↓ %d/%d", end, len(m.outputLines))
 		b.WriteString(styleFooter.Render(scrollInfo) + "\n")
 	}
 
-	b.WriteString("\n")
+	if !compact {
+		b.WriteString("\n")
+	}
 	if m.currentScript == "audit.sh" {
 		b.WriteString(styleFooter.Render("  ↑↓ Scroll · Enter Return · ^K Export · q Quit"))
 	} else {
@@ -3632,7 +3688,7 @@ func (m *model) handleOutputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.outputScroll--
 		}
 	case "down", "j":
-		if m.outputScroll < len(m.outputLines)-1 {
+		if m.outputScroll < m.outputMaxScroll() {
 			m.outputScroll++
 		}
 	case "ctrl+k", "e":
@@ -3709,16 +3765,40 @@ func runExport(binPath, format string) tea.Cmd {
 	}
 }
 
+// exportFullMinHeight is what exportView needs with every gap and format. Below
+// it the gaps go first (title, result, footer and trailing newline are 4 rows
+// plus the formats), then the formats that are not selected.
+const exportFullMinHeight = 13
+
+func (m model) exportWindow(compact bool) (int, int) {
+	total := len(exportFormats)
+	if !compact {
+		return 0, total
+	}
+	visible := max(1, min(total, m.height-4))
+	first := max(0, min(m.exportSel-visible/2, total-visible))
+	return first, first + visible
+}
+
 // exportView draws the format picker: five rows and whatever the last attempt
 // produced. It is deliberately plain - the reader is two keystrokes from a file
 // and does not need a second report on the way there.
 func (m model) exportView() string {
 	var b strings.Builder
-	b.WriteString("\n")
+	compact := m.height > 0 && m.height < exportFullMinHeight
+	gap := func() {
+		if !compact {
+			b.WriteString("\n")
+		}
+	}
+	gap()
 	b.WriteString(styleTitle.Render("  Save the audit as a document"))
-	b.WriteString("\n\n")
+	b.WriteString("\n")
+	gap()
 
-	for i, f := range exportFormats {
+	first, last := m.exportWindow(compact)
+	for i := first; i < last; i++ {
+		f := exportFormats[i]
 		row := fmt.Sprintf("%-10s %s", f.label, f.desc)
 		if i == m.exportSel {
 			b.WriteString("  " + styleSelected.Render(row))
@@ -3728,7 +3808,7 @@ func (m model) exportView() string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\n")
+	gap()
 	switch {
 	case m.exportBusy:
 		b.WriteString(styleDesc.Render("  Running the audit..."))
@@ -3737,7 +3817,8 @@ func (m model) exportView() string {
 	case m.exportResult != "":
 		b.WriteString(styleOutput.Render("  Saved to " + m.exportResult))
 	}
-	b.WriteString("\n\n")
+	b.WriteString("\n")
+	gap()
 	b.WriteString(styleFooter.Render("  ↑↓ Choose · Enter Save · Esc Back"))
 	b.WriteString("\n")
 	return b.String()
