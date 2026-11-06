@@ -2852,6 +2852,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.outputScroll = min(m.outputScroll, m.outputMaxScroll())
 		return m, nil
 
 	case tickMsg:
@@ -3423,10 +3424,11 @@ func (m model) runningView() string {
 	}
 
 	// Live streaming output (show last N lines)
-	// 7 lines of chrome sit around the art (title, two separators, progress bar
-	// and its gap, footer). Deriving from the art itself means an animation of a
+	// 8 rows of chrome sit around the art (title, two separators, progress bar
+	// and its gap, the gap above the footer, footer, and the row the trailing
+	// newline costs). Deriving from the art itself means an animation of a
 	// different height cannot silently push the output off screen.
-	maxLines := m.height - 7 - len(artLines)
+	maxLines := m.height - 8 - len(artLines)
 	if maxLines < 2 {
 		maxLines = 2
 	}
@@ -3456,6 +3458,33 @@ func (m model) runningView() string {
 
 // ─── Output View (after completion) ────────────────────────
 
+// Rows outputView draws around the output. Bubble Tea drops whatever does not
+// fit from the top, which here is the outcome, so this has to be exact. Below
+// outputFullMinHeight the raccoon gives way to the output and only the status
+// row stays.
+const (
+	// Blank, three rows of raccoon, separator, gap, scroll indicator, gap,
+	// footer, and the row the trailing newline costs.
+	outputChromeFull = 10
+	// Status, scroll indicator, footer, trailing newline.
+	outputChromeCompact = 4
+	// outputChromeFull plus the three rows of output the full layout is worth.
+	outputFullMinHeight = outputChromeFull + 3
+)
+
+// ponytail: under 5 rows the status or footer is lost; no real terminal is that short.
+func (m model) outputVisibleLines() int {
+	if m.height < outputFullMinHeight {
+		return max(1, m.height-outputChromeCompact)
+	}
+	return m.height - outputChromeFull
+}
+
+// outputMaxScroll stops scrolling once the last line reaches the bottom row.
+func (m model) outputMaxScroll() int {
+	return max(0, len(m.outputLines)-m.outputVisibleLines())
+}
+
 func (m model) outputView() string {
 	var b strings.Builder
 
@@ -3471,27 +3500,25 @@ func (m model) outputView() string {
 	if !m.outputSuccess {
 		status = styleStatusError.Render("✗ Failed")
 	}
-	b.WriteString("\n")
-	b.WriteString("  " + styleTitle.Render("   n___n") + "\n")
-	b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
+	compact := m.height < outputFullMinHeight
+	statusRow := fmt.Sprintf("  %s  %s  %s\n",
 		styleTitle.Render("  [ "+eyes+" ]"),
 		styleTitle.Render(m.outputTitle),
-		status))
-	b.WriteString("  " + styleTitle.Render("   > ^ <") + "\n")
-
-	sepLen := m.sepWidth()
-	b.WriteString(styleMuted.Render("  " + strings.Repeat("─", sepLen)))
-	b.WriteString("\n\n")
+		status)
+	if compact {
+		b.WriteString(statusRow)
+	} else {
+		b.WriteString("\n")
+		b.WriteString("  " + styleTitle.Render("   n___n") + "\n")
+		b.WriteString(statusRow)
+		b.WriteString("  " + styleTitle.Render("   > ^ <") + "\n")
+		b.WriteString(styleMuted.Render("  " + strings.Repeat("─", m.sepWidth())))
+		b.WriteString("\n\n")
+	}
 
 	// Visible lines based on scroll
-	maxLines := m.height - 6
-	if maxLines < 3 {
-		maxLines = 3
-	}
-	end := m.outputScroll + maxLines
-	if end > len(m.outputLines) {
-		end = len(m.outputLines)
-	}
+	maxLines := m.outputVisibleLines()
+	end := min(m.outputScroll+maxLines, len(m.outputLines))
 	for _, l := range m.outputLines[m.outputScroll:end] {
 		clean := stripANSI(l)
 		if len(clean) > m.width-4 {
@@ -3502,12 +3529,14 @@ func (m model) outputView() string {
 
 	// Scroll indicator
 	if len(m.outputLines) > maxLines {
-		scrollInfo := fmt.Sprintf("  ↑↓ %d/%d", m.outputScroll+1, len(m.outputLines))
-		// Only show percentage if there's meaningful content
+		// The last row on screen, so the end of the output reads N/N.
+		scrollInfo := fmt.Sprintf("  ↑↓ %d/%d", end, len(m.outputLines))
 		b.WriteString(styleFooter.Render(scrollInfo) + "\n")
 	}
 
-	b.WriteString("\n")
+	if !compact {
+		b.WriteString("\n")
+	}
 	if m.currentScript == "audit.sh" {
 		b.WriteString(styleFooter.Render("  ↑↓ Scroll · Enter Return · ^K Export · q Quit"))
 	} else {
@@ -3632,7 +3661,7 @@ func (m *model) handleOutputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.outputScroll--
 		}
 	case "down", "j":
-		if m.outputScroll < len(m.outputLines)-1 {
+		if m.outputScroll < m.outputMaxScroll() {
 			m.outputScroll++
 		}
 	case "ctrl+k", "e":
