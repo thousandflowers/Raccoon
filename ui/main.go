@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -2829,6 +2830,17 @@ func readLine(scanner *bufio.Scanner, cmd *exec.Cmd) tea.Cmd {
 	}
 }
 
+// scriptSucceeded says whether a finished script did its job. An audit exits 2
+// when it ran and found only warnings: a result for CI, not a failure. The TUI
+// passes no flags that could turn exit 2 into audit's usage error.
+func scriptSucceeded(script string, err error) bool {
+	if err == nil {
+		return true
+	}
+	var exit *exec.ExitError
+	return script == "audit.sh" && errors.As(err, &exit) && exit.ExitCode() == 2
+}
+
 // ─── Bubbletea lifecycle ───────────────────────────────────
 
 func (m model) Init() tea.Cmd {
@@ -2899,7 +2911,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.state = stateOutput
 		m.outputLines = append(m.outputLines, "") // spacer
-		if msg.err != nil {
+		if !scriptSucceeded(m.currentScript, msg.err) {
 			m.outputSuccess = false
 			m.spinnerFrame = 4 // sad raccoon
 			m.outputLines = append(m.outputLines, styleError.Render(fmt.Sprintf("  Exit code: %v", msg.err)))

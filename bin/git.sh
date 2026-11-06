@@ -78,11 +78,12 @@ check_repo() {
 	uncommitted=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
 	unpushed=$(git log '@{u}'.. --oneline 2>/dev/null | wc -l | tr -d ' ')
 	stashed=$(git stash list 2>/dev/null | wc -l | tr -d ' ')
-	git symbolic-ref HEAD >/dev/null 2>&1 || detached=1
+	# Tools such as nvm keep a hidden checkout on a tag: detached is how they work.
+	[[ "$(basename "$repo")" == .* ]] || git symbolic-ref HEAD >/dev/null 2>&1 || detached=1
 
-	# Count branches with no upstream. The current branch is prefixed with "* "
-	# (not whitespace), so the old '^\s+\S' missed it; count every remaining line.
-	no_upstream=$(git branch -vv 2>/dev/null | grep -v '\[' | grep -c '.' || true)
+	# for-each-ref, not `git branch -vv`: that one lists a detached HEAD as a branch,
+	# and a commit subject containing "[" looks like an upstream.
+	no_upstream=$(git for-each-ref --format='%(upstream)' refs/heads 2>/dev/null | grep -c '^$' || true)
 
 	local total=$((uncommitted + unpushed + stashed + detached + no_upstream))
 	[[ $total -eq 0 ]] && return 0
