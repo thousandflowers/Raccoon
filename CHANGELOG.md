@@ -3,6 +3,19 @@
 All notable changes to Raccoon are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) · Versioning: [SemVer](https://semver.org)
 
+## [1.0.3] - 2026-11-06
+
+### Fixed
+
+- **The TUI called an audit with only warnings a failure.** It showed `✗ Failed`
+  and `Exit code: exit status 2` for an audit that had run to the end. It now
+  shows `✓ Completed`. The exit code itself is unchanged, so scripts and CI that
+  read it keep working.
+- **`rcc git` flagged the hidden checkouts of tools such as `.nvm`.** Being on a
+  tag is how those tools work, so a detached HEAD there no longer counts.
+- **`rcc git` miscounted branches with no upstream.** A detached HEAD counted as
+  one, and a branch whose last commit subject contained `[` did not count at all.
+
 ## [1.0.2] - 2026-11-05
 
 ### Fixed

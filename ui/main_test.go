@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -1571,5 +1573,26 @@ func TestFleetVisionCountsTheOverflow(t *testing.T) {
 	}
 	if !sawOverflow {
 		t.Error("nine machines never reported the three that did not fit")
+	}
+}
+
+func TestAuditWithOnlyWarningsDidNotFail(t *testing.T) {
+	exit := func(code string) error { return exec.Command("sh", "-c", "exit "+code).Run() }
+	cases := []struct {
+		script string
+		err    error
+		want   bool
+	}{
+		{"audit.sh", nil, true},
+		{"audit.sh", exit("2"), true},
+		{"audit.sh", exit("1"), false},
+		{"audit.sh", errors.New("start: no such file"), false},
+		{"fleet.sh", exit("2"), false},
+		{"disk.sh", exit("2"), false},
+	}
+	for _, c := range cases {
+		if got := scriptSucceeded(c.script, c.err); got != c.want {
+			t.Errorf("scriptSucceeded(%q, %v) = %v, want %v", c.script, c.err, got, c.want)
+		}
 	}
 }
