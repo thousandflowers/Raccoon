@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mattn/go-runewidth"
 )
 
 // numberedLines is output in which every line can be told apart on screen.
@@ -28,7 +30,7 @@ func assertFits(t *testing.T, label, view string, height int) {
 }
 
 func TestOutputViewKeepsStatusAndFooterOnScreen(t *testing.T) {
-	for _, height := range []int{5, 8, 12, 13, 24, 30, 50, 90} {
+	for height := 1; height <= 90; height++ {
 		for _, count := range []int{0, 3, 20, 40, 85, 500} {
 			for _, success := range []bool{true, false} {
 				m := model{
@@ -37,7 +39,7 @@ func TestOutputViewKeepsStatusAndFooterOnScreen(t *testing.T) {
 					outputLines: numberedLines(count), outputSuccess: success,
 				}
 				label := fmt.Sprintf("height %d, %d lines, success %v", height, count, success)
-				view := m.outputView()
+				view := m.View()
 
 				assertFits(t, label, view, height)
 				want := "✗ Failed"
@@ -47,7 +49,7 @@ func TestOutputViewKeepsStatusAndFooterOnScreen(t *testing.T) {
 				if !strings.Contains(view, want) {
 					t.Errorf("%s: %q is missing", label, want)
 				}
-				if !strings.Contains(view, "Quit") {
+				if height >= 3 && !strings.Contains(view, "Quit") {
 					t.Errorf("%s: the footer is missing", label)
 				}
 			}
@@ -97,8 +99,8 @@ func TestOutputResizeKeepsScrollInRange(t *testing.T) {
 	}
 }
 
-func TestRunningViewFitsWithLongOutput(t *testing.T) {
-	for _, height := range []int{24, 30, 50, 90} {
+func TestRunningViewFitsAtAnyHeight(t *testing.T) {
+	for height := 1; height <= 90; height++ {
 		for script := range scriptFrames {
 			for _, total := range []int{0, 8} {
 				m := model{
@@ -107,19 +109,97 @@ func TestRunningViewFitsWithLongOutput(t *testing.T) {
 					outputLines:   numberedLines(500),
 					progressLabel: "working", progressCurr: 3, progressTotal: total,
 				}
-				view := m.runningView()
-				assertFits(t, fmt.Sprintf("%s, height %d, bar total %d", script, height, total), view, height)
-				if !strings.Contains(view, "n___n") {
-					t.Errorf("%s, height %d: the raccoon is missing", script, height)
+				label := fmt.Sprintf("%s, height %d, bar total %d", script, height, total)
+				view := m.View()
+				assertFits(t, label, view, height)
+				if !strings.Contains(view, "» "+script) {
+					t.Errorf("%s: the title is missing", label)
+				}
+				if height >= 5 && !strings.Contains(view, "Running") {
+					t.Errorf("%s: the footer is missing", label)
+				}
+				if height >= 24 && !strings.Contains(view, "n___n") {
+					t.Errorf("%s: the raccoon is missing", label)
 				}
 			}
 		}
 	}
 }
 
-func TestExportViewFits(t *testing.T) {
-	for _, height := range []int{24, 30, 50, 90} {
-		m := model{state: stateExport, width: 80, height: height, exportResult: "/tmp/report.html"}
-		assertFits(t, fmt.Sprintf("height %d", height), m.exportView(), height)
+func TestExportViewFitsAndKeepsTheSelection(t *testing.T) {
+	for height := 1; height <= 90; height++ {
+		for sel := range exportFormats {
+			m := model{state: stateExport, width: 80, height: height, exportSel: sel, exportResult: "/tmp/report.html"}
+			label := fmt.Sprintf("height %d, selection %d", height, sel)
+			view := m.View()
+			assertFits(t, label, view, height)
+			if !strings.Contains(view, "Save the audit") {
+				t.Errorf("%s: the title is missing", label)
+			}
+			if height >= 5 {
+				if !strings.Contains(view, exportFormats[sel].label) {
+					t.Errorf("%s: the selected format is off screen", label)
+				}
+				if !strings.Contains(view, "Esc Back") {
+					t.Errorf("%s: the footer is missing", label)
+				}
+			}
+		}
+	}
+}
+
+func TestStatusSurvivesANarrowTerminal(t *testing.T) {
+	for width := 15; width <= 80; width++ {
+		for _, success := range []bool{true, false} {
+			m := model{
+				state: stateOutput, width: width, height: 24, outputSuccess: success,
+				outputTitle: "A very long title that cannot fit a narrow terminal",
+			}
+			want := "✗ Failed"
+			if success {
+				want = "✓ Completed"
+			}
+			found := false
+			for _, row := range strings.Split(stripANSI(m.View()), "\n") {
+				if strings.Contains(row, want) {
+					found = true
+					if w := runewidth.StringWidth(row); w > width {
+						t.Errorf("width %d: status row is %d columns:\n%q", width, w, row)
+					}
+				}
+			}
+			if !found {
+				t.Errorf("width %d: %q is missing", width, want)
+			}
+		}
+	}
+}
+
+// Bytes are not columns: "⚠" is three bytes and one column.
+func TestOutputLinesAreCutByColumns(t *testing.T) {
+	box := "| ⚠ FileVault: Unknown                  |" // 41 columns, 43 bytes
+	m := model{state: stateOutput, width: 45, height: 24, outputLines: []string{box}}
+	if !strings.Contains(stripANSI(m.View()), box) {
+		t.Errorf("a line that fits lost its right border:\n%s", stripANSI(m.View()))
+	}
+
+	long := strings.Repeat("─", 200)
+	views := map[string]model{
+		"output":  {state: stateOutput, width: 45, height: 24, outputLines: []string{long}},
+		"running": {state: stateRunning, width: 45, height: 24, currentScript: "memory.sh", outputLines: []string{long}},
+		"label":   {state: stateRunning, width: 80, height: 24, currentScript: "memory.sh", progressTotal: 8, progressCurr: 1, progressLabel: long},
+	}
+	for name, v := range views {
+		view := stripANSI(v.View())
+		if !utf8.ValidString(view) {
+			t.Errorf("%s: a character was cut in half", name)
+		}
+		if name == "output" || name == "running" {
+			for _, row := range strings.Split(view, "\n") {
+				if w := runewidth.StringWidth(row); w > v.width {
+					t.Errorf("%s: row is %d columns in %d:\n%q", name, w, v.width, row)
+				}
+			}
+		}
 	}
 }
